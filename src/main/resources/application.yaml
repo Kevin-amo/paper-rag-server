@@ -1,0 +1,60 @@
+﻿spring:
+  application:
+    name: paper-rag-server
+
+  docker:
+    compose:
+      enabled: false
+
+  config:
+    import: optional:classpath:application-local.yaml
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/mydatabase}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 5s
+
+  ai:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:}
+      base-url: https://dashscope.aliyuncs.com
+      chat:
+        enabled: true
+        options:
+          model: qwen3.5-flash
+          temperature: 0.2
+          max-tokens: 256
+          enable-thinking: false
+      embedding:
+        options:
+          model: text-embedding-v4
+          dimensions: 1536
+
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: ${PGVECTOR_DIMENSIONS:1536}
+        index-type: ${PGVECTOR_INDEX_TYPE:hnsw}
+        distance-type: ${PGVECTOR_DISTANCE_TYPE:cosine_distance}
+        max-document-batch-size: ${PGVECTOR_BATCH_SIZE:10000}
+        schema-validation: false
+        remove-existing-vector-store-table: false
+        table-name: ${PGVECTOR_TABLE_NAME:vector_store}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
