@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mydatabase
+    username: root
+    password: root
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ""
+      database: 0
+
+  ai:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:}
+
+app:
+  rag:
+    chunk-size: 800
+    chunk-overlap: 120
+    default-top-k: 5
+    similarity-threshold: 0

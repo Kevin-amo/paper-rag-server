@@ -1,6 +1,10 @@
 ﻿spring:
   application:
     name: paper-rag-server
+  servlet:
+    multipart:
+      max-request-size: 50MB
+      max-file-size: 50MB
 
   docker:
     compose:
@@ -30,10 +34,11 @@
       chat:
         enabled: true
         options:
-          model: qwen3.5-flash
+          model: qwen3.5-plus
           temperature: 0.2
           max-tokens: 256
           enable-thinking: false
+          multi-model: true
       embedding:
         options:
           model: text-embedding-v4
@@ -41,7 +46,7 @@
 
     vectorstore:
       pgvector:
-        initialize-schema: true
+        initialize-schema: false
         dimensions: ${PGVECTOR_DIMENSIONS:1536}
         index-type: ${PGVECTOR_INDEX_TYPE:hnsw}
         distance-type: ${PGVECTOR_DISTANCE_TYPE:cosine_distance}

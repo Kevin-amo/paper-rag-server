@@ -1,13 +1,15 @@
 services:
   postgres:
-    image: 'postgres:latest'
+    image: 'pgvector/pgvector:pg16'
     environment:
       - 'POSTGRES_DB=mydatabase'
       - 'POSTGRES_PASSWORD=root'
       - 'POSTGRES_USER=root'
     ports:
-      - '5432'
+      - '5432:5432'
+    volumes:
+      - './src/main/resources/sql:/docker-entrypoint-initdb.d:ro'
   redis:
     image: 'redis:latest'
     ports:
-      - '6379'
+      - '6379:6379'

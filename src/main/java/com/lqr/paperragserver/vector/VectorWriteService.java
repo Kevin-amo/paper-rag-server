@@ -1,0 +1,27 @@
+package com.lqr.paperragserver.vector;
+
+import com.lqr.paperragserver.ai.EmbeddingService;
+
+import java.util.List;
+
+/**
+ * 向量写入服务接口。
+ *
+ * <p>实现类负责把文档片段的向量批量写入向量库，并支持按来源删除旧数据。</p>
+ */
+public interface VectorWriteService {
+
+    /**
+     * 批量写入或更新向量记录。
+     *
+     * @param vectors 片段向量结果列表
+     */
+    void upsert(List<EmbeddingService.EmbeddingVector> vectors);
+
+    /**
+     * 按文档来源删除向量记录。
+     *
+     * @param sourceId 文档来源标识
+     */
+    void deleteBySourceId(String sourceId);
+}

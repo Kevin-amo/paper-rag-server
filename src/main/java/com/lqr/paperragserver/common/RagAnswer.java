@@ -1,0 +1,15 @@
+package com.lqr.paperragserver.common;
+
+import java.util.List;
+
+/**
+ * RAG 问答返回结果。
+ *
+ * @param answer 大模型生成的最终回答文本
+ * @param citations 回答引用的文档片段列表，用于前端展示来源依据
+ */
+public record RagAnswer(
+        String answer,
+        List<AnswerCitation> citations
+) {
+}
