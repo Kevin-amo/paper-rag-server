@@ -1,10 +1,12 @@
-package com.lqr.paperragserver.paper;
+package com.lqr.paperragserver.paper.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.common.DocumentChunk;
 import com.lqr.paperragserver.common.DocumentSource;
+import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -17,28 +19,32 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * JDBC 实现的文档元数据持久化服务。
  */
 @Service
-public class JdbcPaperDocumentPersistenceService implements PaperDocumentPersistenceService {
+@RequiredArgsConstructor
+public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersistenceService {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {
     };
+    private static final int SECTION_TITLE_MAX_LENGTH = 512;
+    private static final Pattern SEARCH_TOKEN = Pattern.compile("[\\p{IsHan}A-Za-z0-9]+");
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
-
-    public JdbcPaperDocumentPersistenceService(NamedParameterJdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
-        this.jdbcTemplate = jdbcTemplate;
-        this.objectMapper = objectMapper;
-    }
 
     @Override
     public PageResult<DocumentSummary> listDocuments(String keyword, String status, int page, int size) {
@@ -103,6 +109,39 @@ public class JdbcPaperDocumentPersistenceService implements PaperDocumentPersist
     }
 
     @Override
+    public List<DocumentChunk> searchChunks(String question, int limit) {
+        if (question == null || question.isBlank() || limit <= 0) {
+            return List.of();
+        }
+        int safeLimit = clamp(limit, 1, 200);
+        List<DocumentChunk> candidates = jdbcTemplate.query("""
+                select c.chunk_id, c.source_id, c.chunk_index, c.content, c.metadata
+                from public.paper_document_chunk c
+                join public.paper_document d on d.source_id = c.source_id
+                where d.deleted_at is null
+                  and d.status <> 'DELETED'
+                order by c.source_id asc, c.chunk_index asc
+                """, new MapSqlParameterSource(), (rs, rowNum) -> new DocumentChunk(
+                rs.getString("chunk_id"),
+                rs.getString("source_id"),
+                rs.getInt("chunk_index"),
+                rs.getString("content"),
+                jsonMap(rs.getObject("metadata"))
+        ));
+
+        List<String> terms = extractSearchTerms(question);
+        return candidates.stream()
+                .map(chunk -> new ScoredDocumentChunk(chunk, lexicalScore(question, chunk, terms)))
+                .filter(hit -> hit.score() > 0)
+                .sorted(Comparator.comparingDouble(ScoredDocumentChunk::score).reversed()
+                        .thenComparing(hit -> hit.chunk().sourceId())
+                        .thenComparingInt(hit -> hit.chunk().chunkIndex()))
+                .limit(safeLimit)
+                .map(ScoredDocumentChunk::chunk)
+                .toList();
+    }
+
+    @Override
     public void updateMetadata(String sourceId, DocumentMetadataUpdate update) {
         Map<String, Object> metadata = update.metadata() == null ? Map.of() : update.metadata();
         jdbcTemplate.update("""
@@ -134,7 +173,7 @@ public class JdbcPaperDocumentPersistenceService implements PaperDocumentPersist
         jdbcTemplate.update("""
                 update public.paper_document
                 set status = 'PENDING', deleted_at = null, updated_at = now()
-                where source_id = :sourceId and status = 'DELETED'
+                where source_id = :sourceId and deleted_at is not null
                 """, new MapSqlParameterSource("sourceId", sourceId));
     }
 
@@ -190,7 +229,7 @@ public class JdbcPaperDocumentPersistenceService implements PaperDocumentPersist
                         .addValue("chunkStart", intValue(chunk.metadata(), "chunkStart"))
                         .addValue("chunkEnd", intValue(chunk.metadata(), "chunkEnd"))
                         .addValue("pageNumber", intValue(chunk.metadata(), "pageNumber"))
-                        .addValue("sectionTitle", stringValue(chunk.metadata() == null ? null : chunk.metadata().get("sectionTitle")))
+                        .addValue("sectionTitle", cut(stringValue(chunk.metadata() == null ? null : chunk.metadata().get("sectionTitle")), SECTION_TITLE_MAX_LENGTH))
                         .addValue("metadata", toJson(chunk.metadata() == null ? Map.of() : chunk.metadata())))
                 .toArray(MapSqlParameterSource[]::new);
         jdbcTemplate.batchUpdate("""
@@ -206,7 +245,7 @@ public class JdbcPaperDocumentPersistenceService implements PaperDocumentPersist
     public void markIndexed(String sourceId, int chunkCount) {
         jdbcTemplate.update("""
                 update public.paper_document
-                set status = 'INDEXED', chunk_count = :chunkCount, error_message = null, updated_at = now()
+                set status = 'INDEXED', chunk_count = :chunkCount, error_message = null, deleted_at = null, updated_at = now()
                 where source_id = :sourceId
                 """, new MapSqlParameterSource()
                 .addValue("sourceId", sourceId)
@@ -240,8 +279,12 @@ public class JdbcPaperDocumentPersistenceService implements PaperDocumentPersist
         StringBuilder builder = new StringBuilder(" where 1 = 1\n");
         if (status == null || status.isBlank()) {
             builder.append(" and status <> 'DELETED'\n");
+            builder.append(" and deleted_at is null\n");
         } else if (!"ALL".equalsIgnoreCase(status)) {
             builder.append(" and status = :status\n");
+            if (!"DELETED".equalsIgnoreCase(status.trim())) {
+                builder.append(" and deleted_at is null\n");
+            }
         }
         if (keyword != null && !keyword.isBlank()) {
             builder.append("""
@@ -356,6 +399,65 @@ public class JdbcPaperDocumentPersistenceService implements PaperDocumentPersist
         }
     }
 
+    private List<String> extractSearchTerms(String question) {
+        if (question == null || question.isBlank()) {
+            return List.of();
+        }
+        LinkedHashSet<String> terms = new LinkedHashSet<>();
+        Matcher matcher = SEARCH_TOKEN.matcher(question);
+        while (matcher.find()) {
+            addSearchTerms(terms, normalizeSearchText(matcher.group()));
+        }
+        return List.copyOf(terms);
+    }
+
+    private void addSearchTerms(LinkedHashSet<String> terms, String token) {
+        if (token == null || token.length() < 2) {
+            return;
+        }
+        if (token.length() <= 4) {
+            terms.add(token);
+            return;
+        }
+        int maxGram = Math.min(4, token.length());
+        for (int size = maxGram; size >= 2; size--) {
+            for (int start = 0; start + size <= token.length(); start++) {
+                terms.add(token.substring(start, start + size));
+            }
+        }
+    }
+
+    private double lexicalScore(String question, DocumentChunk chunk, List<String> terms) {
+        String haystack = normalizeSearchText(chunk.content()) + "|" + metadataText(chunk.metadata());
+        double score = 0;
+        String normalizedQuestion = normalizeSearchText(question);
+        if (!normalizedQuestion.isBlank() && haystack.contains(normalizedQuestion)) {
+            score += 3.0;
+        }
+        for (String term : terms) {
+            if (haystack.contains(term)) {
+                score += 1.0 + (term.length() * 0.1);
+            }
+        }
+        return score;
+    }
+
+    private String metadataText(Map<String, Object> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return "";
+        }
+        return metadata.values().stream()
+                .map(this::stringValue)
+                .filter(Objects::nonNull)
+                .map(this::normalizeSearchText)
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.joining("|"));
+    }
+
+    private String normalizeSearchText(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", "").toLowerCase();
+    }
+
     private int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
@@ -379,6 +481,9 @@ public class JdbcPaperDocumentPersistenceService implements PaperDocumentPersist
 
     private OffsetDateTime offsetDateTime(ResultSet rs, String columnName) throws SQLException {
         return rs.getObject(columnName, OffsetDateTime.class);
+    }
+
+    private record ScoredDocumentChunk(DocumentChunk chunk, double score) {
     }
 
     private class DocumentSummaryRowMapper implements RowMapper<DocumentSummary> {

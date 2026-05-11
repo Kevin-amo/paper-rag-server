@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.rag;
+package com.lqr.paperragserver.rag.service;
 
 import com.lqr.paperragserver.common.RagAnswer;
 

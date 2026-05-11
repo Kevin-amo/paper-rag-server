@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.ai;
+package com.lqr.paperragserver.ai.service;
 
 import com.lqr.paperragserver.common.RetrievedChunk;
 

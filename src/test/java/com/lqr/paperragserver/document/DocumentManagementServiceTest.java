@@ -1,8 +1,9 @@
 package com.lqr.paperragserver.document;
 
-import com.lqr.paperragserver.ai.EmbeddingService;
-import com.lqr.paperragserver.paper.PaperDocumentPersistenceService;
-import com.lqr.paperragserver.vector.VectorWriteService;
+import com.lqr.paperragserver.ai.service.EmbeddingService;
+import com.lqr.paperragserver.document.service.DocumentSplittingService;
+import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.vector.service.VectorWriteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

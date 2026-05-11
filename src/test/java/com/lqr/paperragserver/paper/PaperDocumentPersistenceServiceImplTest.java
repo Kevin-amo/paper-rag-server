@@ -1,6 +1,9 @@
 package com.lqr.paperragserver.paper;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lqr.paperragserver.common.DocumentChunk;
+import com.lqr.paperragserver.paper.impl.PaperDocumentPersistenceServiceImpl;
+import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -19,15 +22,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class JdbcPaperDocumentPersistenceServiceTest {
+class PaperDocumentPersistenceServiceImplTest {
 
     private final NamedParameterJdbcTemplate jdbcTemplate = mock(NamedParameterJdbcTemplate.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private JdbcPaperDocumentPersistenceService service;
+    private PaperDocumentPersistenceServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new JdbcPaperDocumentPersistenceService(jdbcTemplate, objectMapper);
+        service = new PaperDocumentPersistenceServiceImpl(jdbcTemplate, objectMapper);
     }
 
     @Test
@@ -45,6 +48,7 @@ class JdbcPaperDocumentPersistenceServiceTest {
         assertThat(result.total()).isZero();
         assertThat(sqlCaptor.getValue())
                 .contains("status <> 'DELETED'")
+                .contains("deleted_at is null")
                 .contains("title ilike :keyword")
                 .contains("source_id ilike :keyword")
                 .contains("file_name ilike :keyword")
@@ -106,6 +110,47 @@ class JdbcPaperDocumentPersistenceServiceTest {
     }
 
     @Test
+    void replaceChunksShouldTrimSectionTitleToDatabaseLimit() {
+        String longSectionTitle = "A".repeat(600);
+        DocumentChunk chunk = new DocumentChunk(
+                "chunk-1",
+                "source-1",
+                0,
+                "chunk text",
+                Map.of("sectionTitle", longSectionTitle)
+        );
+
+        service.replaceChunks("source-1", List.of(chunk));
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<MapSqlParameterSource[]> batchCaptor = ArgumentCaptor.forClass(MapSqlParameterSource[].class);
+        verify(jdbcTemplate).batchUpdate(sqlCaptor.capture(), batchCaptor.capture());
+
+        assertThat(sqlCaptor.getValue()).contains("insert into public.paper_document_chunk");
+        Map<String, Object> values = batchCaptor.getValue()[0].getValues();
+        assertThat(String.valueOf(values.get("sectionTitle")))
+                .hasSize(512)
+                .isEqualTo(longSectionTitle.substring(0, 512));
+    }
+
+    @Test
+    void markIndexedShouldClearDeletedAtMarker() {
+        service.markIndexed("source-1", 12);
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<MapSqlParameterSource> paramCaptor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
+        verify(jdbcTemplate).update(sqlCaptor.capture(), paramCaptor.capture());
+
+        assertThat(sqlCaptor.getValue())
+                .contains("status = 'INDEXED'")
+                .contains("deleted_at = null")
+                .contains("chunk_count = :chunkCount");
+        assertThat(paramCaptor.getValue().getValues())
+                .containsEntry("sourceId", "source-1")
+                .containsEntry("chunkCount", 12);
+    }
+
+    @Test
     void restoreShouldOnlyRestoreDeletedDocumentAsPending() {
         service.restore("source-1");
 
@@ -116,7 +161,7 @@ class JdbcPaperDocumentPersistenceServiceTest {
         assertThat(sqlCaptor.getValue())
                 .contains("status = 'PENDING'")
                 .contains("deleted_at = null")
-                .contains("status = 'DELETED'");
+                .contains("deleted_at is not null");
         assertThat(paramCaptor.getValue().getValues()).containsEntry("sourceId", "source-1");
     }
 }

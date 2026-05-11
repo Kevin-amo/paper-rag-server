@@ -1,7 +1,6 @@
-package com.lqr.paperragserver.document;
+package com.lqr.paperragserver.document.service;
 
 import com.lqr.paperragserver.common.DocumentIngestionResult;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 

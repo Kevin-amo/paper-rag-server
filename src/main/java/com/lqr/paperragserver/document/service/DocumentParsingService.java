@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.document;
+package com.lqr.paperragserver.document.service;
 
 import com.lqr.paperragserver.common.DocumentSource;
 

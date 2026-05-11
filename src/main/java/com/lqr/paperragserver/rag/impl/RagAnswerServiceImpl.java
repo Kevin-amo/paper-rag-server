@@ -1,11 +1,13 @@
-package com.lqr.paperragserver.rag;
+package com.lqr.paperragserver.rag.impl;
 
-import com.lqr.paperragserver.ai.LlmService;
-import com.lqr.paperragserver.ai.PromptConstructionService;
+import com.lqr.paperragserver.ai.service.LlmService;
+import com.lqr.paperragserver.ai.service.PromptConstructionService;
 import com.lqr.paperragserver.common.AnswerCitation;
 import com.lqr.paperragserver.common.RagAnswer;
 import com.lqr.paperragserver.common.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.rag.service.RagAnswerService;
+import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,23 +17,38 @@ import java.util.Map;
  * 默认问答编排实现。
  */
 @Service
-public class DefaultRagAnswerService implements RagAnswerService {
+public class RagAnswerServiceImpl implements RagAnswerService {
 
     private final RagRetrievalService ragRetrievalService;
     private final PromptConstructionService promptConstructionService;
     private final LlmService llmService;
     private final RagProperties ragProperties;
 
-    public DefaultRagAnswerService(RagRetrievalService ragRetrievalService,
-                                   PromptConstructionService promptConstructionService,
-                                   LlmService llmService,
-                                   RagProperties ragProperties) {
+    /**
+     * 创建问答编排服务并注入所需依赖。
+     *
+     * @param ragRetrievalService 检索服务
+     * @param promptConstructionService 提示词构造服务
+     * @param llmService 大模型调用服务
+     * @param ragProperties RAG 配置
+     */
+    public RagAnswerServiceImpl(RagRetrievalService ragRetrievalService,
+                                PromptConstructionService promptConstructionService,
+                                LlmService llmService,
+                                RagProperties ragProperties) {
         this.ragRetrievalService = ragRetrievalService;
         this.promptConstructionService = promptConstructionService;
         this.llmService = llmService;
         this.ragProperties = ragProperties;
     }
 
+    /**
+     * 执行检索增强问答并返回回答及引用片段。
+     *
+     * @param question 用户问题
+     * @param topK 期望召回的片段数量
+     * @return 包含回答正文和引用信息的结果对象
+     */
     @Override
     public RagAnswer answer(String question, Integer topK) {
         int resolvedTopK = topK == null || topK <= 0 ? ragProperties.defaultTopK() : topK;
@@ -50,6 +67,12 @@ public class DefaultRagAnswerService implements RagAnswerService {
         return new RagAnswer(answer, citations);
     }
 
+    /**
+     * 截断引用摘要，避免返回过长正文片段。
+     *
+     * @param content 原始片段内容
+     * @return 截断后的摘要文本
+     */
     private String cutExcerpt(String content) {
         if (content == null) {
             return "";
@@ -58,6 +81,13 @@ public class DefaultRagAnswerService implements RagAnswerService {
         return content.length() <= maxLength ? content : content.substring(0, maxLength) + "...";
     }
 
+    /**
+     * 从元数据中读取字符串字段。
+     *
+     * @param metadata 元数据映射
+     * @param key 字段名
+     * @return 对应的字符串值，不存在时返回 null
+     */
     private String stringMetadata(Map<String, Object> metadata, String key) {
         if (metadata == null || !metadata.containsKey(key)) {
             return null;

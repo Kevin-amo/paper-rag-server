@@ -1,6 +1,7 @@
 package com.lqr.paperragserver.document;
 
 import com.lqr.paperragserver.common.DocumentSource;
+import com.lqr.paperragserver.document.impl.DocumentParsingServiceImpl;
 import org.apache.tika.Tika;
 import org.junit.jupiter.api.Test;
 
@@ -10,9 +11,9 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class TikaDocumentParsingServiceTest {
+class DocumentParsingServiceImplTest {
 
-    private final TikaDocumentParsingService service = new TikaDocumentParsingService(new Tika());
+    private final DocumentParsingServiceImpl service = new DocumentParsingServiceImpl(new Tika());
 
     @Test
     void parseShouldUseProvidedMetadataAndTitle() {

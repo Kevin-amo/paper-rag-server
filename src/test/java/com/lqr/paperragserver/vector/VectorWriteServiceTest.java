@@ -1,8 +1,9 @@
 package com.lqr.paperragserver.vector;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lqr.paperragserver.ai.EmbeddingService;
+import com.lqr.paperragserver.ai.service.EmbeddingService;
 import com.lqr.paperragserver.common.DocumentChunk;
+import com.lqr.paperragserver.vector.impl.VectorWriteServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -22,15 +23,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-class PgVectorWriteServiceTest {
+class VectorWriteServiceTest {
 
     private final NamedParameterJdbcTemplate jdbcTemplate = mock(NamedParameterJdbcTemplate.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private PgVectorWriteService service;
+    private VectorWriteServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new PgVectorWriteService(jdbcTemplate, objectMapper);
+        service = new VectorWriteServiceImpl(jdbcTemplate, objectMapper);
     }
 
     @Test

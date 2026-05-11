@@ -3,13 +3,12 @@ package com.lqr.paperragserver.web;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.common.DocumentIngestionResult;
 import com.lqr.paperragserver.common.DocumentSource;
-import com.lqr.paperragserver.document.DocumentIngestionService;
+import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.DocumentManagementService;
-import com.lqr.paperragserver.paper.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;

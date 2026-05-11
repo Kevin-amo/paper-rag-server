@@ -1,6 +1,8 @@
-package com.lqr.paperragserver.ai;
+package com.lqr.paperragserver.ai.impl;
 
+import com.lqr.paperragserver.ai.service.EmbeddingService;
 import com.lqr.paperragserver.common.DocumentChunk;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Service;
 
@@ -12,14 +14,17 @@ import java.util.Map;
  * 基于 Spring AI EmbeddingModel 的向量计算实现。
  */
 @Service
-public class SpringAiEmbeddingService implements EmbeddingService {
+@RequiredArgsConstructor
+public class EmbeddingServiceImpl implements EmbeddingService {
 
     private final EmbeddingModel embeddingModel;
 
-    public SpringAiEmbeddingService(EmbeddingModel embeddingModel) {
-        this.embeddingModel = embeddingModel;
-    }
-
+    /**
+     * 为文档分块批量生成向量表示。
+     *
+     * @param chunks 待向量化的分块列表
+     * @return 与输入分块顺序一致的向量结果列表
+     */
     @Override
     public List<EmbeddingVector> embed(List<DocumentChunk> chunks) {
         if (chunks == null || chunks.isEmpty()) {

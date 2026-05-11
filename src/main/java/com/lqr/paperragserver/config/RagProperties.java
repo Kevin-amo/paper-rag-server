@@ -4,7 +4,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * RAG 业务配置
- *
  * 这些配置控制文档切分、检索数量和相似度阈值，避免业务实现中写死参数
  */
 @ConfigurationProperties(prefix = "app.rag")

@@ -1,6 +1,6 @@
-package com.lqr.paperragserver.vector;
+package com.lqr.paperragserver.vector.service;
 
-import com.lqr.paperragserver.ai.EmbeddingService;
+import com.lqr.paperragserver.ai.service.EmbeddingService;
 
 import java.util.List;
 

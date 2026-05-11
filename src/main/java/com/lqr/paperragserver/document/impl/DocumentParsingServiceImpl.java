@@ -1,7 +1,7 @@
-package com.lqr.paperragserver.document;
+package com.lqr.paperragserver.document.impl;
 
 import com.lqr.paperragserver.common.DocumentSource;
-import com.lqr.paperragserver.common.ParsedDocument;
+import com.lqr.paperragserver.document.service.DocumentParsingService;
 import lombok.RequiredArgsConstructor;
 import org.apache.tika.Tika;
 import org.springframework.stereotype.Service;
@@ -19,14 +19,19 @@ import java.util.UUID;
  * <p>这里优先提取正文文本，再结合文件名和内容类型生成统一的文档来源信息。</p>
  */
 @Service
-public class TikaDocumentParsingService implements DocumentParsingService {
+@RequiredArgsConstructor
+public class DocumentParsingServiceImpl implements DocumentParsingService {
 
     private final Tika tika;
 
-    public TikaDocumentParsingService(Tika tika) {
-        this.tika = tika;
-    }
-
+    /**
+     * 规范化文件信息并生成统一的文档来源对象。
+     *
+     * @param fileName 原始文件名
+     * @param content 文件内容字节
+     * @param metadata 外部传入的元数据
+     * @return 组装完成的文档来源信息
+     */
     @Override
     public DocumentSource parse(String fileName, byte[] content, Map<String, Object> metadata) {
         Objects.requireNonNull(content, "content 不能为空");

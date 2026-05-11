@@ -1,5 +1,6 @@
-package com.lqr.paperragserver.ai;
+package com.lqr.paperragserver.ai.impl;
 
+import com.lqr.paperragserver.ai.service.PromptConstructionService;
 import com.lqr.paperragserver.common.RetrievedChunk;
 import org.springframework.stereotype.Service;
 
@@ -10,8 +11,15 @@ import java.util.stream.Collectors;
  * 默认提示词构造实现。
  */
 @Service
-public class DefaultPromptConstructionService implements PromptConstructionService {
+public class PromptConstructionServiceImpl implements PromptConstructionService {
 
+    /**
+     * 将问题和检索上下文拼装为统一提示词。
+     *
+     * @param question 用户问题
+     * @param context 检索得到的上下文分块
+     * @return 可直接发送给大模型的提示词对象
+     */
     @Override
     public Prompt build(String question, List<RetrievedChunk> context) {
         String systemMessage = "你是一个严谨的论文问答助手。必须只依据给定上下文回答，无法确定时直接说明不确定。";

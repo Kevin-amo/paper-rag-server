@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.ai;
+package com.lqr.paperragserver.ai.service;
 
 /**
  * 大模型调用服务接口。

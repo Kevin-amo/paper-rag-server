@@ -1,10 +1,12 @@
 package com.lqr.paperragserver.document;
 
-import com.lqr.paperragserver.ai.EmbeddingService;
+import com.lqr.paperragserver.ai.service.EmbeddingService;
 import com.lqr.paperragserver.common.DocumentChunk;
 import com.lqr.paperragserver.common.DocumentSource;
-import com.lqr.paperragserver.paper.PaperDocumentPersistenceService;
-import com.lqr.paperragserver.vector.VectorWriteService;
+import com.lqr.paperragserver.document.service.DocumentSplittingService;
+import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.vector.service.VectorWriteService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,22 +17,13 @@ import java.util.Map;
  * 文档管理编排服务。
  */
 @Service
+@RequiredArgsConstructor
 public class DocumentManagementService {
 
     private final PaperDocumentPersistenceService paperDocumentPersistenceService;
     private final DocumentSplittingService documentSplittingService;
     private final EmbeddingService embeddingService;
     private final VectorWriteService vectorWriteService;
-
-    public DocumentManagementService(PaperDocumentPersistenceService paperDocumentPersistenceService,
-                                     DocumentSplittingService documentSplittingService,
-                                     EmbeddingService embeddingService,
-                                     VectorWriteService vectorWriteService) {
-        this.paperDocumentPersistenceService = paperDocumentPersistenceService;
-        this.documentSplittingService = documentSplittingService;
-        this.embeddingService = embeddingService;
-        this.vectorWriteService = vectorWriteService;
-    }
 
     public void restore(String sourceId) {
         paperDocumentPersistenceService.restore(sourceId);

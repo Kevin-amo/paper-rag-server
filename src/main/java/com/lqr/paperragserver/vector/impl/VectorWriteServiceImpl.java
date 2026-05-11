@@ -1,9 +1,11 @@
-package com.lqr.paperragserver.vector;
+package com.lqr.paperragserver.vector.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lqr.paperragserver.ai.EmbeddingService;
+import com.lqr.paperragserver.ai.service.EmbeddingService;
 import com.lqr.paperragserver.common.DocumentChunk;
+import com.lqr.paperragserver.vector.service.VectorWriteService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -17,16 +19,17 @@ import java.util.UUID;
  * 基于 pgvector 表的向量写入实现。
  */
 @Service
-public class PgVectorWriteService implements VectorWriteService {
+@RequiredArgsConstructor
+public class VectorWriteServiceImpl implements VectorWriteService {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
-    public PgVectorWriteService(NamedParameterJdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
-        this.jdbcTemplate = jdbcTemplate;
-        this.objectMapper = objectMapper;
-    }
-
+    /**
+     * 将分块向量写入向量表并回填文档分块记录。
+     *
+     * @param vectors 待写入的向量列表
+     */
     @Override
     @Transactional
     public void upsert(List<EmbeddingService.EmbeddingVector> vectors) {
@@ -65,6 +68,11 @@ public class PgVectorWriteService implements VectorWriteService {
         }
     }
 
+    /**
+     * 按文档来源删除向量表中的全部记录。
+     *
+     * @param sourceId 文档来源标识
+     */
     @Override
     @Transactional
     public void deleteBySourceId(String sourceId) {
@@ -77,6 +85,12 @@ public class PgVectorWriteService implements VectorWriteService {
                 """, new MapSqlParameterSource("sourceId", sourceId));
     }
 
+    /**
+     * 将对象序列化为 JSON 字符串。
+     *
+     * @param value 待序列化对象
+     * @return JSON 文本
+     */
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
@@ -85,6 +99,12 @@ public class PgVectorWriteService implements VectorWriteService {
         }
     }
 
+    /**
+     * 将浮点向量转换为 pgvector 可识别的字面量。
+     *
+     * @param vector 向量数组
+     * @return pgvector 字面量字符串
+     */
     private String toVectorLiteral(float[] vector) {
         if (vector == null || vector.length == 0) {
             throw new IllegalArgumentException("embedding 向量不能为空");

@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.web;
 
 import com.lqr.paperragserver.common.RagAnswer;
-import com.lqr.paperragserver.rag.RagAnswerService;
+import com.lqr.paperragserver.rag.service.RagAnswerService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;

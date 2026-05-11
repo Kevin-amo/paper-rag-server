@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.paper;
+package com.lqr.paperragserver.paper.service;
 
 import com.lqr.paperragserver.common.DocumentChunk;
 import com.lqr.paperragserver.common.DocumentSource;
@@ -19,6 +19,8 @@ public interface PaperDocumentPersistenceService {
     Optional<DocumentDetail> findDocument(String sourceId);
 
     PageResult<DocumentChunkView> listChunks(String sourceId, int page, int size);
+
+    List<DocumentChunk> searchChunks(String question, int limit);
 
     void updateMetadata(String sourceId, DocumentMetadataUpdate update);
 

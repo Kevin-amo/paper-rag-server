@@ -1,12 +1,14 @@
 package com.lqr.paperragserver.rag;
 
-import com.lqr.paperragserver.ai.LlmService;
-import com.lqr.paperragserver.ai.PromptConstructionService;
+import com.lqr.paperragserver.ai.service.LlmService;
+import com.lqr.paperragserver.ai.service.PromptConstructionService;
 import com.lqr.paperragserver.common.AnswerCitation;
 import com.lqr.paperragserver.common.DocumentChunk;
 import com.lqr.paperragserver.common.RagAnswer;
 import com.lqr.paperragserver.common.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.rag.impl.RagAnswerServiceImpl;
+import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +31,7 @@ import static org.mockito.Mockito.when;
  * 能否正确处理调用方显式传入的 topK 参数，优先使用它而非默认配置。
  * 所有依赖均通过 Mockito 进行模拟，实现快速、稳定的单元测试。
  */
-class DefaultRagAnswerServiceTest {
+class RagAnswerServiceImplTest {
 
     // 模拟的检索服务
     private final RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
@@ -40,14 +42,14 @@ class DefaultRagAnswerServiceTest {
     // 测试用的配置：最大上下文800，单个块最大长度120，默认topK=5，重叠度0
     private final RagProperties ragProperties = new RagProperties(800, 120, 5, 0);
     // 被测试的服务实例
-    private DefaultRagAnswerService service;
+    private RagAnswerServiceImpl service;
 
     /**
      * 每个测试方法执行前，用模拟对象重新创建服务实例，保证测试独立性。
      */
     @BeforeEach
     void setUp() {
-        service = new DefaultRagAnswerService(ragRetrievalService, promptConstructionService, llmService, ragProperties);
+        service = new RagAnswerServiceImpl(ragRetrievalService, promptConstructionService, llmService, ragProperties);
     }
 
     /**

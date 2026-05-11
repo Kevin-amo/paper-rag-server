@@ -3,12 +3,13 @@ package com.lqr.paperragserver.web;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.common.DocumentIngestionResult;
-import com.lqr.paperragserver.document.DocumentIngestionService;
+import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.DocumentManagementService;
-import com.lqr.paperragserver.paper.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -36,6 +37,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/documents")
+@RequiredArgsConstructor
 public class DocumentController {
 
     private final DocumentIngestionService documentIngestionService;
@@ -43,18 +45,8 @@ public class DocumentController {
     private final PaperDocumentPersistenceService paperDocumentPersistenceService;
     private final ObjectMapper objectMapper;
 
-    public DocumentController(DocumentIngestionService documentIngestionService,
-                              DocumentManagementService documentManagementService,
-                              PaperDocumentPersistenceService paperDocumentPersistenceService,
-                              ObjectMapper objectMapper) {
-        this.documentIngestionService = documentIngestionService;
-        this.documentManagementService = documentManagementService;
-        this.paperDocumentPersistenceService = paperDocumentPersistenceService;
-        this.objectMapper = objectMapper;
-    }
-
     /**
-     * 上传并入库一个文档。
+     * 上传并入库文档。
      *
      * @param file 待入库文件
      * @param sourceId 可选的外部来源标识
@@ -85,6 +77,7 @@ public class DocumentController {
             BatchDocumentIngestionItemRequest item = requests.get(index);
             String fileName = originalFileName(file, item);
             try {
+                // 入库
                 DocumentIngestionResult result = documentIngestionService.ingest(
                         fileName,
                         file.getBytes(),
@@ -178,6 +171,7 @@ public class DocumentController {
         return metadata;
     }
 
+    // 把 item 解析成列表
     private List<BatchDocumentIngestionItemRequest> parseBatchItems(String items, int fileCount) {
         if (items == null || items.isBlank()) {
             return java.util.stream.IntStream.range(0, fileCount)
