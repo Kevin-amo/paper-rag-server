@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.document.impl;
 
+import com.lqr.paperragserver.common.DocumentAsset;
 import com.lqr.paperragserver.common.DocumentSource;
 import com.lqr.paperragserver.common.ParsedDocument;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService;
@@ -16,8 +17,11 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -81,6 +85,12 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         ExtractionResult extractionResult = extractContent(provisionalSource, content, contentType);
         mergedMetadata.put("extractionMode", extractionResult.mode().name());
         mergedMetadata.put("extractedTextLength", extractionResult.text().length());
+        if (!extractionResult.assets().isEmpty()) {
+            mergedMetadata.put("assetCount", extractionResult.assets().size());
+            mergedMetadata.put("documentAssets", extractionResult.assets().stream()
+                    .map(this::assetMetadata)
+                    .toList());
+        }
         if (extractionResult.renderedPageCount() > 0) {
             mergedMetadata.put("renderedPageCount", extractionResult.renderedPageCount());
         }
@@ -88,7 +98,7 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
             mergedMetadata.put("multimodalTruncated", true);
         }
         DocumentSource source = new DocumentSource(sourceId, title, normalizedFileName, mergedMetadata);
-        return new ParsedDocument(source, extractionResult.text());
+        return new ParsedDocument(source, extractionResult.text(), extractionResult.assets());
     }
 
     private ExtractionResult extractContent(DocumentSource source, byte[] content, String contentType) {
@@ -99,32 +109,33 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
             if (text.isBlank()) {
                 throw new IllegalStateException("图片文档未提取到可用文本");
             }
-            return new ExtractionResult(text, ExtractionMode.MULTIMODAL, result.pageCount(), result.truncated());
+            return new ExtractionResult(text, ExtractionMode.MULTIMODAL, result.pageCount(), result.truncated(), List.of());
         }
 
-        String tikaText = extractTextWithTika(source, content, contentType);
-        if (normalizedContentType.contains("pdf") && tikaText.isBlank()) {
+        TextExtractionResult tikaText = extractTextWithTika(source, content, contentType);
+        if (normalizedContentType.contains("pdf") && tikaText.text().isBlank()) {
             DocumentMultimodalExtractionResult result = documentMultimodalExtractionService.extract(source, content);
             String text = normalizeExtractedText(result.text());
             if (text.isBlank()) {
                 throw new IllegalStateException("扫描版 PDF 未提取到可用文本");
             }
-            return new ExtractionResult(text, ExtractionMode.MULTIMODAL, result.pageCount(), result.truncated());
+            return new ExtractionResult(text, ExtractionMode.MULTIMODAL, result.pageCount(), result.truncated(), List.of());
         }
 
-        return new ExtractionResult(tikaText, ExtractionMode.TEXT, 0, false);
+        return new ExtractionResult(tikaText.text(), ExtractionMode.TEXT, 0, false, tikaText.assets());
     }
 
-    private String extractTextWithTika(DocumentSource source, byte[] content, String contentType) {
+    private TextExtractionResult extractTextWithTika(DocumentSource source, byte[] content, String contentType) {
         try {
             String extractedText = normalizeExtractedText(tika.parseToString(new ByteArrayInputStream(content)));
             if (!isOfficeDocument(contentType)) {
-                return extractedText;
+                return new TextExtractionResult(extractedText, List.of());
             }
             String cleanedText = removeOfficeImageArtifactLines(extractedText);
-            return isWordprocessingDocument(contentType)
-                    ? mergeWordImagesIntoText(source, content, cleanedText)
-                    : cleanedText;
+            if (!isWordprocessingDocument(contentType)) {
+                return new TextExtractionResult(cleanedText, List.of());
+            }
+            return mergeWordImagesIntoText(source, content, cleanedText);
         } catch (Exception ex) {
             throw new IllegalStateException("文档解析失败", ex);
         }
@@ -148,20 +159,20 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return normalized.contains("wordprocessingml.document") || normalized.contains("msword");
     }
 
-    private String mergeWordImagesIntoText(DocumentSource source, byte[] content, String fallbackText) {
+    private TextExtractionResult mergeWordImagesIntoText(DocumentSource source, byte[] content, String fallbackText) {
         try {
             WordPackage wordPackage = readWordPackage(content);
             if (wordPackage.documentXml() == null || wordPackage.relationshipXml() == null) {
-                return fallbackText;
+                return new TextExtractionResult(fallbackText, List.of());
             }
             Map<String, String> relationshipTargets = readImageRelationshipTargets(wordPackage.relationshipXml());
             if (relationshipTargets.isEmpty()) {
-                return fallbackText;
+                return new TextExtractionResult(fallbackText, List.of());
             }
-            String orderedText = readWordDocumentTextWithImages(source, wordPackage.documentXml(), relationshipTargets, wordPackage.entries());
-            return orderedText.isBlank() ? fallbackText : orderedText;
+            TextExtractionResult orderedText = readWordDocumentTextWithImages(source, wordPackage.documentXml(), relationshipTargets, wordPackage.entries());
+            return orderedText.text().isBlank() ? new TextExtractionResult(fallbackText, List.of()) : orderedText;
         } catch (RuntimeException ex) {
-            return fallbackText;
+            return new TextExtractionResult(fallbackText, List.of());
         }
     }
 
@@ -203,22 +214,23 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return targets;
     }
 
-    private String readWordDocumentTextWithImages(DocumentSource source,
-                                                  String documentXml,
-                                                  Map<String, String> relationshipTargets,
-                                                  Map<String, byte[]> entries) {
+    private TextExtractionResult readWordDocumentTextWithImages(DocumentSource source,
+                                                               String documentXml,
+                                                               Map<String, String> relationshipTargets,
+                                                               Map<String, byte[]> entries) {
         Element body = firstElementByLocalName(parseXml(documentXml).getDocumentElement(), "body");
         if (body == null) {
-            return "";
+            return new TextExtractionResult("", List.of());
         }
-        List<String> blocks = new ArrayList<>();
+        StringBuilder textBuilder = new StringBuilder();
+        List<DocumentAsset> assets = new ArrayList<>();
         NodeList children = body.getChildNodes();
         for (int i = 0; i < children.getLength(); i++) {
             Node node = children.item(i);
             if (node instanceof Element element && "p".equals(element.getLocalName())) {
                 String paragraphText = paragraphText(element);
                 if (!paragraphText.isBlank() && !OFFICE_IMAGE_ARTIFACT_LINE.matcher(paragraphText.strip()).matches()) {
-                    blocks.add(paragraphText.strip());
+                    appendBlock(textBuilder, paragraphText.strip());
                 }
                 for (String relationshipId : imageRelationshipIds(element)) {
                     String imagePath = relationshipTargets.get(relationshipId);
@@ -228,12 +240,16 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
                     }
                     String imageText = extractEmbeddedImageText(source, imagePath, imageBytes);
                     if (!imageText.isBlank()) {
-                        blocks.add("【图片：" + imagePath.substring(imagePath.lastIndexOf('/') + 1) + "】\n" + imageText);
+                        String fileName = imagePath.substring(imagePath.lastIndexOf('/') + 1);
+                        String imageBlock = "【图片：" + fileName + "】\n" + imageText;
+                        int textStart = appendBlock(textBuilder, imageBlock);
+                        int textEnd = textStart + imageBlock.length();
+                        assets.add(toDocumentAsset(source, assets.size(), imagePath, fileName, imageBytes, imageText, textStart, textEnd));
                     }
                 }
             }
         }
-        return normalizeExtractedText(String.join("\n\n", blocks));
+        return new TextExtractionResult(normalizeExtractedText(textBuilder.toString()), assets);
     }
 
     private org.w3c.dom.Document parseXml(String xml) {
@@ -273,6 +289,44 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
             }
         }
         return ids;
+    }
+
+    private DocumentAsset toDocumentAsset(DocumentSource source,
+                                          int assetIndex,
+                                          String imagePath,
+                                          String fileName,
+                                          byte[] imageBytes,
+                                          String extractedText,
+                                          int textStart,
+                                          int textEnd) {
+        String contentType = imageContentType(imagePath);
+        String contentHash = sha256(imageBytes);
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("embeddedImagePath", imagePath);
+        return new DocumentAsset(
+                UUID.nameUUIDFromBytes((source.sourceId() + "::" + imagePath + "::" + contentHash).getBytes(StandardCharsets.UTF_8)).toString(),
+                source.sourceId(),
+                assetIndex,
+                "IMAGE",
+                fileName,
+                contentType,
+                imageBytes.length,
+                contentHash,
+                imageBytes,
+                extractedText,
+                textStart,
+                textEnd,
+                metadata
+        );
+    }
+
+    private int appendBlock(StringBuilder builder, String block) {
+        if (!builder.isEmpty()) {
+            builder.append("\n\n");
+        }
+        int start = builder.length();
+        builder.append(block);
+        return start;
     }
 
     private String extractEmbeddedImageText(DocumentSource source, String imagePath, byte[] imageBytes) {
@@ -334,8 +388,34 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return normalizeExtractedText(builder.toString());
     }
 
+    private Map<String, Object> assetMetadata(DocumentAsset asset) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("assetId", asset.assetId());
+        metadata.put("assetType", asset.assetType());
+        metadata.put("fileName", asset.fileName());
+        metadata.put("contentType", asset.contentType());
+        metadata.put("fileSize", asset.fileSize());
+        metadata.put("contentHash", asset.contentHash());
+        metadata.put("textStart", asset.textStart());
+        metadata.put("textEnd", asset.textEnd());
+        if (asset.metadata() != null) {
+            metadata.putAll(asset.metadata());
+        }
+        return metadata;
+    }
+
     private String normalizeExtractedText(String text) {
         return text == null ? "" : text.strip();
+    }
+
+    private String sha256(byte[] content) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(content == null ? new byte[0] : content);
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("当前 JDK 不支持 SHA-256", ex);
+        }
     }
 
     private enum ExtractionMode {
@@ -346,6 +426,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
     private record WordPackage(String documentXml, String relationshipXml, Map<String, byte[]> entries) {
     }
 
-    private record ExtractionResult(String text, ExtractionMode mode, int renderedPageCount, boolean truncated) {
+    private record TextExtractionResult(String text, List<DocumentAsset> assets) {
+    }
+
+    private record ExtractionResult(String text, ExtractionMode mode, int renderedPageCount, boolean truncated, List<DocumentAsset> assets) {
     }
 }

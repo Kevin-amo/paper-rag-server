@@ -1,6 +1,7 @@
 package com.lqr.paperragserver.document;
 
 import com.lqr.paperragserver.ai.service.EmbeddingService;
+import com.lqr.paperragserver.common.DocumentAsset;
 import com.lqr.paperragserver.common.DocumentChunk;
 import com.lqr.paperragserver.common.DocumentIngestionResult;
 import com.lqr.paperragserver.common.DocumentSource;
@@ -57,7 +58,22 @@ class DocumentIngestionServiceImplTest {
                         "extractionMode", "MULTIMODAL"
                 )
         );
-        ParsedDocument parsedDocument = new ParsedDocument(source, "页面文本");
+        DocumentAsset asset = new DocumentAsset(
+                "asset-1",
+                "source-1",
+                0,
+                "IMAGE",
+                "image1.png",
+                "image/png",
+                10,
+                "hash-1",
+                "image-data".getBytes(),
+                "图片文字",
+                0,
+                4,
+                Map.of("embeddedImagePath", "word/media/image1.png")
+        );
+        ParsedDocument parsedDocument = new ParsedDocument(source, "页面文本", List.of(asset));
         DocumentChunk chunk = new DocumentChunk(
                 "chunk-1",
                 "source-1",
@@ -74,6 +90,7 @@ class DocumentIngestionServiceImplTest {
         assertThat(result.source()).isEqualTo(source);
         assertThat(result.chunkCount()).isEqualTo(1);
         verify(paperDocumentPersistenceService).markParsing(source, "页面文本");
+        verify(paperDocumentPersistenceService).replaceAssets("source-1", List.of(asset));
         verify(paperDocumentPersistenceService).replaceChunks("source-1", List.of(chunk));
         verify(paperDocumentPersistenceService).markIndexed("source-1", 1);
         verify(vectorWriteService).deleteBySourceId("source-1");

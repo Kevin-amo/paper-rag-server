@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * AI 相关 Bean 配置。
  *
- * <p>这里把底层 Spring AI 的 ChatClient 显式暴露出来，业务服务只依赖统一封装后的接口。</p>
+ * 这里把底层 Spring AI 的 ChatClient 显式暴露出来，业务服务只依赖统一封装后的接口。
  */
 @Configuration
 public class AiConfiguration {

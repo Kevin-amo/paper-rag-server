@@ -43,14 +43,21 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         DocumentSource source = parsedDocument.source();
         String text = parsedDocument.text();
         try {
+            // 解析文件，得到全文文本 text
             paperDocumentPersistenceService.markParsing(source, text);
+            paperDocumentPersistenceService.replaceAssets(source.sourceId(), parsedDocument.assets());
+            // 切分，保存到列表chunks
             List<DocumentChunk> chunks = documentSplittingService.split(source, text);
+            // 删除旧向量，替换 chunk 表
             vectorWriteService.deleteBySourceId(source.sourceId());
             paperDocumentPersistenceService.replaceChunks(source.sourceId(), chunks);
+            // 对每个 chunk 生成 embedding 写入vector_store
             vectorWriteService.upsert(embeddingService.embed(chunks));
+            // 更新文档状态 INDEXED
             paperDocumentPersistenceService.markIndexed(source.sourceId(), chunks.size());
             return new DocumentIngestionResult(source, chunks.size());
         } catch (RuntimeException ex) {
+            // 出现异常就标记为 FAILED
             paperDocumentPersistenceService.markFailed(source.sourceId(), ex.getMessage());
             throw ex;
         }

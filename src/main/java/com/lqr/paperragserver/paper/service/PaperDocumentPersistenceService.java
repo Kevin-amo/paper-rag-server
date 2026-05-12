@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.paper.service;
 
+import com.lqr.paperragserver.common.DocumentAsset;
 import com.lqr.paperragserver.common.DocumentChunk;
 import com.lqr.paperragserver.common.DocumentSource;
 
@@ -27,6 +28,12 @@ public interface PaperDocumentPersistenceService {
     void restore(String sourceId);
 
     void markParsing(DocumentSource source, String contentText);
+
+    void replaceAssets(String sourceId, List<DocumentAsset> assets);
+
+    List<DocumentAssetView> listAssets(String sourceId, List<String> assetIds);
+
+    Optional<DocumentAssetView> findAsset(String sourceId, String assetId);
 
     void replaceChunks(String sourceId, List<DocumentChunk> chunks);
 
@@ -89,6 +96,25 @@ public interface PaperDocumentPersistenceService {
             String sectionTitle,
             Map<String, Object> metadata,
             UUID vectorStoreId,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt
+    ) {
+    }
+
+    record DocumentAssetView(
+            String assetId,
+            String sourceId,
+            int assetIndex,
+            String assetType,
+            String fileName,
+            String contentType,
+            Long fileSize,
+            String contentHash,
+            byte[] content,
+            String extractedText,
+            Integer textStart,
+            Integer textEnd,
+            Map<String, Object> metadata,
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
     ) {

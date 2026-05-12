@@ -620,7 +620,15 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
     private DocumentChunk toDocumentChunk(DocumentSource source, int chunkIndex, ChunkSlice slice) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         if (source.metadata() != null) {
-            metadata.putAll(source.metadata());
+            source.metadata().forEach((key, value) -> {
+                if (!"documentAssets".equals(key)) {
+                    metadata.put(key, value);
+                }
+            });
+        }
+        List<String> assetIds = overlappingAssetIds(source.metadata(), slice.start(), slice.end());
+        if (!assetIds.isEmpty()) {
+            metadata.put("assetIds", assetIds);
         }
         metadata.put("sectionTitle", slice.sectionTitle());
         metadata.put("sectionType", slice.sectionType().name());
@@ -635,6 +643,42 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
                 slice.content(),
                 metadata
         );
+    }
+
+    private List<String> overlappingAssetIds(Map<String, Object> sourceMetadata, int chunkStart, int chunkEnd) {
+        Object documentAssets = sourceMetadata == null ? null : sourceMetadata.get("documentAssets");
+        if (!(documentAssets instanceof List<?> assets)) {
+            return List.of();
+        }
+        return assets.stream()
+                .filter(Map.class::isInstance)
+                .map(asset -> assetIdIfOverlapping((Map<?, ?>) asset, chunkStart, chunkEnd))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private String assetIdIfOverlapping(Map<?, ?> asset, int chunkStart, int chunkEnd) {
+        Integer textStart = integerValue(asset.get("textStart"));
+        Integer textEnd = integerValue(asset.get("textEnd"));
+        Object assetId = asset.get("assetId");
+        if (assetId == null || textStart == null || textEnd == null) {
+            return null;
+        }
+        return textStart <= chunkEnd && textEnd >= chunkStart ? String.valueOf(assetId) : null;
+    }
+
+    private Integer integerValue(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     /**
