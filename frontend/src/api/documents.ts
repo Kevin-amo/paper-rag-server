@@ -1,7 +1,8 @@
-import { http, uploadHttp } from './http';
+import { apiPrefix, http, uploadHttp } from './http';
 import type {
   BatchDocumentIngestionResponse,
   BatchUploadDocumentPayload,
+  DocumentAsset,
   DocumentChunk,
   DocumentDetail,
   DocumentIngestionResult,
@@ -88,6 +89,20 @@ export async function getDocumentChunks(sourceId: string, params: ListChunksPara
   });
 
   return data;
+}
+
+export async function listDocumentAssets(sourceId: string, assetIds: string[]) {
+  const { data } = await http.get<DocumentAsset[]>(`/documents/${sourceId}/assets`, {
+    params: compactParams({
+      assetIds: assetIds.length ? assetIds.join(',') : undefined,
+    }),
+  });
+
+  return data;
+}
+
+export function getDocumentAssetContentUrl(sourceId: string, assetId: string) {
+  return `${apiPrefix}/documents/${encodeURIComponent(sourceId)}/assets/${encodeURIComponent(assetId)}/content`;
 }
 
 export async function deleteDocument(sourceId: string) {

@@ -3,6 +3,7 @@ package com.lqr.paperragserver.paper.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lqr.paperragserver.common.DocumentAsset;
 import com.lqr.paperragserver.common.DocumentChunk;
 import com.lqr.paperragserver.common.DocumentSource;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
@@ -213,6 +214,72 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
 
     @Override
     @Transactional
+    public void replaceAssets(String sourceId, List<DocumentAsset> assets) {
+        jdbcTemplate.update("delete from public.paper_document_asset where source_id = :sourceId",
+                new MapSqlParameterSource("sourceId", sourceId));
+        if (assets == null || assets.isEmpty()) {
+            return;
+        }
+        MapSqlParameterSource[] batch = assets.stream()
+                .map(asset -> new MapSqlParameterSource()
+                        .addValue("assetId", asset.assetId())
+                        .addValue("sourceId", asset.sourceId())
+                        .addValue("assetIndex", asset.assetIndex())
+                        .addValue("assetType", asset.assetType())
+                        .addValue("fileName", asset.fileName())
+                        .addValue("contentType", asset.contentType())
+                        .addValue("fileSize", asset.fileSize())
+                        .addValue("contentHash", asset.contentHash())
+                        .addValue("content", asset.content())
+                        .addValue("extractedText", asset.extractedText())
+                        .addValue("textStart", asset.textStart())
+                        .addValue("textEnd", asset.textEnd())
+                        .addValue("metadata", toJson(asset.metadata() == null ? Map.of() : asset.metadata())))
+                .toArray(MapSqlParameterSource[]::new);
+        jdbcTemplate.batchUpdate("""
+                insert into public.paper_document_asset (
+                    asset_id, source_id, asset_index, asset_type, file_name, content_type, file_size,
+                    content_hash, content, extracted_text, text_start, text_end, metadata
+                ) values (
+                    :assetId, :sourceId, :assetIndex, :assetType, :fileName, :contentType, :fileSize,
+                    :contentHash, :content, :extractedText, :textStart, :textEnd, cast(:metadata as jsonb)
+                )
+                """, batch);
+    }
+
+    @Override
+    public List<DocumentAssetView> listAssets(String sourceId, List<String> assetIds) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("sourceId", sourceId)
+                .addValue("assetIds", assetIds == null || assetIds.isEmpty() ? null : assetIds);
+        String assetFilter = assetIds == null || assetIds.isEmpty() ? "" : " and asset_id in (:assetIds)\n";
+        return jdbcTemplate.query("""
+                select asset_id, source_id, asset_index, asset_type, file_name, content_type, file_size,
+                       content_hash, null::bytea as content, extracted_text, text_start, text_end,
+                       metadata, created_at, updated_at
+                from public.paper_document_asset
+                where source_id = :sourceId
+                """ + assetFilter + """
+                order by asset_index asc
+                """, params, new DocumentAssetViewRowMapper());
+    }
+
+    @Override
+    public Optional<DocumentAssetView> findAsset(String sourceId, String assetId) {
+        List<DocumentAssetView> results = jdbcTemplate.query("""
+                select asset_id, source_id, asset_index, asset_type, file_name, content_type, file_size,
+                       content_hash, content, extracted_text, text_start, text_end,
+                       metadata, created_at, updated_at
+                from public.paper_document_asset
+                where source_id = :sourceId and asset_id = :assetId
+                """, new MapSqlParameterSource()
+                .addValue("sourceId", sourceId)
+                .addValue("assetId", assetId), new DocumentAssetViewRowMapper());
+        return results.stream().findFirst();
+    }
+
+    @Override
+    @Transactional
     public void replaceChunks(String sourceId, List<DocumentChunk> chunks) {
         jdbcTemplate.update("delete from public.paper_document_chunk where source_id = :sourceId",
                 new MapSqlParameterSource("sourceId", sourceId));
@@ -268,6 +335,8 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     @Override
     @Transactional
     public void markDeleted(String sourceId) {
+        jdbcTemplate.update("delete from public.paper_document_asset where source_id = :sourceId",
+                new MapSqlParameterSource("sourceId", sourceId));
         jdbcTemplate.update("delete from public.paper_document_chunk where source_id = :sourceId",
                 new MapSqlParameterSource("sourceId", sourceId));
         jdbcTemplate.update("""
@@ -549,6 +618,29 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
                     rs.getString("section_title"),
                     jsonMap(rs.getObject("metadata")),
                     rs.getObject("vector_store_id", UUID.class),
+                    offsetDateTime(rs, "created_at"),
+                    offsetDateTime(rs, "updated_at")
+            );
+        }
+    }
+
+    private class DocumentAssetViewRowMapper implements RowMapper<DocumentAssetView> {
+        @Override
+        public DocumentAssetView mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return new DocumentAssetView(
+                    rs.getString("asset_id"),
+                    rs.getString("source_id"),
+                    rs.getInt("asset_index"),
+                    rs.getString("asset_type"),
+                    rs.getString("file_name"),
+                    rs.getString("content_type"),
+                    rs.getObject("file_size", Long.class),
+                    rs.getString("content_hash"),
+                    rs.getBytes("content"),
+                    rs.getString("extracted_text"),
+                    rs.getObject("text_start", Integer.class),
+                    rs.getObject("text_end", Integer.class),
+                    jsonMap(rs.getObject("metadata")),
                     offsetDateTime(rs, "created_at"),
                     offsetDateTime(rs, "updated_at")
             );

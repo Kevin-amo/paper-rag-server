@@ -69,6 +69,23 @@ export interface DocumentChunk {
   updatedAt: string;
 }
 
+export interface DocumentAsset {
+  assetId: string;
+  sourceId: string;
+  assetIndex: number;
+  assetType: string;
+  fileName: string | null;
+  contentType: string | null;
+  fileSize: number | null;
+  contentHash: string | null;
+  extractedText: string | null;
+  textStart: number | null;
+  textEnd: number | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ListDocumentsParams {
   keyword?: string;
   status?: string;

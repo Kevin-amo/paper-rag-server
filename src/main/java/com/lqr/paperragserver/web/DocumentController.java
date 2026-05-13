@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -27,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -130,6 +132,28 @@ public class DocumentController {
         );
     }
 
+    @GetMapping("/{sourceId}/assets")
+    public List<DocumentAssetResponse> assets(@PathVariable String sourceId,
+                                              @RequestParam(value = "assetIds", required = false) String assetIds) {
+        return paperDocumentPersistenceService.listAssets(sourceId, parseAssetIds(assetIds)).stream()
+                .map(DocumentAssetResponse::from)
+                .toList();
+    }
+
+    @GetMapping("/{sourceId}/assets/{assetId}/content")
+    public ResponseEntity<byte[]> assetContent(@PathVariable String sourceId, @PathVariable String assetId) {
+        PaperDocumentPersistenceService.DocumentAssetView asset = paperDocumentPersistenceService.findAsset(sourceId, assetId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "资产不存在"));
+        byte[] content = asset.content() == null ? new byte[0] : asset.content();
+        MediaType mediaType = asset.contentType() == null || asset.contentType().isBlank()
+                ? MediaType.APPLICATION_OCTET_STREAM
+                : MediaType.parseMediaType(asset.contentType());
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .contentLength(content.length)
+                .body(content);
+    }
+
     @PatchMapping("/{sourceId}/metadata")
     public DocumentDetailResponse updateMetadata(@PathVariable String sourceId,
                                                  @Valid @RequestBody DocumentMetadataRequest request) {
@@ -169,6 +193,16 @@ public class DocumentController {
             metadata.put("title", title);
         }
         return metadata;
+    }
+
+    private List<String> parseAssetIds(String assetIds) {
+        if (assetIds == null || assetIds.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(assetIds.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toList();
     }
 
     // 把 item 解析成列表
@@ -362,6 +396,42 @@ public class DocumentController {
                     chunk.vectorStoreId(),
                     chunk.createdAt(),
                     chunk.updatedAt()
+            );
+        }
+    }
+
+    public record DocumentAssetResponse(
+            String assetId,
+            String sourceId,
+            int assetIndex,
+            String assetType,
+            String fileName,
+            String contentType,
+            Long fileSize,
+            String contentHash,
+            String extractedText,
+            Integer textStart,
+            Integer textEnd,
+            Map<String, Object> metadata,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt
+    ) {
+        static DocumentAssetResponse from(PaperDocumentPersistenceService.DocumentAssetView asset) {
+            return new DocumentAssetResponse(
+                    asset.assetId(),
+                    asset.sourceId(),
+                    asset.assetIndex(),
+                    asset.assetType(),
+                    asset.fileName(),
+                    asset.contentType(),
+                    asset.fileSize(),
+                    asset.contentHash(),
+                    asset.extractedText(),
+                    asset.textStart(),
+                    asset.textEnd(),
+                    asset.metadata(),
+                    asset.createdAt(),
+                    asset.updatedAt()
             );
         }
     }

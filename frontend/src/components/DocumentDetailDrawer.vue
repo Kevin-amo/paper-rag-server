@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { DocumentChunk, DocumentDetail } from '../types';
+import { computed, ref, watch } from 'vue';
+import { getDocumentAssetContentUrl, listDocumentAssets } from '../api/documents';
+import type { DocumentAsset, DocumentChunk, DocumentDetail } from '../types';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -23,6 +24,67 @@ const visible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
 });
+
+const assets = ref<DocumentAsset[]>([]);
+
+watch(
+  () => [props.detail?.sourceId, props.chunks.map((chunk) => chunk.chunkId).join('|')],
+  async () => {
+    const sourceId = props.detail?.sourceId;
+    const assetIds = Array.from(new Set(props.chunks.reduce<string[]>((ids, chunk) => {
+      ids.push(...chunkAssetIds(chunk));
+      return ids;
+    }, [])));
+    if (!sourceId || !assetIds.length) {
+      assets.value = [];
+      return;
+    }
+    assets.value = await listDocumentAssets(sourceId, assetIds);
+  },
+  { immediate: true },
+);
+
+const assetMap = computed(() => new Map(assets.value.map((asset) => [asset.assetId, asset])));
+
+function chunkAssetIds(chunk: DocumentChunk) {
+  const assetIds = chunk.metadata?.assetIds;
+  return Array.isArray(assetIds) ? assetIds.filter((value): value is string => typeof value === 'string') : [];
+}
+
+function imageAssetsForChunk(chunk: DocumentChunk) {
+  return chunkAssetIds(chunk)
+    .map((assetId) => assetMap.value.get(assetId))
+    .filter((asset): asset is DocumentAsset => asset !== undefined && asset.contentType?.startsWith('image/') === true);
+}
+
+function assetContentUrl(asset: DocumentAsset) {
+  return getDocumentAssetContentUrl(asset.sourceId, asset.assetId);
+}
+
+function previewUrls(chunk: DocumentChunk) {
+  return imageAssetsForChunk(chunk).map(assetContentUrl);
+}
+
+function handleChunkCurrentChange(page: number) {
+  emit('chunk-page-change', page - 1);
+}
+
+function handleChunkSizeChange(size: number) {
+  emit('chunk-size-change', size);
+}
+
+function formatFileSize(size: number | null) {
+  if (size === null) {
+    return '-';
+  }
+  if (size < 1024) {
+    return `${size} B`;
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+}
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -104,6 +166,25 @@ function formatValue(value: unknown) {
                     </div>
                   </template>
                   <p class="chunk-content">{{ chunk.content }}</p>
+                  <div v-if="imageAssetsForChunk(chunk).length" class="chunk-assets">
+                    <small>关联图片</small>
+                    <div class="asset-preview-list">
+                      <div v-for="asset in imageAssetsForChunk(chunk)" :key="asset.assetId" class="asset-preview-card">
+                        <el-image
+                          class="asset-preview-image"
+                          fit="cover"
+                          :src="assetContentUrl(asset)"
+                          :preview-src-list="previewUrls(chunk)"
+                          :initial-index="previewUrls(chunk).indexOf(assetContentUrl(asset))"
+                          preview-teleported
+                        />
+                        <div class="asset-preview-meta">
+                          <strong>{{ asset.fileName || asset.assetId }}</strong>
+                          <span>{{ asset.contentType || 'unknown' }} · {{ formatFileSize(asset.fileSize) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <div v-if="chunk.metadata && Object.keys(chunk.metadata).length" class="chunk-extra">
                     <small>片段元数据</small>
                     <pre>{{ formatValue(chunk.metadata) }}</pre>
@@ -119,8 +200,8 @@ function formatValue(value: unknown) {
                   :page-sizes="[20, 50, 100, 200]"
                   :total="props.chunkTotal"
                   :disabled="props.chunkLoading"
-                  @current-change="(page: number) => emit('chunk-page-change', page - 1)"
-                  @size-change="(size: number) => emit('chunk-size-change', size)"
+                  @current-change="handleChunkCurrentChange"
+                  @size-change="handleChunkSizeChange"
                 />
               </div>
             </el-skeleton>
@@ -189,9 +270,51 @@ function formatValue(value: unknown) {
   margin-top: 12px;
 }
 
-.chunk-extra small {
+.chunk-extra small,
+.chunk-assets small {
   display: inline-block;
   margin-bottom: 6px;
   color: #64748b;
+}
+
+.chunk-assets {
+  margin-top: 12px;
+}
+
+.asset-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.asset-preview-card {
+  width: 168px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.asset-preview-image {
+  display: block;
+  width: 168px;
+  height: 116px;
+  background: #f8fafc;
+}
+
+.asset-preview-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.asset-preview-meta strong {
+  overflow: hidden;
+  color: #334155;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

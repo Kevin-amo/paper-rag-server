@@ -154,6 +154,28 @@ class DocumentSplittingServiceImplTest {
     }
 
     @Test
+    void splitShouldAttachAssetIdsToOverlappingChunks() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(800, 120, 5, 0));
+        DocumentSource source = new DocumentSource("source-assets", "Asset Paper", "paper.docx", Map.of(
+                "documentAssets", List.of(Map.of(
+                        "assetId", "asset-1",
+                        "textStart", 12,
+                        "textEnd", 28
+                ))
+        ));
+        String text = """
+                1 图示说明
+                这段文字前有图。图中展示系统架构。这里继续描述。
+                """;
+
+        List<DocumentChunk> chunks = service.split(source, text);
+
+        assertThat(chunks).hasSize(1);
+        assertThat(chunks.getFirst().metadata()).containsEntry("assetIds", List.of("asset-1"));
+        assertThat(chunks.getFirst().metadata()).doesNotContainKey("documentAssets");
+    }
+
+    @Test
     void splitShouldReturnEmptyListForBlankText() {
         DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(8, 2, 5, 0));
         DocumentSource source = new DocumentSource("source-1", "Paper A", "paper.pdf", Map.of());

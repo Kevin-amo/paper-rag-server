@@ -58,7 +58,7 @@
             <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
         </dependency>
 
-        <!-- 鏂囨。瑙ｆ瀽 -->
+        <!-- 文档解析 -->
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>

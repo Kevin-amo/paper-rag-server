@@ -147,6 +147,13 @@ class DocumentParsingServiceImplTest {
                 "2.1 后续章节"
         );
         assertThat(parsedDocument.text()).doesNotContain("\nimage1.png\n");
+        assertThat(parsedDocument.assets()).hasSize(1);
+        assertThat(parsedDocument.assets().getFirst().fileName()).isEqualTo("image1.png");
+        assertThat(parsedDocument.assets().getFirst().content()).isEqualTo("fake-image".getBytes(StandardCharsets.UTF_8));
+        assertThat(parsedDocument.assets().getFirst().extractedText()).isEqualTo("图中展示系统架构");
+        assertThat(parsedDocument.assets().getFirst().textStart()).isNotNull();
+        assertThat(parsedDocument.assets().getFirst().textEnd()).isGreaterThan(parsedDocument.assets().getFirst().textStart());
+        assertThat(parsedDocument.source().metadata()).containsEntry("assetCount", 1);
         verify(documentMultimodalExtractionService).extract(any(), any());
     }
 
