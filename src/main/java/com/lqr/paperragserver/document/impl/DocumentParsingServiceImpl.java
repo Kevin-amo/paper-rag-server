@@ -1,8 +1,9 @@
 package com.lqr.paperragserver.document.impl;
 
-import com.lqr.paperragserver.common.DocumentAsset;
-import com.lqr.paperragserver.common.DocumentSource;
-import com.lqr.paperragserver.common.ParsedDocument;
+import com.lqr.paperragserver.common.model.DocumentAsset;
+import com.lqr.paperragserver.common.model.DocumentSource;
+import com.lqr.paperragserver.common.model.ParsedDocument;
+import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService.DocumentMultimodalExtractionResult;
 import com.lqr.paperragserver.document.service.DocumentParsingService;
@@ -69,38 +70,41 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         if (metadata != null) {
             mergedMetadata.putAll(metadata);
         }
-        mergedMetadata.putIfAbsent("fileName", normalizedFileName);
-        mergedMetadata.putIfAbsent("contentLength", content.length);
+        mergedMetadata.putIfAbsent(MetadataKeys.FILE_NAME, normalizedFileName);
+        mergedMetadata.putIfAbsent(MetadataKeys.CONTENT_LENGTH, content.length);
         String contentType = tika.detect(content, normalizedFileName);
-        mergedMetadata.put("contentType", contentType);
-        String sourceId = mergedMetadata.containsKey("sourceId")
-                ? String.valueOf(mergedMetadata.get("sourceId"))
+        mergedMetadata.put(MetadataKeys.CONTENT_TYPE, contentType);
+        String sourceId = mergedMetadata.containsKey(MetadataKeys.SOURCE_ID)
+                ? String.valueOf(mergedMetadata.get(MetadataKeys.SOURCE_ID))
                 : UUID.nameUUIDFromBytes(content).toString();
-        mergedMetadata.putIfAbsent("sourceId", sourceId);
-        String title = mergedMetadata.containsKey("title") && !String.valueOf(mergedMetadata.get("title")).isBlank()
-                ? String.valueOf(mergedMetadata.get("title"))
+        mergedMetadata.putIfAbsent(MetadataKeys.SOURCE_ID, sourceId);
+        String title = mergedMetadata.containsKey(MetadataKeys.TITLE) && !String.valueOf(mergedMetadata.get(MetadataKeys.TITLE)).isBlank()
+                ? String.valueOf(mergedMetadata.get(MetadataKeys.TITLE))
                 : normalizedFileName;
 
         DocumentSource provisionalSource = new DocumentSource(sourceId, title, normalizedFileName, mergedMetadata);
         ExtractionResult extractionResult = extractContent(provisionalSource, content, contentType);
-        mergedMetadata.put("extractionMode", extractionResult.mode().name());
-        mergedMetadata.put("extractedTextLength", extractionResult.text().length());
+        mergedMetadata.put(MetadataKeys.EXTRACTION_MODE, extractionResult.mode().name());
+        mergedMetadata.put(MetadataKeys.EXTRACTED_TEXT_LENGTH, extractionResult.text().length());
         if (!extractionResult.assets().isEmpty()) {
-            mergedMetadata.put("assetCount", extractionResult.assets().size());
-            mergedMetadata.put("documentAssets", extractionResult.assets().stream()
+            mergedMetadata.put(MetadataKeys.ASSET_COUNT, extractionResult.assets().size());
+            mergedMetadata.put(MetadataKeys.DOCUMENT_ASSETS, extractionResult.assets().stream()
                     .map(this::assetMetadata)
                     .toList());
         }
         if (extractionResult.renderedPageCount() > 0) {
-            mergedMetadata.put("renderedPageCount", extractionResult.renderedPageCount());
+            mergedMetadata.put(MetadataKeys.RENDERED_PAGE_COUNT, extractionResult.renderedPageCount());
         }
         if (extractionResult.truncated()) {
-            mergedMetadata.put("multimodalTruncated", true);
+            mergedMetadata.put(MetadataKeys.MULTIMODAL_TRUNCATED, true);
         }
         DocumentSource source = new DocumentSource(sourceId, title, normalizedFileName, mergedMetadata);
         return new ParsedDocument(source, extractionResult.text(), extractionResult.assets());
     }
 
+    /**
+     * 根据文件类型选择文本抽取路径，必要时回退到多模态抽取。
+     */
     private ExtractionResult extractContent(DocumentSource source, byte[] content, String contentType) {
         String normalizedContentType = contentType == null ? "" : contentType.toLowerCase(Locale.ROOT);
         if (normalizedContentType.startsWith("image/")) {
@@ -125,6 +129,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return new ExtractionResult(tikaText.text(), ExtractionMode.TEXT, 0, false, tikaText.assets());
     }
 
+    /**
+     * 使用 Tika 抽取文本，并对 Office 文档中的图片内容做增强处理。
+     */
     private TextExtractionResult extractTextWithTika(DocumentSource source, byte[] content, String contentType) {
         try {
             String extractedText = normalizeExtractedText(tika.parseToString(new ByteArrayInputStream(content)));
@@ -141,6 +148,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         }
     }
 
+    /**
+     * 判断 MIME 类型是否属于 Office 文档。
+     */
     private boolean isOfficeDocument(String contentType) {
         if (contentType == null) {
             return false;
@@ -151,6 +161,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
                 || normalized.contains("vnd.ms-");
     }
 
+    /**
+     * 判断 MIME 类型是否属于 Word 文档。
+     */
     private boolean isWordprocessingDocument(String contentType) {
         if (contentType == null) {
             return false;
@@ -159,6 +172,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return normalized.contains("wordprocessingml.document") || normalized.contains("msword");
     }
 
+    /**
+     * 将 Word 正文和嵌入图片抽取结果按原始顺序合并。
+     */
     private TextExtractionResult mergeWordImagesIntoText(DocumentSource source, byte[] content, String fallbackText) {
         try {
             WordPackage wordPackage = readWordPackage(content);
@@ -176,6 +192,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         }
     }
 
+    /**
+     * 读取 Word 压缩包中的正文 XML、关系 XML 和全部条目。
+     */
     private WordPackage readWordPackage(byte[] content) {
         Map<String, byte[]> entries = new HashMap<>();
         String documentXml = null;
@@ -198,6 +217,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return new WordPackage(documentXml, relationshipXml, entries);
     }
 
+    /**
+     * 从 Word 关系 XML 中读取图片关系 ID 与文件路径的映射。
+     */
     private Map<String, String> readImageRelationshipTargets(String relationshipXml) {
         Map<String, String> targets = new HashMap<>();
         Element root = parseXml(relationshipXml).getDocumentElement();
@@ -214,6 +236,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return targets;
     }
 
+    /**
+     * 按 Word 文档正文顺序合并段落文本和嵌入图片抽取文本。
+     */
     private TextExtractionResult readWordDocumentTextWithImages(DocumentSource source,
                                                                String documentXml,
                                                                Map<String, String> relationshipTargets,
@@ -252,6 +277,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return new TextExtractionResult(normalizeExtractedText(textBuilder.toString()), assets);
     }
 
+    /**
+     * 安全解析 Word XML 文本。
+     */
     private org.w3c.dom.Document parseXml(String xml) {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -264,11 +292,17 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         }
     }
 
+    /**
+     * 查找指定本地名称的第一个 XML 元素。
+     */
     private Element firstElementByLocalName(Element root, String localName) {
         NodeList nodes = root.getElementsByTagNameNS("*", localName);
         return nodes.getLength() == 0 ? null : (Element) nodes.item(0);
     }
 
+    /**
+     * 提取 Word 段落中的纯文本节点内容。
+     */
     private String paragraphText(Element paragraph) {
         StringBuilder builder = new StringBuilder();
         NodeList textNodes = paragraph.getElementsByTagNameNS("*", "t");
@@ -278,6 +312,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return builder.toString();
     }
 
+    /**
+     * 提取段落中引用的图片关系 ID 列表。
+     */
     private List<String> imageRelationshipIds(Element paragraph) {
         List<String> ids = new ArrayList<>();
         NodeList blips = paragraph.getElementsByTagNameNS("*", "blip");
@@ -291,6 +328,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return ids;
     }
 
+    /**
+     * 将 Word 嵌入图片及其抽取文本封装为文档资产。
+     */
     private DocumentAsset toDocumentAsset(DocumentSource source,
                                           int assetIndex,
                                           String imagePath,
@@ -302,7 +342,7 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         String contentType = imageContentType(imagePath);
         String contentHash = sha256(imageBytes);
         Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("embeddedImagePath", imagePath);
+        metadata.put(MetadataKeys.EMBEDDED_IMAGE_PATH, imagePath);
         return new DocumentAsset(
                 UUID.nameUUIDFromBytes((source.sourceId() + "::" + imagePath + "::" + contentHash).getBytes(StandardCharsets.UTF_8)).toString(),
                 source.sourceId(),
@@ -320,6 +360,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         );
     }
 
+    /**
+     * 向文本构建器追加独立内容块并返回起始偏移。
+     */
     private int appendBlock(StringBuilder builder, String block) {
         if (!builder.isEmpty()) {
             builder.append("\n\n");
@@ -329,19 +372,25 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return start;
     }
 
+    /**
+     * 抽取 Word 嵌入图片中的可见文本。
+     */
     private String extractEmbeddedImageText(DocumentSource source, String imagePath, byte[] imageBytes) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         if (source.metadata() != null) {
             metadata.putAll(source.metadata());
         }
         String contentType = imageContentType(imagePath);
-        metadata.put("contentType", contentType);
-        metadata.put("embeddedImagePath", imagePath);
+        metadata.put(MetadataKeys.CONTENT_TYPE, contentType);
+        metadata.put(MetadataKeys.EMBEDDED_IMAGE_PATH, imagePath);
         DocumentSource imageSource = new DocumentSource(source.sourceId(), source.title(), source.origin(), metadata);
         DocumentMultimodalExtractionResult result = documentMultimodalExtractionService.extract(imageSource, imageBytes);
         return normalizeExtractedText(result.text());
     }
 
+    /**
+     * 根据图片路径推断图片 MIME 类型。
+     */
     private String imageContentType(String imagePath) {
         String extension = extension(imagePath);
         return switch (extension) {
@@ -354,10 +403,16 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         };
     }
 
+    /**
+     * 判断 Office 嵌入图片格式是否支持处理。
+     */
     private boolean isSupportedOfficeImage(String imagePath) {
         return SUPPORTED_OFFICE_IMAGE_EXTENSIONS.contains(extension(imagePath));
     }
 
+    /**
+     * 提取路径中的小写文件扩展名。
+     */
     private String extension(String path) {
         if (path == null) {
             return "";
@@ -366,6 +421,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return dot < 0 ? "" : path.substring(dot + 1).toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 将 Word 关系目标路径规范化为压缩包内路径。
+     */
     private String normalizeWordTarget(String target) {
         String normalized = target.replace('\\', '/');
         if (normalized.startsWith("/")) {
@@ -374,6 +432,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return normalized.startsWith("word/") ? normalized : "word/" + normalized;
     }
 
+    /**
+     * 移除 Tika 抽取结果中由 Office 图片文件名产生的噪声行。
+     */
     private String removeOfficeImageArtifactLines(String text) {
         if (text == null || text.isBlank()) {
             return "";
@@ -388,26 +449,35 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         return normalizeExtractedText(builder.toString());
     }
 
+    /**
+     * 将文档资产信息转换为可写入文档元数据的摘要结构。
+     */
     private Map<String, Object> assetMetadata(DocumentAsset asset) {
         Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("assetId", asset.assetId());
-        metadata.put("assetType", asset.assetType());
-        metadata.put("fileName", asset.fileName());
-        metadata.put("contentType", asset.contentType());
-        metadata.put("fileSize", asset.fileSize());
-        metadata.put("contentHash", asset.contentHash());
-        metadata.put("textStart", asset.textStart());
-        metadata.put("textEnd", asset.textEnd());
+        metadata.put(MetadataKeys.ASSET_ID, asset.assetId());
+        metadata.put(MetadataKeys.ASSET_TYPE, asset.assetType());
+        metadata.put(MetadataKeys.FILE_NAME, asset.fileName());
+        metadata.put(MetadataKeys.CONTENT_TYPE, asset.contentType());
+        metadata.put(MetadataKeys.FILE_SIZE, asset.fileSize());
+        metadata.put(MetadataKeys.CONTENT_HASH, asset.contentHash());
+        metadata.put(MetadataKeys.TEXT_START, asset.textStart());
+        metadata.put(MetadataKeys.TEXT_END, asset.textEnd());
         if (asset.metadata() != null) {
             metadata.putAll(asset.metadata());
         }
         return metadata;
     }
 
+    /**
+     * 规范化抽取文本，空值回退为空字符串。
+     */
     private String normalizeExtractedText(String text) {
         return text == null ? "" : text.strip();
     }
 
+    /**
+     * 计算二进制内容的 SHA-256 十六进制摘要。
+     */
     private String sha256(byte[] content) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")

@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.ai.impl;
 
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
-import com.lqr.paperragserver.common.RetrievedChunk;
+import com.lqr.paperragserver.common.model.RetrievedChunk;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

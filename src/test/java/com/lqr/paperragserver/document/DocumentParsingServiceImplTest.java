@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.document;
 
-import com.lqr.paperragserver.common.ParsedDocument;
+import com.lqr.paperragserver.common.model.ParsedDocument;
 import com.lqr.paperragserver.document.impl.DocumentParsingServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService.DocumentMultimodalExtractionResult;

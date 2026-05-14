@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.common;
+package com.lqr.paperragserver.common.model;
 
 /**
  * 文档入库结果。

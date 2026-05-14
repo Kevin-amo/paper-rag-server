@@ -1,8 +1,8 @@
 package com.lqr.paperragserver.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lqr.paperragserver.common.DocumentIngestionResult;
-import com.lqr.paperragserver.common.DocumentSource;
+import com.lqr.paperragserver.common.model.DocumentIngestionResult;
+import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.DocumentManagementService;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;

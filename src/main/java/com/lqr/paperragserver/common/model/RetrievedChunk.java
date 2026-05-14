@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.common;
+package com.lqr.paperragserver.common.model;
 
 /**
  * 检索命中的文本片段。

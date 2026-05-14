@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.rag;
 
-import com.lqr.paperragserver.common.DocumentChunk;
-import com.lqr.paperragserver.common.RetrievedChunk;
+import com.lqr.paperragserver.common.model.DocumentChunk;
+import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import com.lqr.paperragserver.rag.impl.RagRetrievalServiceImpl;

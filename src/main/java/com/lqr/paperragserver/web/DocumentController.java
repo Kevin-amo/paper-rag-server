@@ -2,9 +2,10 @@ package com.lqr.paperragserver.web;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lqr.paperragserver.common.DocumentIngestionResult;
+import com.lqr.paperragserver.common.model.DocumentIngestionResult;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.DocumentManagementService;
+import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -63,6 +64,13 @@ public class DocumentController {
         return documentIngestionService.ingest(file.getOriginalFilename(), file.getBytes(), buildMetadata(sourceId, title));
     }
 
+    /**
+     * 批量上传并入库多个文档，单个文件失败不会中断整批处理。
+     *
+     * @param files 待上传文件数组
+     * @param items 与文件一一对应的可选元数据 JSON
+     * @return 批量入库结果
+     */
     @PostMapping(path = "/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BatchDocumentIngestionResponse ingestBatch(@RequestParam("files") MultipartFile[] files,
                                                       @RequestParam(value = "items", required = false) String items) {
@@ -96,6 +104,15 @@ public class DocumentController {
         return new BatchDocumentIngestionResponse(results, successCount, files.length - successCount);
     }
 
+    /**
+     * 分页查询文档摘要列表。
+     *
+     * @param keyword 可选关键词
+     * @param status 可选状态过滤
+     * @param page 页码，从 0 开始
+     * @param size 每页数量
+     * @return 文档摘要分页结果
+     */
     @GetMapping
     public PageResponse<DocumentSummaryResponse> list(@RequestParam(value = "keyword", required = false) String keyword,
                                                       @RequestParam(value = "status", required = false) String status,
@@ -111,6 +128,12 @@ public class DocumentController {
         );
     }
 
+    /**
+     * 查询单个文档详情。
+     *
+     * @param sourceId 文档来源 ID
+     * @return 文档详情
+     */
     @GetMapping("/{sourceId}")
     public DocumentDetailResponse detail(@PathVariable String sourceId) {
         return paperDocumentPersistenceService.findDocument(sourceId)
@@ -118,6 +141,14 @@ public class DocumentController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文档不存在"));
     }
 
+    /**
+     * 分页查询指定文档的分块内容。
+     *
+     * @param sourceId 文档来源 ID
+     * @param page 页码，从 0 开始
+     * @param size 每页数量
+     * @return 文档分块分页结果
+     */
     @GetMapping("/{sourceId}/chunks")
     public PageResponse<DocumentChunkResponse> chunks(@PathVariable String sourceId,
                                                       @RequestParam(value = "page", defaultValue = "0") @Min(0) int page,
@@ -132,6 +163,13 @@ public class DocumentController {
         );
     }
 
+    /**
+     * 查询指定文档的资产列表。
+     *
+     * @param sourceId 文档来源 ID
+     * @param assetIds 可选的逗号分隔资产 ID 列表
+     * @return 文档资产列表
+     */
     @GetMapping("/{sourceId}/assets")
     public List<DocumentAssetResponse> assets(@PathVariable String sourceId,
                                               @RequestParam(value = "assetIds", required = false) String assetIds) {
@@ -140,6 +178,13 @@ public class DocumentController {
                 .toList();
     }
 
+    /**
+     * 下载指定文档资产的原始内容。
+     *
+     * @param sourceId 文档来源 ID
+     * @param assetId 资产 ID
+     * @return 资产二进制响应
+     */
     @GetMapping("/{sourceId}/assets/{assetId}/content")
     public ResponseEntity<byte[]> assetContent(@PathVariable String sourceId, @PathVariable String assetId) {
         PaperDocumentPersistenceService.DocumentAssetView asset = paperDocumentPersistenceService.findAsset(sourceId, assetId)
@@ -154,6 +199,13 @@ public class DocumentController {
                 .body(content);
     }
 
+    /**
+     * 更新指定文档的元数据并返回最新详情。
+     *
+     * @param sourceId 文档来源 ID
+     * @param request 元数据更新请求
+     * @return 更新后的文档详情
+     */
     @PatchMapping("/{sourceId}/metadata")
     public DocumentDetailResponse updateMetadata(@PathVariable String sourceId,
                                                  @Valid @RequestBody DocumentMetadataRequest request) {
@@ -172,29 +224,54 @@ public class DocumentController {
         documentIngestionService.deleteBySourceId(sourceId);
     }
 
+    /**
+     * 恢复已删除文档并返回最新详情。
+     *
+     * @param sourceId 文档来源 ID
+     * @return 恢复后的文档详情
+     */
     @PostMapping("/{sourceId}/restore")
     public DocumentDetailResponse restore(@PathVariable String sourceId) {
         documentManagementService.restore(sourceId);
         return detail(sourceId);
     }
 
+    /**
+     * 重新构建指定文档的分块和向量索引。
+     *
+     * @param sourceId 文档来源 ID
+     * @return 重建索引结果
+     */
     @PostMapping("/{sourceId}/reindex")
     public ReindexResponse reindex(@PathVariable String sourceId) {
         DocumentManagementService.ReindexResult result = documentManagementService.reindex(sourceId);
         return new ReindexResponse(result.sourceId(), result.chunkCount());
     }
 
+    /**
+     * 构建入库时传递给解析流程的基础元数据。
+     *
+     * @param sourceId 可选来源 ID
+     * @param title 可选标题
+     * @return 元数据映射
+     */
     private Map<String, Object> buildMetadata(String sourceId, String title) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         if (sourceId != null && !sourceId.isBlank()) {
-            metadata.put("sourceId", sourceId);
+            metadata.put(MetadataKeys.SOURCE_ID, sourceId);
         }
         if (title != null && !title.isBlank()) {
-            metadata.put("title", title);
+            metadata.put(MetadataKeys.TITLE, title);
         }
         return metadata;
     }
 
+    /**
+     * 将逗号分隔的资产 ID 参数解析为列表。
+     *
+     * @param assetIds 逗号分隔的资产 ID
+     * @return 资产 ID 列表
+     */
     private List<String> parseAssetIds(String assetIds) {
         if (assetIds == null || assetIds.isBlank()) {
             return List.of();
@@ -205,7 +282,13 @@ public class DocumentController {
                 .toList();
     }
 
-    // 把 item 解析成列表
+    /**
+     * 解析批量上传中与文件一一对应的元数据项。
+     *
+     * @param items 元数据 JSON 字符串
+     * @param fileCount 文件数量
+     * @return 批量上传项请求列表
+     */
     private List<BatchDocumentIngestionItemRequest> parseBatchItems(String items, int fileCount) {
         if (items == null || items.isBlank()) {
             return java.util.stream.IntStream.range(0, fileCount)
@@ -231,6 +314,13 @@ public class DocumentController {
         }
     }
 
+    /**
+     * 解析上传文件名，缺失时回退到批量项中的文件名。
+     *
+     * @param file 上传文件
+     * @param item 批量上传项元数据
+     * @return 可用于入库的文件名
+     */
     private String originalFileName(MultipartFile file, BatchDocumentIngestionItemRequest item) {
         String fileName = file.getOriginalFilename();
         if (fileName != null && !fileName.isBlank()) {
@@ -257,6 +347,14 @@ public class DocumentController {
             DocumentSourceResponse source,
             Integer chunkCount
     ) {
+        /**
+         * 构建批量入库成功项响应。
+         *
+         * @param index 文件序号
+         * @param fileName 文件名
+         * @param result 入库结果
+         * @return 成功项响应
+         */
         static BatchDocumentIngestionItemResponse success(int index, String fileName, DocumentIngestionResult result) {
             return new BatchDocumentIngestionItemResponse(
                     index,
@@ -268,6 +366,14 @@ public class DocumentController {
             );
         }
 
+        /**
+         * 构建批量入库失败项响应。
+         *
+         * @param index 文件序号
+         * @param fileName 文件名
+         * @param errorMessage 错误信息
+         * @return 失败项响应
+         */
         static BatchDocumentIngestionItemResponse failure(int index, String fileName, String errorMessage) {
             return new BatchDocumentIngestionItemResponse(index, fileName, false, errorMessage, null, null);
         }
@@ -282,7 +388,13 @@ public class DocumentController {
             String origin,
             Map<String, Object> metadata
     ) {
-        static DocumentSourceResponse from(com.lqr.paperragserver.common.DocumentSource source) {
+        /**
+         * 将内部文档来源对象转换为接口响应。
+         *
+         * @param source 文档来源对象
+         * @return 文档来源响应
+         */
+        static DocumentSourceResponse from(com.lqr.paperragserver.common.model.DocumentSource source) {
             return new DocumentSourceResponse(source.sourceId(), source.title(), source.origin(), source.metadata());
         }
     }
@@ -303,6 +415,12 @@ public class DocumentController {
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
     ) {
+        /**
+         * 将持久化层文档摘要转换为接口响应。
+         *
+         * @param document 文档摘要
+         * @return 文档摘要响应
+         */
         static DocumentSummaryResponse from(PaperDocumentPersistenceService.DocumentSummary document) {
             return new DocumentSummaryResponse(
                     document.sourceId(),
@@ -342,6 +460,12 @@ public class DocumentController {
             OffsetDateTime updatedAt,
             OffsetDateTime deletedAt
     ) {
+        /**
+         * 将持久化层文档详情转换为接口响应。
+         *
+         * @param document 文档详情
+         * @return 文档详情响应
+         */
         static DocumentDetailResponse from(PaperDocumentPersistenceService.DocumentDetail document) {
             return new DocumentDetailResponse(
                     document.sourceId(),
@@ -382,6 +506,12 @@ public class DocumentController {
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
     ) {
+        /**
+         * 将持久化层分块视图转换为接口响应。
+         *
+         * @param chunk 分块视图
+         * @return 分块响应
+         */
         static DocumentChunkResponse from(PaperDocumentPersistenceService.DocumentChunkView chunk) {
             return new DocumentChunkResponse(
                     chunk.chunkId(),
@@ -416,6 +546,12 @@ public class DocumentController {
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
     ) {
+        /**
+         * 将持久化层资产视图转换为接口响应。
+         *
+         * @param asset 资产视图
+         * @return 资产响应
+         */
         static DocumentAssetResponse from(PaperDocumentPersistenceService.DocumentAssetView asset) {
             return new DocumentAssetResponse(
                     asset.assetId(),
@@ -446,6 +582,11 @@ public class DocumentController {
             Object keywords,
             Map<String, Object> metadata
     ) {
+        /**
+         * 转换为持久化层元数据更新对象。
+         *
+         * @return 元数据更新对象
+         */
         PaperDocumentPersistenceService.DocumentMetadataUpdate toUpdate() {
             return new PaperDocumentPersistenceService.DocumentMetadataUpdate(
                     title,

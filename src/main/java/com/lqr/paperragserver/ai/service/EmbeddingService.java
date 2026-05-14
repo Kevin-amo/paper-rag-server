@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.ai.service;
 
-import com.lqr.paperragserver.common.DocumentChunk;
+import com.lqr.paperragserver.common.model.DocumentChunk;
 
 import java.util.List;
 import java.util.Map;

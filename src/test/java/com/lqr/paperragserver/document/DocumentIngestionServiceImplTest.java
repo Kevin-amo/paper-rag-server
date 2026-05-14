@@ -1,11 +1,11 @@
 package com.lqr.paperragserver.document;
 
 import com.lqr.paperragserver.ai.service.EmbeddingService;
-import com.lqr.paperragserver.common.DocumentAsset;
-import com.lqr.paperragserver.common.DocumentChunk;
-import com.lqr.paperragserver.common.DocumentIngestionResult;
-import com.lqr.paperragserver.common.DocumentSource;
-import com.lqr.paperragserver.common.ParsedDocument;
+import com.lqr.paperragserver.common.model.DocumentAsset;
+import com.lqr.paperragserver.common.model.DocumentChunk;
+import com.lqr.paperragserver.common.model.DocumentIngestionResult;
+import com.lqr.paperragserver.common.model.DocumentSource;
+import com.lqr.paperragserver.common.model.ParsedDocument;
 import com.lqr.paperragserver.document.impl.DocumentIngestionServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentParsingService;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;

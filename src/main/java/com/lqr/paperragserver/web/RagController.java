@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.web;
 
-import com.lqr.paperragserver.common.RagAnswer;
+import com.lqr.paperragserver.common.model.RagAnswer;
 import com.lqr.paperragserver.rag.service.RagAnswerService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -21,6 +21,11 @@ public class RagController {
 
     private final RagAnswerService ragAnswerService;
 
+    /**
+     * 创建 RAG 问答控制器。
+     *
+     * @param ragAnswerService 问答服务
+     */
     public RagController(RagAnswerService ragAnswerService) {
         this.ragAnswerService = ragAnswerService;
     }

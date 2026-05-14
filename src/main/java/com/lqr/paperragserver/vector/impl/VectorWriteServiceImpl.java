@@ -3,14 +3,17 @@ package com.lqr.paperragserver.vector.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.ai.service.EmbeddingService;
-import com.lqr.paperragserver.common.DocumentChunk;
+import com.lqr.paperragserver.common.model.DocumentChunk;
+import com.lqr.paperragserver.common.constant.MetadataKeys;
+import com.lqr.paperragserver.paper.mapper.PaperDocumentChunkMapper;
+import com.lqr.paperragserver.vector.mapper.VectorStoreMapper;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -22,8 +25,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VectorWriteServiceImpl implements VectorWriteService {
 
-    private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final VectorStoreMapper vectorStoreMapper;
+    private final PaperDocumentChunkMapper chunkMapper;
     private final ObjectMapper objectMapper;
+    @Value("${spring.ai.vectorstore.pgvector.dimensions:1536}")
+    private int embeddingDimensions;
 
     /**
      * 将分块向量写入向量表并回填文档分块记录。
@@ -38,33 +44,21 @@ public class VectorWriteServiceImpl implements VectorWriteService {
         }
         for (EmbeddingService.EmbeddingVector vector : vectors) {
             DocumentChunk chunk = vector.chunk();
-            UUID vectorStoreId = UUID.nameUUIDFromBytes(chunk.chunkId().getBytes());
+            UUID vectorStoreId = UUID.nameUUIDFromBytes(chunk.chunkId().getBytes(StandardCharsets.UTF_8));
             Map<String, Object> metadata = new java.util.LinkedHashMap<>();
             if (vector.metadata() != null) {
                 metadata.putAll(vector.metadata());
             }
-            metadata.put("sourceId", chunk.sourceId());
-            metadata.put("chunkId", chunk.chunkId());
-            metadata.put("chunkIndex", chunk.chunkIndex());
-            jdbcTemplate.update("""
-                    insert into public.vector_store (id, content, metadata, embedding)
-                    values (:id, :content, cast(:metadata as json), cast(:embedding as vector))
-                    on conflict (id) do update set
-                        content = excluded.content,
-                        metadata = excluded.metadata,
-                        embedding = excluded.embedding
-                    """, new MapSqlParameterSource()
-                    .addValue("id", vectorStoreId)
-                    .addValue("content", chunk.content())
-                    .addValue("metadata", toJson(metadata))
-                    .addValue("embedding", toVectorLiteral(vector.vector())));
-            jdbcTemplate.update("""
-                    update public.paper_document_chunk
-                    set vector_store_id = :vectorStoreId, updated_at = now()
-                    where chunk_id = :chunkId
-                    """, new MapSqlParameterSource()
-                    .addValue("vectorStoreId", vectorStoreId)
-                    .addValue("chunkId", chunk.chunkId()));
+            metadata.put(MetadataKeys.SOURCE_ID, chunk.sourceId());
+            metadata.put(MetadataKeys.CHUNK_ID, chunk.chunkId());
+            metadata.put(MetadataKeys.CHUNK_INDEX, chunk.chunkIndex());
+            vectorStoreMapper.upsert(
+                    vectorStoreId,
+                    chunk.content(),
+                    toJson(metadata),
+                    toVectorLiteral(vector.vector())
+            );
+            chunkMapper.updateVectorStoreId(chunk.chunkId(), vectorStoreId);
         }
     }
 
@@ -79,10 +73,7 @@ public class VectorWriteServiceImpl implements VectorWriteService {
         if (sourceId == null || sourceId.isBlank()) {
             return;
         }
-        jdbcTemplate.update("""
-                delete from public.vector_store
-                where metadata ->> 'sourceId' = :sourceId
-                """, new MapSqlParameterSource("sourceId", sourceId));
+        vectorStoreMapper.deleteBySourceId(sourceId);
     }
 
     /**
@@ -109,8 +100,8 @@ public class VectorWriteServiceImpl implements VectorWriteService {
         if (vector == null || vector.length == 0) {
             throw new IllegalArgumentException("embedding 向量不能为空");
         }
-        if (vector.length != 1536) {
-            throw new IllegalArgumentException("embedding 向量维度必须为 1536，实际为 " + vector.length);
+        if (vector.length != embeddingDimensions) {
+            throw new IllegalArgumentException("embedding 向量维度必须为 " + embeddingDimensions + "，实际为 " + vector.length);
         }
         StringBuilder builder = new StringBuilder(vector.length * 8).append('[');
         for (int i = 0; i < vector.length; i++) {

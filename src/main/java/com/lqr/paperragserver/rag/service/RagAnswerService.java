@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.rag.service;
 
-import com.lqr.paperragserver.common.RagAnswer;
+import com.lqr.paperragserver.common.model.RagAnswer;
 
 /**
  * 问答编排服务接口。

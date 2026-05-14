@@ -1,8 +1,9 @@
 package com.lqr.paperragserver.document.impl;
 
-import com.lqr.paperragserver.common.DocumentChunk;
-import com.lqr.paperragserver.common.DocumentSource;
+import com.lqr.paperragserver.common.model.DocumentChunk;
+import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -461,6 +462,9 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return splitParagraphUnits(section, section.paragraphs());
     }
 
+    /**
+     * 按段落边界聚合切片，超长段落回退为滑动窗口切分。
+     */
     private List<ChunkSlice> splitParagraphUnits(SectionBlock section, List<ParagraphBlock> paragraphs) {
         List<ChunkSlice> chunks = new ArrayList<>();
         List<ParagraphBlock> buffer = new ArrayList<>();
@@ -508,6 +512,9 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return chunks;
     }
 
+    /**
+     * 判断当前位置是否以隐式目录条目块开头。
+     */
     private boolean startsImplicitContentsBlock(List<ParagraphBlock> paragraphs, int startIndex) {
         int matchedEntries = 0;
         for (int index = startIndex; index < paragraphs.size() && index < startIndex + 12; index++) {
@@ -524,6 +531,9 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return false;
     }
 
+    /**
+     * 统计段落中符合目录项特征的行数。
+     */
     private int countContentsEntryLines(ParagraphBlock paragraph) {
         int count = 0;
         for (LineBlock line : extractLines(paragraph.content())) {
@@ -534,6 +544,9 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return count;
     }
 
+    /**
+     * 判断段落是否包含目录项行。
+     */
     private boolean containsContentsEntries(ParagraphBlock paragraph) {
         for (LineBlock line : extractLines(paragraph.content())) {
             if (looksLikeContentsEntry(line.content())) {
@@ -543,6 +556,9 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return false;
     }
 
+    /**
+     * 判断单行文本是否符合目录项格式。
+     */
     private boolean looksLikeContentsEntry(String text) {
         String normalized = normalizeWhitespace(text);
         if (normalized.isBlank() || normalized.length() > 240) {
@@ -621,21 +637,21 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         Map<String, Object> metadata = new LinkedHashMap<>();
         if (source.metadata() != null) {
             source.metadata().forEach((key, value) -> {
-                if (!"documentAssets".equals(key)) {
+                if (!MetadataKeys.DOCUMENT_ASSETS.equals(key)) {
                     metadata.put(key, value);
                 }
             });
         }
         List<String> assetIds = overlappingAssetIds(source.metadata(), slice.start(), slice.end());
         if (!assetIds.isEmpty()) {
-            metadata.put("assetIds", assetIds);
+            metadata.put(MetadataKeys.ASSET_IDS, assetIds);
         }
-        metadata.put("sectionTitle", slice.sectionTitle());
-        metadata.put("sectionType", slice.sectionType().name());
-        metadata.put("sectionLevel", slice.sectionLevel());
-        metadata.put("chunkStart", slice.start());
-        metadata.put("chunkEnd", slice.end());
-        metadata.put("chunkLength", slice.content().length());
+        metadata.put(MetadataKeys.SECTION_TITLE, slice.sectionTitle());
+        metadata.put(MetadataKeys.SECTION_TYPE, slice.sectionType().name());
+        metadata.put(MetadataKeys.SECTION_LEVEL, slice.sectionLevel());
+        metadata.put(MetadataKeys.CHUNK_START, slice.start());
+        metadata.put(MetadataKeys.CHUNK_END, slice.end());
+        metadata.put(MetadataKeys.CHUNK_LENGTH, slice.content().length());
         return new DocumentChunk(
                 UUID.nameUUIDFromBytes((source.sourceId() + "::" + chunkIndex + "::" + slice.start() + "::" + slice.end()).getBytes()).toString(),
                 source.sourceId(),
@@ -645,8 +661,11 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         );
     }
 
+    /**
+     * 查找与当前切片原文范围重叠的文档资产 ID。
+     */
     private List<String> overlappingAssetIds(Map<String, Object> sourceMetadata, int chunkStart, int chunkEnd) {
-        Object documentAssets = sourceMetadata == null ? null : sourceMetadata.get("documentAssets");
+        Object documentAssets = sourceMetadata == null ? null : sourceMetadata.get(MetadataKeys.DOCUMENT_ASSETS);
         if (!(documentAssets instanceof List<?> assets)) {
             return List.of();
         }
@@ -657,16 +676,22 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
                 .toList();
     }
 
+    /**
+     * 若资产文本范围与切片范围重叠，则返回资产 ID。
+     */
     private String assetIdIfOverlapping(Map<?, ?> asset, int chunkStart, int chunkEnd) {
-        Integer textStart = integerValue(asset.get("textStart"));
-        Integer textEnd = integerValue(asset.get("textEnd"));
-        Object assetId = asset.get("assetId");
+        Integer textStart = integerValue(asset.get(MetadataKeys.TEXT_START));
+        Integer textEnd = integerValue(asset.get(MetadataKeys.TEXT_END));
+        Object assetId = asset.get(MetadataKeys.ASSET_ID);
         if (assetId == null || textStart == null || textEnd == null) {
             return null;
         }
         return textStart <= chunkEnd && textEnd >= chunkStart ? String.valueOf(assetId) : null;
     }
 
+    /**
+     * 将元数据值安全转换为整数。
+     */
     private Integer integerValue(Object value) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -712,20 +737,32 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         private final int level;
         private final List<ParagraphBlock> paragraphs = new ArrayList<>();
 
+        /**
+         * 创建章节构建器。
+         */
         private SectionBuilder(String title, SectionType type, int level) {
             this.title = title;
             this.type = type;
             this.level = level;
         }
 
+        /**
+         * 追加章节内段落。
+         */
         private void add(ParagraphBlock paragraph) {
             paragraphs.add(paragraph);
         }
 
+        /**
+         * 构建不可变章节块。
+         */
         private SectionBlock build() {
             return new SectionBlock(title, type, level, List.copyOf(paragraphs));
         }
 
+        /**
+         * 返回当前章节类型。
+         */
         private SectionType type() {
             return type;
         }

@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.ai.impl;
 
 import com.lqr.paperragserver.ai.service.EmbeddingService;
-import com.lqr.paperragserver.common.DocumentChunk;
+import com.lqr.paperragserver.common.model.DocumentChunk;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Service;

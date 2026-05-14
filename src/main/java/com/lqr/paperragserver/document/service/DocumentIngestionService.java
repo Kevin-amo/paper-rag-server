@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.document.service;
 
-import com.lqr.paperragserver.common.DocumentIngestionResult;
+import com.lqr.paperragserver.common.model.DocumentIngestionResult;
 
 import java.util.Map;
 

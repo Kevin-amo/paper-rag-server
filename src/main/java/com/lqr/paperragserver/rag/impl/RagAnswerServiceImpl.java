@@ -2,10 +2,11 @@ package com.lqr.paperragserver.rag.impl;
 
 import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
-import com.lqr.paperragserver.common.AnswerCitation;
-import com.lqr.paperragserver.common.RagAnswer;
-import com.lqr.paperragserver.common.RetrievedChunk;
+import com.lqr.paperragserver.common.model.AnswerCitation;
+import com.lqr.paperragserver.common.model.RagAnswer;
+import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.rag.service.RagAnswerService;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import org.springframework.stereotype.Service;
@@ -60,7 +61,7 @@ public class RagAnswerServiceImpl implements RagAnswerService {
                         chunk.chunk().sourceId(),
                         chunk.chunk().chunkId(),
                         chunk.chunk().chunkIndex(),
-                        stringMetadata(chunk.chunk().metadata(), "title"),
+                        stringMetadata(chunk.chunk().metadata(), MetadataKeys.TITLE),
                         cutExcerpt(chunk.chunk().content()),
                         chunk.rankScore()))
                 .toList();

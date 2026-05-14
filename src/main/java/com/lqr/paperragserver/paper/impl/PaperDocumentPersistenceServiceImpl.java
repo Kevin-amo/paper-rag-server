@@ -1,25 +1,27 @@
 package com.lqr.paperragserver.paper.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lqr.paperragserver.common.DocumentAsset;
-import com.lqr.paperragserver.common.DocumentChunk;
-import com.lqr.paperragserver.common.DocumentSource;
+import com.lqr.paperragserver.common.model.DocumentAsset;
+import com.lqr.paperragserver.common.model.DocumentChunk;
+import com.lqr.paperragserver.common.model.DocumentSource;
+import com.lqr.paperragserver.common.constant.MetadataKeys;
+import com.lqr.paperragserver.paper.entity.PaperDocumentAssetEntity;
+import com.lqr.paperragserver.paper.entity.PaperDocumentChunkEntity;
+import com.lqr.paperragserver.paper.entity.PaperDocumentEntity;
+import com.lqr.paperragserver.paper.mapper.PaperDocumentAssetMapper;
+import com.lqr.paperragserver.paper.mapper.PaperDocumentChunkMapper;
+import com.lqr.paperragserver.paper.mapper.PaperDocumentMapper;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
@@ -27,109 +29,87 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * JDBC 实现的文档元数据持久化服务。
+ * 基于 MyBatis-Plus 的文档元数据持久化服务。
  */
 @Service
 @RequiredArgsConstructor
 public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersistenceService {
 
-    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {
-    };
     private static final int SECTION_TITLE_MAX_LENGTH = 512;
     private static final Pattern SEARCH_TOKEN = Pattern.compile("[\\p{IsHan}A-Za-z0-9]+");
 
-    private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final PaperDocumentMapper documentMapper;
+    private final PaperDocumentChunkMapper chunkMapper;
+    private final PaperDocumentAssetMapper assetMapper;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 分页查询文档摘要，支持关键词和状态过滤。
+     */
     @Override
     public PageResult<DocumentSummary> listDocuments(String keyword, String status, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = clamp(size, 1, 100);
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("keyword", normalizeLikeKeyword(keyword))
-                .addValue("status", normalizeStatus(status))
-                .addValue("limit", safeSize)
-                .addValue("offset", safePage * safeSize);
-        String whereSql = documentWhereSql(keyword, status);
-        Long total = jdbcTemplate.queryForObject("""
-                select count(*)
-                from public.paper_document
-                """ + whereSql, params, Long.class);
-        List<DocumentSummary> items = jdbcTemplate.query("""
-                select source_id, title, origin, file_name, file_type, file_size, status, chunk_count,
-                       publish_year, created_at, updated_at
-                from public.paper_document
-                """ + whereSql + """
-                order by updated_at desc, created_at desc
-                limit :limit offset :offset
-                """, params, new DocumentSummaryRowMapper());
-        return new PageResult<>(items, safePage, safeSize, total == null ? 0 : total);
+        LambdaQueryWrapper<PaperDocumentEntity> wrapper = documentListWrapper(keyword, status)
+                .orderByDesc(PaperDocumentEntity::getUpdatedAt)
+                .orderByDesc(PaperDocumentEntity::getCreatedAt);
+        Page<PaperDocumentEntity> result = documentMapper.selectPage(new Page<>(safePage + 1L, safeSize), wrapper);
+        List<DocumentSummary> items = result.getRecords().stream()
+                .map(this::toDocumentSummary)
+                .toList();
+        return new PageResult<>(items, safePage, safeSize, result.getTotal());
     }
 
+    /**
+     * 按来源 ID 查询文档详情。
+     */
     @Override
     public Optional<DocumentDetail> findDocument(String sourceId) {
-        List<DocumentDetail> results = jdbcTemplate.query("""
-                select source_id, title, origin, file_name, file_type, file_size,
-                       authors, abstract, doi, journal, publish_year, keywords,
-                       content_text, metadata, status, chunk_count, error_message,
-                       created_at, updated_at, deleted_at
-                from public.paper_document
-                where source_id = :sourceId
-                """, new MapSqlParameterSource("sourceId", sourceId), new DocumentDetailRowMapper());
-        return results.stream().findFirst();
+        return Optional.ofNullable(documentMapper.selectOne(new LambdaQueryWrapper<PaperDocumentEntity>()
+                        .eq(PaperDocumentEntity::getSourceId, sourceId)))
+                .map(this::toDocumentDetail);
     }
 
+    /**
+     * 分页查询指定文档的分块视图。
+     */
     @Override
     public PageResult<DocumentChunkView> listChunks(String sourceId, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = clamp(size, 1, 200);
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("sourceId", sourceId)
-                .addValue("limit", safeSize)
-                .addValue("offset", safePage * safeSize);
-        Long total = jdbcTemplate.queryForObject("""
-                select count(*)
-                from public.paper_document_chunk
-                where source_id = :sourceId
-                """, params, Long.class);
-        List<DocumentChunkView> items = jdbcTemplate.query("""
-                select chunk_id, chunk_index, content, content_hash, chunk_start, chunk_end,
-                       page_number, section_title, metadata, vector_store_id, created_at, updated_at
-                from public.paper_document_chunk
-                where source_id = :sourceId
-                order by chunk_index asc
-                limit :limit offset :offset
-                """, params, new DocumentChunkViewRowMapper());
-        return new PageResult<>(items, safePage, safeSize, total == null ? 0 : total);
+        Page<PaperDocumentChunkEntity> result = chunkMapper.selectPage(new Page<>(safePage + 1L, safeSize),
+                new LambdaQueryWrapper<PaperDocumentChunkEntity>()
+                        .eq(PaperDocumentChunkEntity::getSourceId, sourceId)
+                        .orderByAsc(PaperDocumentChunkEntity::getChunkIndex));
+        List<DocumentChunkView> items = result.getRecords().stream()
+                .map(this::toDocumentChunkView)
+                .toList();
+        return new PageResult<>(items, safePage, safeSize, result.getTotal());
     }
 
+    /**
+     * 基于本地关键词评分检索候选文档分块。
+     */
     @Override
     public List<DocumentChunk> searchChunks(String question, int limit) {
         if (question == null || question.isBlank() || limit <= 0) {
             return List.of();
         }
         int safeLimit = clamp(limit, 1, 200);
-        List<DocumentChunk> candidates = jdbcTemplate.query("""
-                select c.chunk_id, c.source_id, c.chunk_index, c.content, c.metadata
-                from public.paper_document_chunk c
-                join public.paper_document d on d.source_id = c.source_id
-                where d.deleted_at is null
-                  and d.status = 'INDEXED'
-                order by c.source_id asc, c.chunk_index asc
-                """, new MapSqlParameterSource(), (rs, rowNum) -> new DocumentChunk(
-                rs.getString("chunk_id"),
-                rs.getString("source_id"),
-                rs.getInt("chunk_index"),
-                rs.getString("content"),
-                jsonMap(rs.getObject("metadata"))
-        ));
-
+        List<DocumentChunk> candidates = chunkMapper.selectSearchCandidates().stream()
+                .map(entity -> new DocumentChunk(
+                        entity.getChunkId(),
+                        entity.getSourceId(),
+                        intOrZero(entity.getChunkIndex()),
+                        entity.getContent(),
+                        safeMetadata(entity.getMetadata())
+                ))
+                .toList();
         List<String> terms = extractSearchTerms(question);
         return candidates.stream()
                 .map(chunk -> new ScoredDocumentChunk(chunk, lexicalScore(question, chunk, terms)))
@@ -142,234 +122,319 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
                 .toList();
     }
 
+    /**
+     * 更新文档可编辑元数据字段。
+     */
     @Override
     public void updateMetadata(String sourceId, DocumentMetadataUpdate update) {
         Map<String, Object> metadata = update.metadata() == null ? Map.of() : update.metadata();
-        jdbcTemplate.update("""
-                update public.paper_document
-                set title = coalesce(:title, title),
-                    authors = coalesce(cast(:authors as jsonb), authors),
-                    abstract = coalesce(:abstractText, abstract),
-                    doi = coalesce(:doi, doi),
-                    journal = coalesce(:journal, journal),
-                    publish_year = coalesce(:publishYear, publish_year),
-                    keywords = coalesce(cast(:keywords as jsonb), keywords),
-                    metadata = metadata || cast(:metadata as jsonb),
-                    updated_at = now()
-                where source_id = :sourceId
-                """, new MapSqlParameterSource()
-                .addValue("sourceId", sourceId)
-                .addValue("title", blankToNull(update.title()))
-                .addValue("authors", toNullableJson(update.authors()))
-                .addValue("abstractText", blankToNull(update.abstractText()))
-                .addValue("doi", blankToNull(update.doi()))
-                .addValue("journal", blankToNull(update.journal()))
-                .addValue("publishYear", update.publishYear())
-                .addValue("keywords", toNullableJson(update.keywords()))
-                .addValue("metadata", toJson(metadata)));
+        documentMapper.updateMetadata(
+                sourceId,
+                blankToNull(update.title()),
+                toNullableJson(update.authors()),
+                blankToNull(update.abstractText()),
+                blankToNull(update.doi()),
+                blankToNull(update.journal()),
+                update.publishYear(),
+                toNullableJson(update.keywords()),
+                toJson(metadata)
+        );
     }
 
+    /**
+     * 恢复已软删除文档。
+     */
     @Override
     public void restore(String sourceId) {
-        jdbcTemplate.update("""
-                update public.paper_document
-                set status = 'PENDING', deleted_at = null, updated_at = now()
-                where source_id = :sourceId and deleted_at is not null
-                """, new MapSqlParameterSource("sourceId", sourceId));
+        documentMapper.restore(sourceId);
     }
 
+    /**
+     * 标记文档进入解析中状态并保存正文与基础元数据。
+     */
     @Override
     @Transactional
     public void markParsing(DocumentSource source, String contentText) {
         Map<String, Object> metadata = source.metadata() == null ? Map.of() : source.metadata();
-        jdbcTemplate.update("""
-                insert into public.paper_document (
-                    source_id, title, origin, file_name, file_type, file_size, content_text, metadata, status, chunk_count, error_message
-                ) values (
-                    :sourceId, :title, :origin, :fileName, :fileType, :fileSize, :contentText, cast(:metadata as jsonb), 'PARSING', 0, null
-                )
-                on conflict (source_id) do update set
-                    title = excluded.title,
-                    origin = excluded.origin,
-                    file_name = excluded.file_name,
-                    file_type = excluded.file_type,
-                    file_size = excluded.file_size,
-                    content_text = excluded.content_text,
-                    metadata = excluded.metadata,
-                    status = 'PARSING',
-                    chunk_count = 0,
-                    error_message = null,
-                    deleted_at = null,
-                    updated_at = now()
-                """, new MapSqlParameterSource()
-                .addValue("sourceId", source.sourceId())
-                .addValue("title", nonBlank(source.title(), source.origin(), source.sourceId()))
-                .addValue("origin", source.origin())
-                .addValue("fileName", stringValue(metadata.get("fileName")))
-                .addValue("fileType", stringValue(metadata.get("contentType")))
-                .addValue("fileSize", longValue(metadata.get("contentLength")))
-                .addValue("contentText", contentText)
-                .addValue("metadata", toJson(metadata)));
+        documentMapper.upsertParsing(
+                source.sourceId(),
+                nonBlank(source.title(), source.origin(), source.sourceId()),
+                source.origin(),
+                stringValue(metadata.get(MetadataKeys.FILE_NAME)),
+                stringValue(metadata.get(MetadataKeys.CONTENT_TYPE)),
+                longValue(metadata.get(MetadataKeys.CONTENT_LENGTH)),
+                contentText,
+                toJson(metadata)
+        );
     }
 
+    /**
+     * 替换指定文档的资产记录。
+     */
     @Override
     @Transactional
     public void replaceAssets(String sourceId, List<DocumentAsset> assets) {
-        jdbcTemplate.update("delete from public.paper_document_asset where source_id = :sourceId",
-                new MapSqlParameterSource("sourceId", sourceId));
+        assetMapper.delete(new LambdaQueryWrapper<PaperDocumentAssetEntity>()
+                .eq(PaperDocumentAssetEntity::getSourceId, sourceId));
         if (assets == null || assets.isEmpty()) {
             return;
         }
-        MapSqlParameterSource[] batch = assets.stream()
-                .map(asset -> new MapSqlParameterSource()
-                        .addValue("assetId", asset.assetId())
-                        .addValue("sourceId", asset.sourceId())
-                        .addValue("assetIndex", asset.assetIndex())
-                        .addValue("assetType", asset.assetType())
-                        .addValue("fileName", asset.fileName())
-                        .addValue("contentType", asset.contentType())
-                        .addValue("fileSize", asset.fileSize())
-                        .addValue("contentHash", asset.contentHash())
-                        .addValue("content", asset.content())
-                        .addValue("extractedText", asset.extractedText())
-                        .addValue("textStart", asset.textStart())
-                        .addValue("textEnd", asset.textEnd())
-                        .addValue("metadata", toJson(asset.metadata() == null ? Map.of() : asset.metadata())))
-                .toArray(MapSqlParameterSource[]::new);
-        jdbcTemplate.batchUpdate("""
-                insert into public.paper_document_asset (
-                    asset_id, source_id, asset_index, asset_type, file_name, content_type, file_size,
-                    content_hash, content, extracted_text, text_start, text_end, metadata
-                ) values (
-                    :assetId, :sourceId, :assetIndex, :assetType, :fileName, :contentType, :fileSize,
-                    :contentHash, :content, :extractedText, :textStart, :textEnd, cast(:metadata as jsonb)
-                )
-                """, batch);
+        for (DocumentAsset asset : assets) {
+            assetMapper.insert(toAssetEntity(asset));
+        }
     }
 
+    /**
+     * 查询指定文档的资产视图列表。
+     */
     @Override
     public List<DocumentAssetView> listAssets(String sourceId, List<String> assetIds) {
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("sourceId", sourceId)
-                .addValue("assetIds", assetIds == null || assetIds.isEmpty() ? null : assetIds);
-        String assetFilter = assetIds == null || assetIds.isEmpty() ? "" : " and asset_id in (:assetIds)\n";
-        return jdbcTemplate.query("""
-                select asset_id, source_id, asset_index, asset_type, file_name, content_type, file_size,
-                       content_hash, null::bytea as content, extracted_text, text_start, text_end,
-                       metadata, created_at, updated_at
-                from public.paper_document_asset
-                where source_id = :sourceId
-                """ + assetFilter + """
-                order by asset_index asc
-                """, params, new DocumentAssetViewRowMapper());
+        LambdaQueryWrapper<PaperDocumentAssetEntity> wrapper = new LambdaQueryWrapper<PaperDocumentAssetEntity>()
+                .select(PaperDocumentAssetEntity::getAssetId,
+                        PaperDocumentAssetEntity::getSourceId,
+                        PaperDocumentAssetEntity::getAssetIndex,
+                        PaperDocumentAssetEntity::getAssetType,
+                        PaperDocumentAssetEntity::getFileName,
+                        PaperDocumentAssetEntity::getContentType,
+                        PaperDocumentAssetEntity::getFileSize,
+                        PaperDocumentAssetEntity::getContentHash,
+                        PaperDocumentAssetEntity::getExtractedText,
+                        PaperDocumentAssetEntity::getTextStart,
+                        PaperDocumentAssetEntity::getTextEnd,
+                        PaperDocumentAssetEntity::getMetadata,
+                        PaperDocumentAssetEntity::getCreatedAt,
+                        PaperDocumentAssetEntity::getUpdatedAt)
+                .eq(PaperDocumentAssetEntity::getSourceId, sourceId)
+                .orderByAsc(PaperDocumentAssetEntity::getAssetIndex);
+        if (assetIds != null && !assetIds.isEmpty()) {
+            wrapper.in(PaperDocumentAssetEntity::getAssetId, assetIds);
+        }
+        return assetMapper.selectList(wrapper).stream()
+                .map(this::toDocumentAssetView)
+                .toList();
     }
 
+    /**
+     * 查询指定文档下的单个资产视图。
+     */
     @Override
     public Optional<DocumentAssetView> findAsset(String sourceId, String assetId) {
-        List<DocumentAssetView> results = jdbcTemplate.query("""
-                select asset_id, source_id, asset_index, asset_type, file_name, content_type, file_size,
-                       content_hash, content, extracted_text, text_start, text_end,
-                       metadata, created_at, updated_at
-                from public.paper_document_asset
-                where source_id = :sourceId and asset_id = :assetId
-                """, new MapSqlParameterSource()
-                .addValue("sourceId", sourceId)
-                .addValue("assetId", assetId), new DocumentAssetViewRowMapper());
-        return results.stream().findFirst();
+        return Optional.ofNullable(assetMapper.selectOne(new LambdaQueryWrapper<PaperDocumentAssetEntity>()
+                        .eq(PaperDocumentAssetEntity::getSourceId, sourceId)
+                        .eq(PaperDocumentAssetEntity::getAssetId, assetId)))
+                .map(this::toDocumentAssetView);
     }
 
+    /**
+     * 替换指定文档的分块记录。
+     */
     @Override
     @Transactional
     public void replaceChunks(String sourceId, List<DocumentChunk> chunks) {
-        jdbcTemplate.update("delete from public.paper_document_chunk where source_id = :sourceId",
-                new MapSqlParameterSource("sourceId", sourceId));
+        chunkMapper.delete(new LambdaQueryWrapper<PaperDocumentChunkEntity>()
+                .eq(PaperDocumentChunkEntity::getSourceId, sourceId));
         if (chunks == null || chunks.isEmpty()) {
             return;
         }
-        MapSqlParameterSource[] batch = chunks.stream()
-                .map(chunk -> new MapSqlParameterSource()
-                        .addValue("chunkId", chunk.chunkId())
-                        .addValue("sourceId", chunk.sourceId())
-                        .addValue("chunkIndex", chunk.chunkIndex())
-                        .addValue("content", chunk.content())
-                        .addValue("contentHash", sha256(chunk.content()))
-                        .addValue("chunkStart", intValue(chunk.metadata(), "chunkStart"))
-                        .addValue("chunkEnd", intValue(chunk.metadata(), "chunkEnd"))
-                        .addValue("pageNumber", intValue(chunk.metadata(), "pageNumber"))
-                        .addValue("sectionTitle", cut(stringValue(chunk.metadata() == null ? null : chunk.metadata().get("sectionTitle")), SECTION_TITLE_MAX_LENGTH))
-                        .addValue("metadata", toJson(chunk.metadata() == null ? Map.of() : chunk.metadata())))
-                .toArray(MapSqlParameterSource[]::new);
-        jdbcTemplate.batchUpdate("""
-                insert into public.paper_document_chunk (
-                    chunk_id, source_id, chunk_index, content, content_hash, chunk_start, chunk_end, page_number, section_title, metadata
-                ) values (
-                    :chunkId, :sourceId, :chunkIndex, :content, :contentHash, :chunkStart, :chunkEnd, :pageNumber, :sectionTitle, cast(:metadata as jsonb)
-                )
-                """, batch);
+        for (DocumentChunk chunk : chunks) {
+            chunkMapper.insert(toChunkEntity(chunk));
+        }
     }
 
+    /**
+     * 标记文档索引完成并记录分块数量。
+     */
     @Override
     public void markIndexed(String sourceId, int chunkCount) {
-        jdbcTemplate.update("""
-                update public.paper_document
-                set status = 'INDEXED', chunk_count = :chunkCount, error_message = null, updated_at = now()
-                where source_id = :sourceId
-                  and deleted_at is null
-                  and status <> 'DELETED'
-                """, new MapSqlParameterSource()
-                .addValue("sourceId", sourceId)
-                .addValue("chunkCount", chunkCount));
+        documentMapper.markIndexed(sourceId, chunkCount);
     }
 
+    /**
+     * 标记文档处理失败并截断过长错误信息。
+     */
     @Override
     public void markFailed(String sourceId, String errorMessage) {
-        jdbcTemplate.update("""
-                update public.paper_document
-                set status = 'FAILED', error_message = :errorMessage, updated_at = now()
-                where source_id = :sourceId
-                """, new MapSqlParameterSource()
-                .addValue("sourceId", sourceId)
-                .addValue("errorMessage", cut(errorMessage, 4000)));
+        documentMapper.markFailed(sourceId, cut(errorMessage, 4000));
     }
 
+    /**
+     * 软删除文档并清理关联资产和分块。
+     */
     @Override
     @Transactional
     public void markDeleted(String sourceId) {
-        jdbcTemplate.update("delete from public.paper_document_asset where source_id = :sourceId",
-                new MapSqlParameterSource("sourceId", sourceId));
-        jdbcTemplate.update("delete from public.paper_document_chunk where source_id = :sourceId",
-                new MapSqlParameterSource("sourceId", sourceId));
-        jdbcTemplate.update("""
-                update public.paper_document
-                set status = 'DELETED', deleted_at = now(), updated_at = now()
-                where source_id = :sourceId
-                """, new MapSqlParameterSource("sourceId", sourceId));
+        assetMapper.delete(new LambdaQueryWrapper<PaperDocumentAssetEntity>()
+                .eq(PaperDocumentAssetEntity::getSourceId, sourceId));
+        chunkMapper.delete(new LambdaQueryWrapper<PaperDocumentChunkEntity>()
+                .eq(PaperDocumentChunkEntity::getSourceId, sourceId));
+        documentMapper.markDeleted(sourceId);
     }
 
-    private String documentWhereSql(String keyword, String status) {
-        StringBuilder builder = new StringBuilder(" where 1 = 1\n");
+    /**
+     * 构建文档列表查询条件。
+     */
+    private LambdaQueryWrapper<PaperDocumentEntity> documentListWrapper(String keyword, String status) {
+        LambdaQueryWrapper<PaperDocumentEntity> wrapper = new LambdaQueryWrapper<>();
         if (status == null || status.isBlank()) {
-            builder.append(" and status <> 'DELETED'\n");
-            builder.append(" and deleted_at is null\n");
+            wrapper.ne(PaperDocumentEntity::getStatus, "DELETED")
+                    .isNull(PaperDocumentEntity::getDeletedAt);
         } else if (!"ALL".equalsIgnoreCase(status)) {
-            builder.append(" and status = :status\n");
-            if (!"DELETED".equalsIgnoreCase(status.trim())) {
-                builder.append(" and deleted_at is null\n");
+            String normalizedStatus = normalizeStatus(status);
+            wrapper.eq(PaperDocumentEntity::getStatus, normalizedStatus);
+            if (!"DELETED".equalsIgnoreCase(normalizedStatus)) {
+                wrapper.isNull(PaperDocumentEntity::getDeletedAt);
             }
         }
-        if (keyword != null && !keyword.isBlank()) {
-            builder.append("""
-                     and (
-                         title ilike :keyword
-                         or source_id ilike :keyword
-                         or file_name ilike :keyword
-                         or doi ilike :keyword
-                     )
-                    """);
+        String normalizedKeyword = normalizeLikeKeyword(keyword);
+        if (normalizedKeyword != null) {
+            wrapper.and(query -> query.apply("title ilike {0}", normalizedKeyword)
+                    .or().apply("source_id ilike {0}", normalizedKeyword)
+                    .or().apply("file_name ilike {0}", normalizedKeyword)
+                    .or().apply("doi ilike {0}", normalizedKeyword));
         }
-        return builder.toString();
+        return wrapper;
     }
 
+    /**
+     * 将文档实体转换为摘要视图。
+     */
+    private DocumentSummary toDocumentSummary(PaperDocumentEntity entity) {
+        return new DocumentSummary(
+                entity.getSourceId(),
+                entity.getTitle(),
+                entity.getOrigin(),
+                entity.getFileName(),
+                entity.getFileType(),
+                entity.getFileSize(),
+                entity.getStatus(),
+                intOrZero(entity.getChunkCount()),
+                entity.getPublishYear(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    /**
+     * 将文档实体转换为详情视图。
+     */
+    private DocumentDetail toDocumentDetail(PaperDocumentEntity entity) {
+        return new DocumentDetail(
+                entity.getSourceId(),
+                entity.getTitle(),
+                entity.getOrigin(),
+                entity.getFileName(),
+                entity.getFileType(),
+                entity.getFileSize(),
+                entity.getAuthors(),
+                entity.getAbstractText(),
+                entity.getDoi(),
+                entity.getJournal(),
+                entity.getPublishYear(),
+                entity.getKeywords(),
+                entity.getContentText(),
+                safeMetadata(entity.getMetadata()),
+                entity.getStatus(),
+                intOrZero(entity.getChunkCount()),
+                entity.getErrorMessage(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt(),
+                entity.getDeletedAt()
+        );
+    }
+
+    /**
+     * 将分块实体转换为分块视图。
+     */
+    private DocumentChunkView toDocumentChunkView(PaperDocumentChunkEntity entity) {
+        return new DocumentChunkView(
+                entity.getChunkId(),
+                intOrZero(entity.getChunkIndex()),
+                entity.getContent(),
+                entity.getContentHash(),
+                entity.getChunkStart(),
+                entity.getChunkEnd(),
+                entity.getPageNumber(),
+                entity.getSectionTitle(),
+                safeMetadata(entity.getMetadata()),
+                entity.getVectorStoreId(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    /**
+     * 将资产实体转换为资产视图。
+     */
+    private DocumentAssetView toDocumentAssetView(PaperDocumentAssetEntity entity) {
+        return new DocumentAssetView(
+                entity.getAssetId(),
+                entity.getSourceId(),
+                intOrZero(entity.getAssetIndex()),
+                entity.getAssetType(),
+                entity.getFileName(),
+                entity.getContentType(),
+                entity.getFileSize(),
+                entity.getContentHash(),
+                entity.getContent(),
+                entity.getExtractedText(),
+                entity.getTextStart(),
+                entity.getTextEnd(),
+                safeMetadata(entity.getMetadata()),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    /**
+     * 将文档分块领域对象转换为分块实体。
+     */
+    private PaperDocumentChunkEntity toChunkEntity(DocumentChunk chunk) {
+        Map<String, Object> metadata = chunk.metadata() == null ? Map.of() : chunk.metadata();
+        PaperDocumentChunkEntity entity = new PaperDocumentChunkEntity();
+        entity.setChunkId(chunk.chunkId());
+        entity.setSourceId(chunk.sourceId());
+        entity.setChunkIndex(chunk.chunkIndex());
+        entity.setContent(chunk.content());
+        entity.setContentHash(sha256(chunk.content()));
+        entity.setChunkStart(intValue(metadata, MetadataKeys.CHUNK_START));
+        entity.setChunkEnd(intValue(metadata, MetadataKeys.CHUNK_END));
+        entity.setPageNumber(intValue(metadata, MetadataKeys.PAGE_NUMBER));
+        entity.setSectionTitle(cut(stringValue(metadata.get(MetadataKeys.SECTION_TITLE)), SECTION_TITLE_MAX_LENGTH));
+        entity.setMetadata(metadata);
+        return entity;
+    }
+
+    /**
+     * 将文档资产领域对象转换为资产实体。
+     */
+    private PaperDocumentAssetEntity toAssetEntity(DocumentAsset asset) {
+        PaperDocumentAssetEntity entity = new PaperDocumentAssetEntity();
+        entity.setAssetId(asset.assetId());
+        entity.setSourceId(asset.sourceId());
+        entity.setAssetIndex(asset.assetIndex());
+        entity.setAssetType(asset.assetType());
+        entity.setFileName(asset.fileName());
+        entity.setContentType(asset.contentType());
+        entity.setFileSize(asset.fileSize());
+        entity.setContentHash(asset.contentHash());
+        entity.setContent(asset.content());
+        entity.setExtractedText(asset.extractedText());
+        entity.setTextStart(asset.textStart());
+        entity.setTextEnd(asset.textEnd());
+        entity.setMetadata(asset.metadata() == null ? Map.of() : asset.metadata());
+        return entity;
+    }
+
+    /**
+     * 将空元数据统一回退为空映射。
+     */
+    private Map<String, Object> safeMetadata(Map<String, Object> metadata) {
+        return metadata == null ? Map.of() : metadata;
+    }
+
+    /**
+     * 将查询关键词转换为 SQL LIKE 模式。
+     */
     private String normalizeLikeKeyword(String keyword) {
         if (keyword == null || keyword.isBlank()) {
             return null;
@@ -377,6 +442,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         return "%" + keyword.trim() + "%";
     }
 
+    /**
+     * 规范化文档状态过滤值。
+     */
     private String normalizeStatus(String status) {
         if (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status)) {
             return null;
@@ -384,28 +452,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         return status.trim().toUpperCase();
     }
 
-    private Map<String, Object> jsonMap(Object value) {
-        if (value == null) {
-            return Map.of();
-        }
-        try {
-            return objectMapper.readValue(String.valueOf(value), MAP_TYPE);
-        } catch (JsonProcessingException ex) {
-            return Map.of();
-        }
-    }
-
-    private Object jsonValue(Object value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return objectMapper.readValue(String.valueOf(value), Object.class);
-        } catch (JsonProcessingException ex) {
-            return String.valueOf(value);
-        }
-    }
-
+    /**
+     * 将对象序列化为 JSON 字符串，空值回退为空对象。
+     */
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
@@ -414,6 +463,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         }
     }
 
+    /**
+     * 将非空对象序列化为 JSON 字符串。
+     */
     private String toNullableJson(Object value) {
         if (value == null) {
             return null;
@@ -421,6 +473,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         return toJson(value);
     }
 
+    /**
+     * 从候选字符串中返回第一个非空值。
+     */
     private String nonBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank()) {
@@ -430,14 +485,23 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         return "unknown";
     }
 
+    /**
+     * 将对象转换为字符串表示。
+     */
     private String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
     }
 
+    /**
+     * 将空白字符串转换为 null。
+     */
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }
 
+    /**
+     * 将元数据值安全转换为长整数。
+     */
     private Long longValue(Object value) {
         if (value instanceof Number number) {
             return number.longValue();
@@ -452,6 +516,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         }
     }
 
+    /**
+     * 从元数据映射中安全读取整数值。
+     */
     private Integer intValue(Map<String, Object> metadata, String key) {
         if (metadata == null) {
             return null;
@@ -470,6 +537,16 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         }
     }
 
+    /**
+     * 将可空整数转换为非空整数。
+     */
+    private int intOrZero(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    /**
+     * 从用户问题中提取用于本地关键词检索的词项。
+     */
     private List<String> extractSearchTerms(String question) {
         if (question == null || question.isBlank()) {
             return List.of();
@@ -482,6 +559,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         return List.copyOf(terms);
     }
 
+    /**
+     * 将检索词及其 n-gram 片段加入词项集合。
+     */
     private void addSearchTerms(LinkedHashSet<String> terms, String token) {
         if (token == null || token.length() < 2) {
             return;
@@ -498,6 +578,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         }
     }
 
+    /**
+     * 根据问题词项与分块内容命中情况计算本地检索分数。
+     */
     private double lexicalScore(String question, DocumentChunk chunk, List<String> terms) {
         String haystack = normalizeSearchText(chunk.content()) + "|" + metadataText(chunk.metadata());
         double score = 0;
@@ -513,6 +596,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         return score;
     }
 
+    /**
+     * 将元数据值拼接为可参与关键词检索的文本。
+     */
     private String metadataText(Map<String, Object> metadata) {
         if (metadata == null || metadata.isEmpty()) {
             return "";
@@ -525,14 +611,23 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
                 .collect(Collectors.joining("|"));
     }
 
+    /**
+     * 规范化用于关键词检索的文本。
+     */
     private String normalizeSearchText(String value) {
         return value == null ? "" : value.replaceAll("\\s+", "").toLowerCase();
     }
 
+    /**
+     * 将整数限制在指定闭区间内。
+     */
     private int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
 
+    /**
+     * 截断超出最大长度的字符串。
+     */
     private String cut(String value, int maxLength) {
         if (value == null || value.length() <= maxLength) {
             return value;
@@ -540,6 +635,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         return value.substring(0, maxLength);
     }
 
+    /**
+     * 计算字符串内容的 SHA-256 十六进制摘要。
+     */
     private String sha256(String value) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
@@ -550,100 +648,6 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         }
     }
 
-    private OffsetDateTime offsetDateTime(ResultSet rs, String columnName) throws SQLException {
-        return rs.getObject(columnName, OffsetDateTime.class);
-    }
-
     private record ScoredDocumentChunk(DocumentChunk chunk, double score) {
-    }
-
-    private class DocumentSummaryRowMapper implements RowMapper<DocumentSummary> {
-        @Override
-        public DocumentSummary mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new DocumentSummary(
-                    rs.getString("source_id"),
-                    rs.getString("title"),
-                    rs.getString("origin"),
-                    rs.getString("file_name"),
-                    rs.getString("file_type"),
-                    rs.getObject("file_size", Long.class),
-                    rs.getString("status"),
-                    rs.getInt("chunk_count"),
-                    rs.getObject("publish_year", Integer.class),
-                    offsetDateTime(rs, "created_at"),
-                    offsetDateTime(rs, "updated_at")
-            );
-        }
-    }
-
-    private class DocumentDetailRowMapper implements RowMapper<DocumentDetail> {
-        @Override
-        public DocumentDetail mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new DocumentDetail(
-                    rs.getString("source_id"),
-                    rs.getString("title"),
-                    rs.getString("origin"),
-                    rs.getString("file_name"),
-                    rs.getString("file_type"),
-                    rs.getObject("file_size", Long.class),
-                    jsonValue(rs.getObject("authors")),
-                    rs.getString("abstract"),
-                    rs.getString("doi"),
-                    rs.getString("journal"),
-                    rs.getObject("publish_year", Integer.class),
-                    jsonValue(rs.getObject("keywords")),
-                    rs.getString("content_text"),
-                    jsonMap(rs.getObject("metadata")),
-                    rs.getString("status"),
-                    rs.getInt("chunk_count"),
-                    rs.getString("error_message"),
-                    offsetDateTime(rs, "created_at"),
-                    offsetDateTime(rs, "updated_at"),
-                    offsetDateTime(rs, "deleted_at")
-            );
-        }
-    }
-
-    private class DocumentChunkViewRowMapper implements RowMapper<DocumentChunkView> {
-        @Override
-        public DocumentChunkView mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new DocumentChunkView(
-                    rs.getString("chunk_id"),
-                    rs.getInt("chunk_index"),
-                    rs.getString("content"),
-                    rs.getString("content_hash"),
-                    rs.getObject("chunk_start", Integer.class),
-                    rs.getObject("chunk_end", Integer.class),
-                    rs.getObject("page_number", Integer.class),
-                    rs.getString("section_title"),
-                    jsonMap(rs.getObject("metadata")),
-                    rs.getObject("vector_store_id", UUID.class),
-                    offsetDateTime(rs, "created_at"),
-                    offsetDateTime(rs, "updated_at")
-            );
-        }
-    }
-
-    private class DocumentAssetViewRowMapper implements RowMapper<DocumentAssetView> {
-        @Override
-        public DocumentAssetView mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new DocumentAssetView(
-                    rs.getString("asset_id"),
-                    rs.getString("source_id"),
-                    rs.getInt("asset_index"),
-                    rs.getString("asset_type"),
-                    rs.getString("file_name"),
-                    rs.getString("content_type"),
-                    rs.getObject("file_size", Long.class),
-                    rs.getString("content_hash"),
-                    rs.getBytes("content"),
-                    rs.getString("extracted_text"),
-                    rs.getObject("text_start", Integer.class),
-                    rs.getObject("text_end", Integer.class),
-                    jsonMap(rs.getObject("metadata")),
-                    offsetDateTime(rs, "created_at"),
-                    offsetDateTime(rs, "updated_at")
-            );
-        }
     }
 }

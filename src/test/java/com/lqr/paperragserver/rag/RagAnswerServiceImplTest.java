@@ -2,10 +2,10 @@ package com.lqr.paperragserver.rag;
 
 import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
-import com.lqr.paperragserver.common.AnswerCitation;
-import com.lqr.paperragserver.common.DocumentChunk;
-import com.lqr.paperragserver.common.RagAnswer;
-import com.lqr.paperragserver.common.RetrievedChunk;
+import com.lqr.paperragserver.common.model.AnswerCitation;
+import com.lqr.paperragserver.common.model.DocumentChunk;
+import com.lqr.paperragserver.common.model.RagAnswer;
+import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
 import com.lqr.paperragserver.rag.impl.RagAnswerServiceImpl;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;

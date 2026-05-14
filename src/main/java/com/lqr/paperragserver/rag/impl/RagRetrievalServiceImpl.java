@@ -1,8 +1,9 @@
 package com.lqr.paperragserver.rag.impl;
 
-import com.lqr.paperragserver.common.DocumentChunk;
-import com.lqr.paperragserver.common.RetrievedChunk;
+import com.lqr.paperragserver.common.model.DocumentChunk;
+import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import org.springframework.ai.document.Document;
@@ -67,13 +68,13 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
         int index = 0;
         for (Document document : documents) {
             Map<String, Object> metadata = document.getMetadata();
-            String sourceId = metadata == null ? null : String.valueOf(metadata.getOrDefault("sourceId", ""));
+            String sourceId = metadata == null ? null : String.valueOf(metadata.getOrDefault(MetadataKeys.SOURCE_ID, ""));
             if (!isIndexedDocument(sourceId)) {
                 continue;
             }
-            String chunkId = metadata == null ? document.getId() : String.valueOf(metadata.getOrDefault("chunkId", document.getId()));
+            String chunkId = metadata == null ? document.getId() : String.valueOf(metadata.getOrDefault(MetadataKeys.CHUNK_ID, document.getId()));
             int currentIndex = index++;
-            int chunkIndex = intMetadata(metadata, "chunkIndex", currentIndex);
+            int chunkIndex = intMetadata(metadata, MetadataKeys.CHUNK_INDEX, currentIndex);
             DocumentChunk chunk = new DocumentChunk(
                     chunkId,
                     sourceId,
@@ -107,6 +108,12 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
                 .toList();
     }
 
+    /**
+     * 判断文档是否仍处于可检索的已索引状态。
+     *
+     * @param sourceId 文档来源 ID
+     * @return 文档存在、未删除且状态为已索引时返回 true
+     */
     private boolean isIndexedDocument(String sourceId) {
         if (sourceId == null || sourceId.isBlank()) {
             return false;
@@ -117,6 +124,14 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
                 .orElse(false);
     }
 
+    /**
+     * 优先使用向量库返回的相似度分数，缺失时按召回排序补评分。
+     *
+     * @param vectorScore 向量库相似度分数
+     * @param index 当前召回位置
+     * @param total 召回总数
+     * @return 用于融合排序的向量侧分数
+     */
     private double vectorRankContribution(Double vectorScore, int index, int total) {
         if (vectorScore != null && vectorScore > 0) {
             return vectorScore;
@@ -124,6 +139,13 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
         return rankContribution(index, total);
     }
 
+    /**
+     * 根据排序位置计算递减的归一化贡献分。
+     *
+     * @param index 当前排序位置
+     * @param total 候选总数
+     * @return 归一化排序分数
+     */
     private double rankContribution(int index, int total) {
         if (total <= 0) {
             return 0.0;

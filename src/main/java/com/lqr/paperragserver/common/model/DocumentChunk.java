@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.common;
+package com.lqr.paperragserver.common.model;
 
 import java.util.Map;
 

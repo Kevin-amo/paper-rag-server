@@ -13,9 +13,9 @@
 --   mvn spring-boot:run
 --
 -- 上传验证：
---   curl -F "file=@sample.pdf" -F "sourceId=sample-paper" -F "title=Sample Paper" http://localhost:8080/api/documents
+--   curl -F "file=@sample.pdf" -F "sourceId=sample-paper" -F "title=Sample Paper" http://localhost:8080/documents
 --
 -- 问答验证：
---   curl -H "Content-Type: application/json" -d '{"question":"这篇论文的核心观点是什么？","topK":3}' http://localhost:8080/api/rag/ask
+--   curl -H "Content-Type: application/json" -d '{"question":"这篇论文的核心观点是什么？","topK":3}' http://localhost:8080/rag/ask
 --
 -- 注意：如果通过 Navicat 执行，请按文件名顺序逐个执行。

@@ -1,8 +1,8 @@
 package com.lqr.paperragserver.document;
 
 import com.lqr.paperragserver.ai.service.EmbeddingService;
-import com.lqr.paperragserver.common.DocumentChunk;
-import com.lqr.paperragserver.common.DocumentSource;
+import com.lqr.paperragserver.common.model.DocumentChunk;
+import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
@@ -25,10 +25,21 @@ public class DocumentManagementService {
     private final EmbeddingService embeddingService;
     private final VectorWriteService vectorWriteService;
 
+    /**
+     * 恢复指定文档的可见状态。
+     *
+     * @param sourceId 文档来源 ID
+     */
     public void restore(String sourceId) {
         paperDocumentPersistenceService.restore(sourceId);
     }
 
+    /**
+     * 基于已持久化的文档全文重建分块和向量索引。
+     *
+     * @param sourceId 文档来源 ID
+     * @return 重建后的分块统计结果
+     */
     @Transactional
     public ReindexResult reindex(String sourceId) {
         PaperDocumentPersistenceService.DocumentDetail document = paperDocumentPersistenceService.findDocument(sourceId)

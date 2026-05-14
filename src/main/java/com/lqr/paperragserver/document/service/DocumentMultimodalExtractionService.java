@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.document.service;
 
-import com.lqr.paperragserver.common.DocumentSource;
+import com.lqr.paperragserver.common.model.DocumentSource;
 
 /**
  * 原生多模态文档抽取服务。

@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.paper;
 
-import com.lqr.paperragserver.common.DocumentSource;
+import com.lqr.paperragserver.common.model.DocumentSource;
 
 import java.util.Map;
 

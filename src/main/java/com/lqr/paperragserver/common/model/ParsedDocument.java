@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.common;
+package com.lqr.paperragserver.common.model;
 
 import java.util.List;
 
@@ -14,6 +14,12 @@ public record ParsedDocument(
         String text,
         List<DocumentAsset> assets
 ) {
+    /**
+     * 创建不包含二进制资产的解析结果。
+     *
+     * @param source 文档来源信息
+     * @param text 提取出的正文文本
+     */
     public ParsedDocument(DocumentSource source, String text) {
         this(source, text, List.of());
     }
