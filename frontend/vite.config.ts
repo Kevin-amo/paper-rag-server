@@ -19,6 +19,14 @@ export default defineConfig(({ mode }) => {
           target,
           changeOrigin: true,
         },
+        '/auth': {
+          target,
+          changeOrigin: true,
+        },
+        '/admin': {
+          target,
+          changeOrigin: true,
+        },
         '/api': {
           target,
           changeOrigin: true,

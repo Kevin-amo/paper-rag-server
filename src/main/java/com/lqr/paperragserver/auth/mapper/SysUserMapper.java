@@ -1,0 +1,32 @@
+package com.lqr.paperragserver.auth.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.lqr.paperragserver.auth.entity.SysUserEntity;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+
+import java.util.UUID;
+
+/**
+ * 系统用户 Mapper，提供账号查询、统计和登录时间更新能力。
+ */
+public interface SysUserMapper extends BaseMapper<SysUserEntity> {
+
+    @Select("""
+            select count(*)
+            from public.sys_user u
+            join public.sys_user_role ur on ur.user_id = u.id
+            join public.sys_role r on r.id = ur.role_id
+            where r.code = #{roleCode}
+              and u.status = 'ACTIVE'
+            """)
+    long countActiveByRole(@Param("roleCode") String roleCode);
+
+    @Update("""
+            update public.sys_user
+            set last_login_at = now(), updated_at = now()
+            where id = #{id}
+            """)
+    int updateLastLoginAt(@Param("id") UUID id);
+}

@@ -1,4 +1,5 @@
 import { apiPrefix, http, uploadHttp } from './http';
+import { getAccessToken } from '../composables/authState';
 import type {
   BatchDocumentIngestionResponse,
   BatchUploadDocumentPayload,
@@ -102,7 +103,9 @@ export async function listDocumentAssets(sourceId: string, assetIds: string[]) {
 }
 
 export function getDocumentAssetContentUrl(sourceId: string, assetId: string) {
-  return `${apiPrefix}/documents/${encodeURIComponent(sourceId)}/assets/${encodeURIComponent(assetId)}/content`;
+  const token = getAccessToken();
+  const query = token ? `?access_token=${encodeURIComponent(token)}` : '';
+  return `${apiPrefix}/documents/${encodeURIComponent(sourceId)}/assets/${encodeURIComponent(assetId)}/content${query}`;
 }
 
 export async function deleteDocument(sourceId: string) {

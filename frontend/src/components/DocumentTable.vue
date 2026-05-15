@@ -10,6 +10,7 @@ const props = defineProps<{
   size: number;
   total: number;
   deletingSourceId: string | null;
+  canDelete?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -120,7 +121,7 @@ function handleCurrentChange(value: number) {
           {{ formatDate(row.updatedAt) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column v-if="props.canDelete" label="操作" width="120" fixed="right">
         <template #default="{ row }">
           <el-popconfirm
             title="确认移除这篇文档吗？"

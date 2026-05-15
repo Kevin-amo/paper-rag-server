@@ -147,3 +147,63 @@ export interface RagAnswer {
   answer: string;
   citations: AnswerCitation[];
 }
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  displayName: string | null;
+  email: string | null;
+  roles: string[];
+}
+
+export interface LoginPayload {
+  username: string;
+  password: string;
+}
+
+export interface RegisterEmailCodePayload {
+  email: string;
+}
+
+export interface RegisterPayload {
+  username: string;
+  password: string;
+  email: string;
+  emailCode: string;
+}
+
+export interface LoginResponse {
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+  user: AuthUser;
+}
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  displayName: string | null;
+  email: string | null;
+  status: string;
+  roles: string[];
+  lastLoginAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface CreateAdminUserPayload {
+  username: string;
+  password: string;
+  displayName?: string;
+  email?: string;
+  roles: string[];
+}
+
+export interface UpdateAdminUserPayload {
+  displayName?: string;
+  email?: string;
+}
+
+export interface ResetPasswordPayload {
+  password: string;
+}

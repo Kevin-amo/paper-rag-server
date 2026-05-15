@@ -63,6 +63,18 @@ mybatis-plus:
     map-underscore-to-camel-case: true
   type-handlers-package: com.lqr.paperragserver.persistence.typehandler
 
+app:
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:paper-rag-server}
+      secret: ${JWT_SECRET:paper-rag-server-local-development-secret-change-before-production}
+      access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:2h}
+    bootstrap-admin:
+      enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
+      username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+      display-name: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:系统管理员}
+
 management:
   endpoints:
     web:
