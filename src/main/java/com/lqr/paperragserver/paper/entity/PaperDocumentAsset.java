@@ -13,11 +13,12 @@ import java.util.UUID;
 
 @Data
 @TableName(value = "public.paper_document_asset", autoResultMap = true)
-public class PaperDocumentAssetEntity {
+public class PaperDocumentAsset {
 
     @TableId(value = "id", type = IdType.INPUT)
     private UUID id;
 
+    private UUID ownerUserId;
     private String assetId;
     private String sourceId;
     private Integer assetIndex;

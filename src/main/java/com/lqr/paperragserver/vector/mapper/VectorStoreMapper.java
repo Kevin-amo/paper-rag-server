@@ -25,11 +25,12 @@ public interface VectorStoreMapper {
                @Param("embeddingLiteral") String embeddingLiteral);
 
     /**
-     * 删除指定文档来源对应的全部向量记录。
+     * 删除指定用户的指定文档来源对应的全部向量记录。
      */
     @Delete("""
             delete from public.vector_store
-            where metadata ->> 'sourceId' = #{sourceId}
+            where metadata ->> 'ownerUserId' = #{ownerUserId}
+              and metadata ->> 'sourceId' = #{sourceId}
             """)
-    int deleteBySourceId(@Param("sourceId") String sourceId);
+    int deleteBySourceId(@Param("ownerUserId") String ownerUserId, @Param("sourceId") String sourceId);
 }

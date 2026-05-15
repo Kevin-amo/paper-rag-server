@@ -3,6 +3,7 @@ package com.lqr.paperragserver.rag.service;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 问答检索服务接口。
@@ -18,5 +19,5 @@ public interface RagRetrievalService {
      * @param topK 需要返回的候选片段数量
      * @return 召回的上下文片段列表
      */
-    List<RetrievedChunk> retrieve(String question, int topK);
+    List<RetrievedChunk> retrieve(UUID ownerUserId, String question, int topK);
 }

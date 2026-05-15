@@ -11,7 +11,7 @@ import java.util.UUID;
  */
 @Data
 @TableName("public.sys_user_role")
-public class SysUserRoleEntity {
+public class SysUserRole {
 
     private UUID userId;
     private UUID roleId;

@@ -1,6 +1,8 @@
 package com.lqr.paperragserver.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lqr.paperragserver.auth.entity.SysUser;
+import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.common.model.DocumentIngestionResult;
 import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
@@ -9,7 +11,9 @@ import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,6 +31,8 @@ class DocumentControllerTest {
     private final DocumentManagementService documentManagementService = mock(DocumentManagementService.class);
     private final PaperDocumentPersistenceService paperDocumentPersistenceService = mock(PaperDocumentPersistenceService.class);
     private DocumentController controller;
+    private UUID ownerUserId;
+    private SecurityUserPrincipal principal;
 
     @BeforeEach
     void setUp() {
@@ -36,6 +42,8 @@ class DocumentControllerTest {
                 paperDocumentPersistenceService,
                 new ObjectMapper()
         );
+        ownerUserId = UUID.randomUUID();
+        principal = principal(ownerUserId);
     }
 
     @Test
@@ -47,14 +55,14 @@ class DocumentControllerTest {
                 "files", "paper-b.pdf", "application/pdf", "b".getBytes()
         );
 
-        when(documentIngestionService.ingest(eq("paper-a.pdf"), any(), eq(Map.of("sourceId", "source-a", "title", "Paper A"))))
+        when(documentIngestionService.ingest(eq(ownerUserId), eq("paper-a.pdf"), any(), eq(Map.of("sourceId", "source-a", "title", "Paper A"))))
                 .thenReturn(new DocumentIngestionResult(
                         new DocumentSource("source-a", "Paper A", "paper-a.pdf", Map.of("sourceId", "source-a")),
                         3
                 ));
         doThrow(new IllegalStateException("解析失败"))
                 .when(documentIngestionService)
-                .ingest(eq("paper-b.pdf"), any(), eq(Map.of("title", "Paper B")));
+                .ingest(eq(ownerUserId), eq("paper-b.pdf"), any(), eq(Map.of("title", "Paper B")));
 
         String itemsJson = """
                 [
@@ -64,6 +72,7 @@ class DocumentControllerTest {
                 """;
 
         DocumentController.BatchDocumentIngestionResponse response = controller.ingestBatch(
+                principal,
                 new org.springframework.web.multipart.MultipartFile[]{file1, file2},
                 itemsJson
         );
@@ -87,7 +96,7 @@ class DocumentControllerTest {
         assertThat(failureItem.errorMessage()).isEqualTo("解析失败");
         assertThat(failureItem.source()).isNull();
 
-        verify(documentIngestionService, times(2)).ingest(any(), any(), any());
+        verify(documentIngestionService, times(2)).ingest(eq(ownerUserId), any(), any(), any());
     }
 
     @Test
@@ -97,6 +106,7 @@ class DocumentControllerTest {
         );
 
         assertThatThrownBy(() -> controller.ingestBatch(
+                principal,
                 new org.springframework.web.multipart.MultipartFile[]{file},
                 "[]"
         ))
@@ -106,8 +116,18 @@ class DocumentControllerTest {
 
     @Test
     void deleteBySourceIdShouldDelegateToIngestionService() {
-        controller.deleteBySourceId("source-1");
+        controller.deleteBySourceId(principal, "source-1");
 
-        verify(documentIngestionService).deleteBySourceId("source-1");
+        verify(documentIngestionService).deleteBySourceId(ownerUserId, "source-1");
+    }
+
+    private SecurityUserPrincipal principal(UUID userId) {
+        SysUser user = new SysUser();
+        user.setId(userId);
+        user.setUsername("user");
+        user.setPasswordHash("{noop}password");
+        user.setDisplayName("User");
+        user.setStatus("ACTIVE");
+        return new SecurityUserPrincipal(user, List.of("USER"));
     }
 }

@@ -13,11 +13,12 @@ import java.util.UUID;
 
 @Data
 @TableName(value = "public.paper_document", autoResultMap = true)
-public class PaperDocumentEntity {
+public class PaperDocument {
 
     @TableId(value = "id", type = IdType.INPUT)
     private UUID id;
 
+    private UUID ownerUserId;
     private String sourceId;
     private String title;
     private String origin;

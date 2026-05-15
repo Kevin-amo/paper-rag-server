@@ -19,6 +19,7 @@ export interface DocumentIngestionResult {
 
 export interface DocumentSummary {
   sourceId: string;
+  ownerUserId: string;
   title: string;
   origin: string;
   fileName: string;
@@ -33,6 +34,7 @@ export interface DocumentSummary {
 
 export interface DocumentDetail {
   sourceId: string;
+  ownerUserId: string;
   title: string;
   origin: string;
   fileName: string;
@@ -56,6 +58,7 @@ export interface DocumentDetail {
 
 export interface DocumentChunk {
   chunkId: string;
+  ownerUserId: string;
   chunkIndex: number;
   content: string;
   contentHash: string;
@@ -72,6 +75,7 @@ export interface DocumentChunk {
 export interface DocumentAsset {
   assetId: string;
   sourceId: string;
+  ownerUserId: string;
   assetIndex: number;
   assetType: string;
   fileName: string | null;
@@ -130,6 +134,7 @@ export interface BatchDocumentIngestionResponse {
 }
 
 export interface AskQuestionPayload {
+  conversationId?: string;
   question: string;
   topK?: number;
 }
@@ -146,6 +151,29 @@ export interface AnswerCitation {
 export interface RagAnswer {
   answer: string;
   citations: AnswerCitation[];
+  conversationId: string;
+}
+
+export interface Conversation {
+  id: string;
+  ownerUserId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversationMessage {
+  id: string;
+  conversationId: string;
+  role: 'USER' | 'ASSISTANT';
+  messageOrder: number;
+  content: string;
+  citations: AnswerCitation[];
+  createdAt: string;
+}
+
+export interface CreateConversationPayload {
+  title?: string;
 }
 
 export interface AuthUser {

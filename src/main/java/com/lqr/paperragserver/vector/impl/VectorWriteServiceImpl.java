@@ -38,17 +38,18 @@ public class VectorWriteServiceImpl implements VectorWriteService {
      */
     @Override
     @Transactional
-    public void upsert(List<EmbeddingService.EmbeddingVector> vectors) {
+    public void upsert(UUID ownerUserId, List<EmbeddingService.EmbeddingVector> vectors) {
         if (vectors == null || vectors.isEmpty()) {
             return;
         }
         for (EmbeddingService.EmbeddingVector vector : vectors) {
             DocumentChunk chunk = vector.chunk();
-            UUID vectorStoreId = UUID.nameUUIDFromBytes(chunk.chunkId().getBytes(StandardCharsets.UTF_8));
+            UUID vectorStoreId = UUID.nameUUIDFromBytes((ownerUserId + "::" + chunk.chunkId()).getBytes(StandardCharsets.UTF_8));
             Map<String, Object> metadata = new java.util.LinkedHashMap<>();
             if (vector.metadata() != null) {
                 metadata.putAll(vector.metadata());
             }
+            metadata.put(MetadataKeys.OWNER_USER_ID, ownerUserId.toString());
             metadata.put(MetadataKeys.SOURCE_ID, chunk.sourceId());
             metadata.put(MetadataKeys.CHUNK_ID, chunk.chunkId());
             metadata.put(MetadataKeys.CHUNK_INDEX, chunk.chunkIndex());
@@ -58,7 +59,7 @@ public class VectorWriteServiceImpl implements VectorWriteService {
                     toJson(metadata),
                     toVectorLiteral(vector.vector())
             );
-            chunkMapper.updateVectorStoreId(chunk.chunkId(), vectorStoreId);
+            chunkMapper.updateVectorStoreId(ownerUserId, chunk.chunkId(), vectorStoreId);
         }
     }
 
@@ -69,11 +70,11 @@ public class VectorWriteServiceImpl implements VectorWriteService {
      */
     @Override
     @Transactional
-    public void deleteBySourceId(String sourceId) {
-        if (sourceId == null || sourceId.isBlank()) {
+    public void deleteBySourceId(UUID ownerUserId, String sourceId) {
+        if (ownerUserId == null || sourceId == null || sourceId.isBlank()) {
             return;
         }
-        vectorStoreMapper.deleteBySourceId(sourceId);
+        vectorStoreMapper.deleteBySourceId(ownerUserId.toString(), sourceId);
     }
 
     /**
