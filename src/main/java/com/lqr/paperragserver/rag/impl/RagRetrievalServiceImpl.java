@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 基于向量库的检索实现。
@@ -49,8 +50,8 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
      * @return 按相关度排序的分块列表
      */
     @Override
-    public List<RetrievedChunk> retrieve(String question, int topK) {
-        if (question == null || question.isBlank()) {
+    public List<RetrievedChunk> retrieve(UUID ownerUserId, String question, int topK) {
+        if (ownerUserId == null || question == null || question.isBlank()) {
             return List.of();
         }
         int resolvedTopK = topK > 0 ? topK : ragProperties.defaultTopK();
@@ -69,7 +70,8 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
         for (Document document : documents) {
             Map<String, Object> metadata = document.getMetadata();
             String sourceId = metadata == null ? null : String.valueOf(metadata.getOrDefault(MetadataKeys.SOURCE_ID, ""));
-            if (!isIndexedDocument(sourceId)) {
+            String metadataOwnerUserId = metadata == null ? null : String.valueOf(metadata.getOrDefault(MetadataKeys.OWNER_USER_ID, ""));
+            if (!ownerUserId.toString().equals(metadataOwnerUserId) || !isIndexedDocument(ownerUserId, sourceId)) {
                 continue;
             }
             String chunkId = metadata == null ? document.getId() : String.valueOf(metadata.getOrDefault(MetadataKeys.CHUNK_ID, document.getId()));
@@ -86,7 +88,7 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
             vectorChunks.add(new RetrievedChunk(chunk, vectorRankContribution(vectorScore, currentIndex, documents.size())));
         }
 
-        List<DocumentChunk> lexicalChunks = paperDocumentPersistenceService.searchChunks(question, Math.max(resolvedTopK * 3, resolvedTopK));
+        List<DocumentChunk> lexicalChunks = paperDocumentPersistenceService.searchChunks(ownerUserId, question, Math.max(resolvedTopK * 3, resolvedTopK));
         Map<String, DocumentChunk> chunkById = new LinkedHashMap<>();
         Map<String, Double> scoreById = new LinkedHashMap<>();
         for (int lexicalIndex = 0; lexicalIndex < lexicalChunks.size(); lexicalIndex++) {
@@ -114,11 +116,11 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
      * @param sourceId 文档来源 ID
      * @return 文档存在、未删除且状态为已索引时返回 true
      */
-    private boolean isIndexedDocument(String sourceId) {
-        if (sourceId == null || sourceId.isBlank()) {
+    private boolean isIndexedDocument(UUID ownerUserId, String sourceId) {
+        if (ownerUserId == null || sourceId == null || sourceId.isBlank()) {
             return false;
         }
-        return paperDocumentPersistenceService.findDocument(sourceId)
+        return paperDocumentPersistenceService.findDocument(ownerUserId, sourceId)
                 .filter(document -> document.deletedAt() == null)
                 .map(document -> "INDEXED".equals(document.status()))
                 .orElse(false);

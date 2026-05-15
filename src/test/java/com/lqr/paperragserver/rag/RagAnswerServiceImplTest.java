@@ -7,6 +7,7 @@ import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RagAnswer;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.conversation.service.ConversationService;
 import com.lqr.paperragserver.rag.impl.RagAnswerServiceImpl;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,11 +15,14 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,8 +43,12 @@ class RagAnswerServiceImplTest {
     private final PromptConstructionService promptConstructionService = mock(PromptConstructionService.class);
     // 模拟的 LLM 服务
     private final LlmService llmService = mock(LlmService.class);
+    // 模拟的会话服务
+    private final ConversationService conversationService = mock(ConversationService.class);
     // 测试用的配置：最大上下文800，单个块最大长度120，默认topK=5，重叠度0
     private final RagProperties ragProperties = new RagProperties(800, 120, 5, 0);
+    private final UUID ownerUserId = UUID.randomUUID();
+    private final UUID conversationId = UUID.randomUUID();
     // 被测试的服务实例
     private RagAnswerServiceImpl service;
 
@@ -49,7 +57,11 @@ class RagAnswerServiceImplTest {
      */
     @BeforeEach
     void setUp() {
-        service = new RagAnswerServiceImpl(ragRetrievalService, promptConstructionService, llmService, ragProperties);
+        service = new RagAnswerServiceImpl(ragRetrievalService, promptConstructionService, llmService, ragProperties, conversationService);
+        when(conversationService.getOrCreateConversation(eq(ownerUserId), any(), anyString()))
+                .thenReturn(new ConversationService.ConversationView(conversationId, ownerUserId, "测试会话", null, null));
+        when(conversationService.recentMessages(eq(ownerUserId), eq(conversationId), anyInt()))
+                .thenReturn(List.of());
     }
 
     /**
@@ -79,16 +91,16 @@ class RagAnswerServiceImplTest {
 
         // --- 设置模拟行为 ---
         // 当检索服务收到指定问题和 topK=5 时，返回上述检索结果
-        when(ragRetrievalService.retrieve("what is the main idea", 5))
+        when(ragRetrievalService.retrieve(ownerUserId, "what is the main idea", 5))
                 .thenReturn(List.of(retrievedChunk));
         // 提示构造服务任意调用都返回一个简单的 Prompt 对象
-        when(promptConstructionService.build(anyString(), anyList()))
+        when(promptConstructionService.build(anyString(), anyList(), anyList()))
                 .thenReturn(new PromptConstructionService.Prompt("sys", "user"));
         // LLM 服务任意调用都返回固定答案
         when(llmService.generate(any())).thenReturn("final answer");
 
         // --- 执行被测方法 ---
-        RagAnswer answer = service.answer("what is the main idea", null);
+        RagAnswer answer = service.answer(ownerUserId, null, "what is the main idea", null);
 
         // --- 断言验证 ---
         // 答案文本应与 LLM 返回的一致
@@ -104,7 +116,7 @@ class RagAnswerServiceImplTest {
         assertThat(citation.excerpt()).isEqualTo("This is the relevant text of the paper.");
         assertThat(citation.rankScore()).isEqualTo(0.93);
         // 确认检索服务确实被调用过一次，且参数正确
-        verify(ragRetrievalService).retrieve("what is the main idea", 5);
+        verify(ragRetrievalService).retrieve(ownerUserId, "what is the main idea", 5);
     }
 
     /**
@@ -119,15 +131,15 @@ class RagAnswerServiceImplTest {
     @Test
     void answerShouldRespectExplicitTopK() {
         // 设置检索服务返回空列表（仅关注 topK 传递）
-        when(ragRetrievalService.retrieve("question", 2)).thenReturn(List.of());
-        when(promptConstructionService.build(anyString(), anyList()))
+        when(ragRetrievalService.retrieve(ownerUserId, "question", 2)).thenReturn(List.of());
+        when(promptConstructionService.build(anyString(), anyList(), anyList()))
                 .thenReturn(new PromptConstructionService.Prompt("sys", "user"));
         when(llmService.generate(any())).thenReturn("answer");
 
         // 执行，显式传入 topK=2
-        service.answer("question", 2);
+        service.answer(ownerUserId, null, "question", 2);
 
         // 验证检索服务确实被调用，且 topK 为 2
-        verify(ragRetrievalService).retrieve("question", 2);
+        verify(ragRetrievalService).retrieve(ownerUserId, "question", 2);
     }
 }

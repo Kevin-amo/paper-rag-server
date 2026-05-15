@@ -6,6 +6,7 @@ package com.lqr.paperragserver.common.constant;
 public final class MetadataKeys {
 
     public static final String SOURCE_ID = "sourceId";
+    public static final String OWNER_USER_ID = "ownerUserId";
     public static final String TITLE = "title";
     public static final String FILE_NAME = "fileName";
     public static final String CONTENT_TYPE = "contentType";

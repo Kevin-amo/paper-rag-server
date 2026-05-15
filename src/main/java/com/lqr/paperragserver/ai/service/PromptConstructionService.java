@@ -1,6 +1,7 @@
 package com.lqr.paperragserver.ai.service;
 
 import com.lqr.paperragserver.common.model.RetrievedChunk;
+import com.lqr.paperragserver.conversation.service.ConversationService;
 
 import java.util.List;
 
@@ -18,7 +19,7 @@ public interface PromptConstructionService {
      * @param context 检索到的上下文片段
      * @return 可直接发送给模型的提示词对象
      */
-    Prompt build(String question, List<RetrievedChunk> context);
+    Prompt build(String question, List<RetrievedChunk> context, List<ConversationService.MessageView> history);
 
     /**
      * 模型请求所需的提示词结构。

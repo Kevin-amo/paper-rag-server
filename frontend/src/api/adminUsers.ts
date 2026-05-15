@@ -49,3 +49,7 @@ export async function updateAdminUserStatus(id: string, status: string) {
 export async function resetAdminUserPassword(id: string, payload: ResetPasswordPayload) {
   await http.post(`/admin/users/${id}/reset-password`, payload);
 }
+
+export async function deleteAdminUser(id: string) {
+  await http.delete(`/admin/users/${id}`);
+}

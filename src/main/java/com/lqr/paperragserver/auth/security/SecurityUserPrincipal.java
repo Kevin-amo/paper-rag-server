@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.auth.security;
 
-import com.lqr.paperragserver.auth.entity.SysUserEntity;
+import com.lqr.paperragserver.auth.entity.SysUser;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -23,7 +23,7 @@ public class SecurityUserPrincipal implements UserDetails {
     private final List<String> roles;
     private final List<GrantedAuthority> authorities;
 
-    public SecurityUserPrincipal(SysUserEntity user, List<String> roles) {
+    public SecurityUserPrincipal(SysUser user, List<String> roles) {
         this.id = user.getId();
         this.username = user.getUsername();
         this.password = user.getPasswordHash();

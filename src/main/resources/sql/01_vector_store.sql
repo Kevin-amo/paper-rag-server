@@ -18,6 +18,9 @@ CREATE INDEX IF NOT EXISTS vector_store_embedding_idx
     ON public.vector_store
     USING hnsw (embedding public.vector_cosine_ops);
 
+create index if not exists vector_store_owner_user_id_idx
+    on public.vector_store ((metadata ->> 'ownerUserId'));
+
 CREATE INDEX IF NOT EXISTS vector_store_source_id_idx
     ON public.vector_store ((metadata ->> 'sourceId'));
 

@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.auth.security;
 
-import com.lqr.paperragserver.auth.entity.SysUserEntity;
+import com.lqr.paperragserver.auth.entity.SysUser;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
@@ -63,7 +63,7 @@ class JwtAuthenticationFilterTest {
     }
 
     private SecurityUserPrincipal principal(String username, List<String> roles) {
-        SysUserEntity user = new SysUserEntity();
+        SysUser user = new SysUser();
         user.setId(UUID.randomUUID());
         user.setUsername(username);
         user.setPasswordHash("{noop}password");

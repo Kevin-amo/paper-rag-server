@@ -2,6 +2,7 @@ package com.lqr.paperragserver.web;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.common.model.DocumentIngestionResult;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.DocumentManagementService;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -58,10 +60,11 @@ public class DocumentController {
      * @throws IOException 读取上传文件失败时抛出
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public DocumentIngestionResult ingest(@RequestParam("file") MultipartFile file,
+    public DocumentIngestionResult ingest(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                          @RequestParam("file") MultipartFile file,
                                           @RequestParam(value = "sourceId", required = false) String sourceId,
                                           @RequestParam(value = "title", required = false) String title) throws IOException {
-        return documentIngestionService.ingest(file.getOriginalFilename(), file.getBytes(), buildMetadata(sourceId, title));
+        return documentIngestionService.ingest(principal.getId(), file.getOriginalFilename(), file.getBytes(), buildMetadata(sourceId, title));
     }
 
     /**
@@ -72,7 +75,8 @@ public class DocumentController {
      * @return 批量入库结果
      */
     @PostMapping(path = "/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public BatchDocumentIngestionResponse ingestBatch(@RequestParam("files") MultipartFile[] files,
+    public BatchDocumentIngestionResponse ingestBatch(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                      @RequestParam("files") MultipartFile[] files,
                                                       @RequestParam(value = "items", required = false) String items) {
         if (files == null || files.length == 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请至少上传一个文件");
@@ -89,6 +93,7 @@ public class DocumentController {
             try {
                 // 入库
                 DocumentIngestionResult result = documentIngestionService.ingest(
+                        principal.getId(),
                         fileName,
                         file.getBytes(),
                         buildMetadata(item.sourceId(), item.title())
@@ -114,12 +119,13 @@ public class DocumentController {
      * @return 文档摘要分页结果
      */
     @GetMapping
-    public PageResponse<DocumentSummaryResponse> list(@RequestParam(value = "keyword", required = false) String keyword,
+    public PageResponse<DocumentSummaryResponse> list(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                      @RequestParam(value = "keyword", required = false) String keyword,
                                                       @RequestParam(value = "status", required = false) String status,
                                                       @RequestParam(value = "page", defaultValue = "0") @Min(0) int page,
                                                       @RequestParam(value = "size", defaultValue = "20") @Min(1) @Max(100) int size) {
         PaperDocumentPersistenceService.PageResult<PaperDocumentPersistenceService.DocumentSummary> result =
-                paperDocumentPersistenceService.listDocuments(keyword, status, page, size);
+                paperDocumentPersistenceService.listDocuments(principal.getId(), keyword, status, page, size);
         return new PageResponse<>(
                 result.items().stream().map(DocumentSummaryResponse::from).toList(),
                 result.page(),
@@ -135,8 +141,9 @@ public class DocumentController {
      * @return 文档详情
      */
     @GetMapping("/{sourceId}")
-    public DocumentDetailResponse detail(@PathVariable String sourceId) {
-        return paperDocumentPersistenceService.findDocument(sourceId)
+    public DocumentDetailResponse detail(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                         @PathVariable String sourceId) {
+        return paperDocumentPersistenceService.findDocument(principal.getId(), sourceId)
                 .map(DocumentDetailResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文档不存在"));
     }
@@ -150,11 +157,12 @@ public class DocumentController {
      * @return 文档分块分页结果
      */
     @GetMapping("/{sourceId}/chunks")
-    public PageResponse<DocumentChunkResponse> chunks(@PathVariable String sourceId,
+    public PageResponse<DocumentChunkResponse> chunks(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                      @PathVariable String sourceId,
                                                       @RequestParam(value = "page", defaultValue = "0") @Min(0) int page,
                                                       @RequestParam(value = "size", defaultValue = "50") @Min(1) @Max(200) int size) {
         PaperDocumentPersistenceService.PageResult<PaperDocumentPersistenceService.DocumentChunkView> result =
-                paperDocumentPersistenceService.listChunks(sourceId, page, size);
+                paperDocumentPersistenceService.listChunks(principal.getId(), sourceId, page, size);
         return new PageResponse<>(
                 result.items().stream().map(DocumentChunkResponse::from).toList(),
                 result.page(),
@@ -171,9 +179,10 @@ public class DocumentController {
      * @return 文档资产列表
      */
     @GetMapping("/{sourceId}/assets")
-    public List<DocumentAssetResponse> assets(@PathVariable String sourceId,
+    public List<DocumentAssetResponse> assets(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                              @PathVariable String sourceId,
                                               @RequestParam(value = "assetIds", required = false) String assetIds) {
-        return paperDocumentPersistenceService.listAssets(sourceId, parseAssetIds(assetIds)).stream()
+        return paperDocumentPersistenceService.listAssets(principal.getId(), sourceId, parseAssetIds(assetIds)).stream()
                 .map(DocumentAssetResponse::from)
                 .toList();
     }
@@ -186,8 +195,10 @@ public class DocumentController {
      * @return 资产二进制响应
      */
     @GetMapping("/{sourceId}/assets/{assetId}/content")
-    public ResponseEntity<byte[]> assetContent(@PathVariable String sourceId, @PathVariable String assetId) {
-        PaperDocumentPersistenceService.DocumentAssetView asset = paperDocumentPersistenceService.findAsset(sourceId, assetId)
+    public ResponseEntity<byte[]> assetContent(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                               @PathVariable String sourceId,
+                                               @PathVariable String assetId) {
+        PaperDocumentPersistenceService.DocumentAssetView asset = paperDocumentPersistenceService.findAsset(principal.getId(), sourceId, assetId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "资产不存在"));
         byte[] content = asset.content() == null ? new byte[0] : asset.content();
         MediaType mediaType = asset.contentType() == null || asset.contentType().isBlank()
@@ -207,10 +218,11 @@ public class DocumentController {
      * @return 更新后的文档详情
      */
     @PatchMapping("/{sourceId}/metadata")
-    public DocumentDetailResponse updateMetadata(@PathVariable String sourceId,
+    public DocumentDetailResponse updateMetadata(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                 @PathVariable String sourceId,
                                                  @Valid @RequestBody DocumentMetadataRequest request) {
-        paperDocumentPersistenceService.updateMetadata(sourceId, request.toUpdate());
-        return detail(sourceId);
+        paperDocumentPersistenceService.updateMetadata(principal.getId(), sourceId, request.toUpdate());
+        return detail(principal, sourceId);
     }
 
     /**
@@ -220,8 +232,9 @@ public class DocumentController {
      */
     @DeleteMapping("/{sourceId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteBySourceId(@PathVariable String sourceId) {
-        documentIngestionService.deleteBySourceId(sourceId);
+    public void deleteBySourceId(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                 @PathVariable String sourceId) {
+        documentIngestionService.deleteBySourceId(principal.getId(), sourceId);
     }
 
     /**
@@ -231,9 +244,10 @@ public class DocumentController {
      * @return 恢复后的文档详情
      */
     @PostMapping("/{sourceId}/restore")
-    public DocumentDetailResponse restore(@PathVariable String sourceId) {
-        documentManagementService.restore(sourceId);
-        return detail(sourceId);
+    public DocumentDetailResponse restore(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                          @PathVariable String sourceId) {
+        documentManagementService.restore(principal.getId(), sourceId);
+        return detail(principal, sourceId);
     }
 
     /**
@@ -243,8 +257,9 @@ public class DocumentController {
      * @return 重建索引结果
      */
     @PostMapping("/{sourceId}/reindex")
-    public ReindexResponse reindex(@PathVariable String sourceId) {
-        DocumentManagementService.ReindexResult result = documentManagementService.reindex(sourceId);
+    public ReindexResponse reindex(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                   @PathVariable String sourceId) {
+        DocumentManagementService.ReindexResult result = documentManagementService.reindex(principal.getId(), sourceId);
         return new ReindexResponse(result.sourceId(), result.chunkCount());
     }
 
@@ -404,6 +419,7 @@ public class DocumentController {
 
     public record DocumentSummaryResponse(
             String sourceId,
+            UUID ownerUserId,
             String title,
             String origin,
             String fileName,
@@ -424,6 +440,7 @@ public class DocumentController {
         static DocumentSummaryResponse from(PaperDocumentPersistenceService.DocumentSummary document) {
             return new DocumentSummaryResponse(
                     document.sourceId(),
+                    document.ownerUserId(),
                     document.title(),
                     document.origin(),
                     document.fileName(),
@@ -440,6 +457,7 @@ public class DocumentController {
 
     public record DocumentDetailResponse(
             String sourceId,
+            UUID ownerUserId,
             String title,
             String origin,
             String fileName,
@@ -469,6 +487,7 @@ public class DocumentController {
         static DocumentDetailResponse from(PaperDocumentPersistenceService.DocumentDetail document) {
             return new DocumentDetailResponse(
                     document.sourceId(),
+                    document.ownerUserId(),
                     document.title(),
                     document.origin(),
                     document.fileName(),
@@ -494,6 +513,7 @@ public class DocumentController {
 
     public record DocumentChunkResponse(
             String chunkId,
+            UUID ownerUserId,
             int chunkIndex,
             String content,
             String contentHash,
@@ -515,6 +535,7 @@ public class DocumentController {
         static DocumentChunkResponse from(PaperDocumentPersistenceService.DocumentChunkView chunk) {
             return new DocumentChunkResponse(
                     chunk.chunkId(),
+                    chunk.ownerUserId(),
                     chunk.chunkIndex(),
                     chunk.content(),
                     chunk.contentHash(),
@@ -533,6 +554,7 @@ public class DocumentController {
     public record DocumentAssetResponse(
             String assetId,
             String sourceId,
+            UUID ownerUserId,
             int assetIndex,
             String assetType,
             String fileName,
@@ -556,6 +578,7 @@ public class DocumentController {
             return new DocumentAssetResponse(
                     asset.assetId(),
                     asset.sourceId(),
+                    asset.ownerUserId(),
                     asset.assetIndex(),
                     asset.assetType(),
                     asset.fileName(),

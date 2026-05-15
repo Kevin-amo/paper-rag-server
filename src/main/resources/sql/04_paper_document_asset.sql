@@ -5,7 +5,8 @@ create extension if not exists "uuid-ossp";
 
 create table if not exists public.paper_document_asset (
     id uuid primary key default uuid_generate_v4(),
-    asset_id varchar(128) not null unique,
+    owner_user_id uuid not null references public.sys_user(id) on delete cascade,
+    asset_id varchar(128) not null,
     source_id varchar(128) not null,
 
     asset_index int not null,
@@ -25,12 +26,13 @@ create table if not exists public.paper_document_asset (
     updated_at timestamptz not null default now(),
 
     constraint fk_paper_document_asset_source
-        foreign key (source_id)
-        references public.paper_document (source_id)
+        foreign key (owner_user_id, source_id)
+        references public.paper_document (owner_user_id, source_id)
         on update cascade
         on delete cascade,
 
-    constraint uq_paper_document_asset_source_index unique (source_id, asset_index),
+    constraint uq_paper_document_asset_owner_asset unique (owner_user_id, asset_id),
+    constraint uq_paper_document_asset_source_index unique (owner_user_id, source_id, asset_index),
     constraint chk_paper_document_asset_index check (asset_index >= 0),
     constraint chk_paper_document_asset_size check (file_size >= 0),
     constraint chk_paper_document_asset_type check (asset_type in ('IMAGE', 'ATTACHMENT')),
@@ -42,11 +44,15 @@ create table if not exists public.paper_document_asset (
 );
 
 comment on table public.paper_document_asset is '文档资产表，保存图片等二进制内容及其 OCR 文本';
+comment on column public.paper_document_asset.owner_user_id is '资产归属用户 ID';
 comment on column public.paper_document_asset.asset_id is '资产唯一标识，对应代码中的 DocumentAsset.assetId';
 comment on column public.paper_document_asset.source_id is '所属文档来源标识，对应 paper_document.source_id';
 comment on column public.paper_document_asset.content is '资产二进制内容，用于预览或下载';
 comment on column public.paper_document_asset.extracted_text is '从资产中抽取出的文本，例如图片 OCR 结果';
 comment on column public.paper_document_asset.metadata is '资产级扩展元数据，例如原始包内路径';
+
+create index if not exists idx_paper_document_asset_owner_source_id
+    on public.paper_document_asset using btree (owner_user_id, source_id);
 
 create index if not exists idx_paper_document_asset_source_id
     on public.paper_document_asset using btree (source_id);

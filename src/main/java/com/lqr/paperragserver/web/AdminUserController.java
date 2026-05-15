@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -65,6 +66,11 @@ public class AdminUserController {
     @PostMapping("/{id}/reset-password")
     public void resetPassword(@PathVariable UUID id, @Valid @RequestBody ResetPasswordRequest request) {
         userAdminService.resetPassword(id, request.password());
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteUser(@PathVariable UUID id) {
+        userAdminService.deleteUser(id);
     }
 
     /**

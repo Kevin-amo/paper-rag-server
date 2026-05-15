@@ -1,8 +1,8 @@
 package com.lqr.paperragserver.auth.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.lqr.paperragserver.auth.entity.SysRoleEntity;
-import com.lqr.paperragserver.auth.entity.SysUserEntity;
+import com.lqr.paperragserver.auth.entity.SysRole;
+import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.mapper.SysRoleMapper;
 import com.lqr.paperragserver.auth.mapper.SysUserMapper;
 import com.lqr.paperragserver.auth.mapper.SysUserRoleMapper;
@@ -67,7 +67,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void createRegisterEmailCode(String email) {
         String normalizedEmail = normalizeEmail(email);
-        if (userMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>().eq(SysUserEntity::getEmail, normalizedEmail)) != null) {
+        if (userMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getEmail, normalizedEmail)) != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "邮箱已被注册");
         }
         verificationCodeService.createRegisterEmailCode(normalizedEmail);
@@ -82,14 +82,14 @@ public class AuthServiceImpl implements AuthService {
         String normalizedCode = requireText(emailCode, "验证码不能为空");
         verificationCodeService.requireRegisterEmailCodeMatches(normalizedEmail, normalizedCode);
 
-        if (userMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>().eq(SysUserEntity::getUsername, normalizedUsername)) != null) {
+        if (userMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, normalizedUsername)) != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "用户名已存在");
         }
-        if (userMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>().eq(SysUserEntity::getEmail, normalizedEmail)) != null) {
+        if (userMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getEmail, normalizedEmail)) != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "邮箱已被注册");
         }
 
-        SysUserEntity user = new SysUserEntity();
+        SysUser user = new SysUser();
         user.setId(UUID.randomUUID());
         user.setUsername(normalizedUsername);
         user.setPasswordHash(passwordEncoder.encode(normalizedPassword));
@@ -101,7 +101,7 @@ public class AuthServiceImpl implements AuthService {
         user.setUpdatedAt(now);
         userMapper.insert(user);
 
-        SysRoleEntity role = roleMapper.selectByCode(RoleCodes.USER);
+        SysRole role = roleMapper.selectByCode(RoleCodes.USER);
         if (role == null) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "默认用户角色不存在");
         }

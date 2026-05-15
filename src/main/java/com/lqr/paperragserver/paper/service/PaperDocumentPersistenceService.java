@@ -18,78 +18,79 @@ public interface PaperDocumentPersistenceService {
     /**
      * 分页查询文档摘要。
      */
-    PageResult<DocumentSummary> listDocuments(String keyword, String status, int page, int size);
+    PageResult<DocumentSummary> listDocuments(UUID ownerUserId, String keyword, String status, int page, int size);
 
     /**
      * 按来源 ID 查询文档详情。
      */
-    Optional<DocumentDetail> findDocument(String sourceId);
+    Optional<DocumentDetail> findDocument(UUID ownerUserId, String sourceId);
 
     /**
      * 分页查询指定文档的分块。
      */
-    PageResult<DocumentChunkView> listChunks(String sourceId, int page, int size);
+    PageResult<DocumentChunkView> listChunks(UUID ownerUserId, String sourceId, int page, int size);
 
     /**
      * 从已索引文档分块中执行关键词检索。
      */
-    List<DocumentChunk> searchChunks(String question, int limit);
+    List<DocumentChunk> searchChunks(UUID ownerUserId, String question, int limit);
 
     /**
      * 更新文档的可编辑元数据。
      */
-    void updateMetadata(String sourceId, DocumentMetadataUpdate update);
+    void updateMetadata(UUID ownerUserId, String sourceId, DocumentMetadataUpdate update);
 
     /**
      * 恢复已删除文档。
      */
-    void restore(String sourceId);
+    void restore(UUID ownerUserId, String sourceId);
 
     /**
      * 标记文档进入解析中状态并保存正文。
      */
-    void markParsing(DocumentSource source, String contentText);
+    void markParsing(UUID ownerUserId, DocumentSource source, String contentText);
 
     /**
      * 替换指定文档的二进制资产列表。
      */
-    void replaceAssets(String sourceId, List<DocumentAsset> assets);
+    void replaceAssets(UUID ownerUserId, String sourceId, List<DocumentAsset> assets);
 
     /**
      * 查询指定文档的资产列表，可按资产 ID 过滤。
      */
-    List<DocumentAssetView> listAssets(String sourceId, List<String> assetIds);
+    List<DocumentAssetView> listAssets(UUID ownerUserId, String sourceId, List<String> assetIds);
 
     /**
      * 查询指定文档下的单个资产。
      */
-    Optional<DocumentAssetView> findAsset(String sourceId, String assetId);
+    Optional<DocumentAssetView> findAsset(UUID ownerUserId, String sourceId, String assetId);
 
     /**
      * 替换指定文档的分块列表。
      */
-    void replaceChunks(String sourceId, List<DocumentChunk> chunks);
+    void replaceChunks(UUID ownerUserId, String sourceId, List<DocumentChunk> chunks);
 
     /**
      * 标记文档索引完成。
      */
-    void markIndexed(String sourceId, int chunkCount);
+    void markIndexed(UUID ownerUserId, String sourceId, int chunkCount);
 
     /**
      * 标记文档处理失败。
      */
-    void markFailed(String sourceId, String errorMessage);
+    void markFailed(UUID ownerUserId, String sourceId, String errorMessage);
 
     /**
      * 软删除指定文档。
      */
-    void markDeleted(String sourceId);
+    void markDeleted(UUID ownerUserId, String sourceId);
 
     record PageResult<T>(List<T> items, int page, int size, long total) {
     }
 
     record DocumentSummary(
             String sourceId,
+            UUID ownerUserId,
             String title,
             String origin,
             String fileName,
@@ -105,6 +106,7 @@ public interface PaperDocumentPersistenceService {
 
     record DocumentDetail(
             String sourceId,
+            UUID ownerUserId,
             String title,
             String origin,
             String fileName,
@@ -129,6 +131,7 @@ public interface PaperDocumentPersistenceService {
 
     record DocumentChunkView(
             String chunkId,
+            UUID ownerUserId,
             int chunkIndex,
             String content,
             String contentHash,
@@ -146,6 +149,7 @@ public interface PaperDocumentPersistenceService {
     record DocumentAssetView(
             String assetId,
             String sourceId,
+            UUID ownerUserId,
             int assetIndex,
             String assetType,
             String fileName,

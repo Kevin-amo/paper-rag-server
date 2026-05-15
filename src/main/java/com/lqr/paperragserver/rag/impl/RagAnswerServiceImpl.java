@@ -7,12 +7,14 @@ import com.lqr.paperragserver.common.model.RagAnswer;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
+import com.lqr.paperragserver.conversation.service.ConversationService;
 import com.lqr.paperragserver.rag.service.RagAnswerService;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 默认问答编排实现。
@@ -24,6 +26,7 @@ public class RagAnswerServiceImpl implements RagAnswerService {
     private final PromptConstructionService promptConstructionService;
     private final LlmService llmService;
     private final RagProperties ragProperties;
+    private final ConversationService conversationService;
 
     /**
      * 创建问答编排服务并注入所需依赖。
@@ -36,11 +39,13 @@ public class RagAnswerServiceImpl implements RagAnswerService {
     public RagAnswerServiceImpl(RagRetrievalService ragRetrievalService,
                                 PromptConstructionService promptConstructionService,
                                 LlmService llmService,
-                                RagProperties ragProperties) {
+                                RagProperties ragProperties,
+                                ConversationService conversationService) {
         this.ragRetrievalService = ragRetrievalService;
         this.promptConstructionService = promptConstructionService;
         this.llmService = llmService;
         this.ragProperties = ragProperties;
+        this.conversationService = conversationService;
     }
 
     /**
@@ -51,10 +56,18 @@ public class RagAnswerServiceImpl implements RagAnswerService {
      * @return 包含回答正文和引用信息的结果对象
      */
     @Override
-    public RagAnswer answer(String question, Integer topK) {
+    public RagAnswer answer(UUID ownerUserId, UUID conversationId, String question, Integer topK) {
+        ConversationService.ConversationView conversation = conversationService.getOrCreateConversation(ownerUserId, conversationId, question);
+        conversationService.appendUserMessage(ownerUserId, conversation.id(), question);
+
         int resolvedTopK = topK == null || topK <= 0 ? ragProperties.defaultTopK() : topK;
-        List<RetrievedChunk> chunks = ragRetrievalService.retrieve(question, resolvedTopK);
-        PromptConstructionService.Prompt prompt = promptConstructionService.build(question, chunks);
+        List<RetrievedChunk> chunks = ragRetrievalService.retrieve(ownerUserId, question, resolvedTopK);
+        List<ConversationService.MessageView> history = conversationService.recentMessages(
+                ownerUserId,
+                conversation.id(),
+                ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT
+        );
+        PromptConstructionService.Prompt prompt = promptConstructionService.build(question, chunks, history);
         String answer = llmService.generate(prompt);
         List<AnswerCitation> citations = chunks.stream()
                 .map(chunk -> new AnswerCitation(
@@ -65,7 +78,8 @@ public class RagAnswerServiceImpl implements RagAnswerService {
                         cutExcerpt(chunk.chunk().content()),
                         chunk.rankScore()))
                 .toList();
-        return new RagAnswer(answer, citations);
+        conversationService.appendAssistantMessage(ownerUserId, conversation.id(), answer, citations);
+        return new RagAnswer(answer, citations, conversation.id());
     }
 
     /**
