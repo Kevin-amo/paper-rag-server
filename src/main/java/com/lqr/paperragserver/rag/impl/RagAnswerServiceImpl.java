@@ -2,15 +2,19 @@ package com.lqr.paperragserver.rag.impl;
 
 import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
+import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.model.AnswerCitation;
 import com.lqr.paperragserver.common.model.RagAnswer;
+import com.lqr.paperragserver.common.model.RagStreamEvent;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
-import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.conversation.service.ConversationService;
 import com.lqr.paperragserver.rag.service.RagAnswerService;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Map;
@@ -57,6 +61,39 @@ public class RagAnswerServiceImpl implements RagAnswerService {
      */
     @Override
     public RagAnswer answer(UUID ownerUserId, UUID conversationId, String question, Integer topK) {
+        AnswerContext context = prepareAnswerContext(ownerUserId, conversationId, question, topK);
+        String answer = llmService.generate(context.prompt());
+        conversationService.appendAssistantMessage(ownerUserId, context.conversationId(), answer, context.citations());
+        return new RagAnswer(answer, context.citations(), context.conversationId());
+    }
+
+    /**
+     * 执行检索增强问答并流式返回生成过程。
+     *
+     * @param question 用户问题
+     * @param topK 期望召回的片段数量
+     * @return 问答过程事件流
+     */
+    @Override
+    public Flux<RagStreamEvent> streamAnswer(UUID ownerUserId, UUID conversationId, String question, Integer topK) {
+        return Flux.defer(() -> {
+            AnswerContext context = prepareAnswerContext(ownerUserId, conversationId, question, topK);
+            StringBuilder answerBuffer = new StringBuilder();
+            Flux<RagStreamEvent> answerEvents = llmService.streamGenerate(context.prompt())
+                    .filter(delta -> delta != null && !delta.isEmpty())
+                    .doOnNext(answerBuffer::append)
+                    .map(delta -> RagStreamEvent.delta(context.conversationId(), delta));
+            Mono<RagStreamEvent> doneEvent = Mono.fromCallable(() -> {
+                String answer = answerBuffer.toString();
+                conversationService.appendAssistantMessage(ownerUserId, context.conversationId(), answer, context.citations());
+                return RagStreamEvent.done(context.conversationId(), answer, context.citations());
+            });
+            return Flux.concat(Flux.just(RagStreamEvent.start(context.conversationId())), answerEvents, doneEvent);
+        }).subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(error -> Flux.just(RagStreamEvent.error(conversationId, error.getMessage())));
+    }
+
+    private AnswerContext prepareAnswerContext(UUID ownerUserId, UUID conversationId, String question, Integer topK) {
         ConversationService.ConversationView conversation = conversationService.getOrCreateConversation(ownerUserId, conversationId, question);
         conversationService.appendUserMessage(ownerUserId, conversation.id(), question);
 
@@ -68,8 +105,12 @@ public class RagAnswerServiceImpl implements RagAnswerService {
                 ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT
         );
         PromptConstructionService.Prompt prompt = promptConstructionService.build(question, chunks, history);
-        String answer = llmService.generate(prompt);
-        List<AnswerCitation> citations = chunks.stream()
+        List<AnswerCitation> citations = buildCitations(chunks);
+        return new AnswerContext(conversation.id(), prompt, citations);
+    }
+
+    private List<AnswerCitation> buildCitations(List<RetrievedChunk> chunks) {
+        return chunks.stream()
                 .map(chunk -> new AnswerCitation(
                         chunk.chunk().sourceId(),
                         chunk.chunk().chunkId(),
@@ -78,8 +119,6 @@ public class RagAnswerServiceImpl implements RagAnswerService {
                         cutExcerpt(chunk.chunk().content()),
                         chunk.rankScore()))
                 .toList();
-        conversationService.appendAssistantMessage(ownerUserId, conversation.id(), answer, citations);
-        return new RagAnswer(answer, citations, conversation.id());
     }
 
     /**
@@ -109,5 +148,12 @@ public class RagAnswerServiceImpl implements RagAnswerService {
         }
         Object value = metadata.get(key);
         return value == null ? null : String.valueOf(value);
+    }
+
+    private record AnswerContext(
+            UUID conversationId,
+            PromptConstructionService.Prompt prompt,
+            List<AnswerCitation> citations
+    ) {
     }
 }

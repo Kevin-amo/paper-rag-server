@@ -36,7 +36,7 @@
         options:
           model: qwen3.5-flash
           temperature: 0.2
-          max-tokens: 256
+          max-tokens: 2048
           enable-thinking: false
           multi-model: true
       embedding:

@@ -5,9 +5,10 @@ export default {
 </script>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import EmptyState from '../common/EmptyState.vue';
 import CitationCards from './CitationCards.vue';
+import { renderMarkdown } from '../../utils/markdown';
 import type { ConversationMessage } from '../../types';
 
 const props = defineProps<{
@@ -21,12 +22,21 @@ const emit = defineEmits<{
   askExample: [question: string];
 }>();
 
+const scrollSignal = computed(() => {
+  const last = props.messages[props.messages.length - 1];
+  return `${props.messages.length}:${last?.id ?? ''}:${last?.content ?? ''}:${last?.streaming ?? false}`;
+});
+
 function formatDate(value: string) {
   return value ? new Date(value).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
 }
 
+function assistantHtml(content: string) {
+  return renderMarkdown(content || '正在生成回答...');
+}
+
 watch(
-  () => props.messages.length,
+  scrollSignal,
   async () => {
     await nextTick();
     listRef.value?.scrollTo({ top: listRef.value.scrollHeight, behavior: 'smooth' });
@@ -35,7 +45,7 @@ watch(
 </script>
 
 <template>
-  <div ref="listRef" v-loading="props.loading" class="message-list">
+  <div ref="listRef" v-loading="props.loading && !props.messages.some((message) => message.streaming)" class="message-list">
     <EmptyState
       v-if="!props.messages.length"
       title="开始和你的论文知识库对话"
@@ -67,7 +77,9 @@ watch(
             <strong>{{ message.role === 'USER' ? '你' : '论文助手' }}</strong>
             <time>{{ formatDate(message.createdAt) }}</time>
           </div>
-          <div class="message-content">{{ message.content }}</div>
+          <div v-if="message.role === 'USER'" class="message-content">{{ message.content }}</div>
+          <div v-else class="message-content markdown-content" v-html="assistantHtml(message.content)" />
+          <span v-if="message.streaming" class="streaming-indicator">正在生成...</span>
           <CitationCards v-if="message.role === 'ASSISTANT'" :citations="message.citations || []" />
         </div>
       </article>
@@ -176,6 +188,69 @@ watch(
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.78;
+}
+
+.markdown-content {
+  white-space: normal;
+}
+
+.markdown-content :deep(p) {
+  margin: 0 0 0.75em;
+}
+
+.markdown-content :deep(p:last-child),
+.markdown-content :deep(ul:last-child),
+.markdown-content :deep(ol:last-child),
+.markdown-content :deep(pre:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  padding-left: 1.4em;
+  margin: 0.5em 0 0.85em;
+}
+
+.markdown-content :deep(code) {
+  padding: 0.15em 0.35em;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.92em;
+}
+
+.markdown-content :deep(pre) {
+  overflow-x: auto;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.markdown-content :deep(pre code) {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.markdown-content :deep(blockquote) {
+  margin: 0.7em 0;
+  padding-left: 1em;
+  border-left: 3px solid #cbd5e1;
+  color: #475569;
+}
+
+.markdown-content :deep(a) {
+  color: var(--app-primary);
+  font-weight: 700;
+}
+
+.streaming-indicator {
+  display: inline-flex;
+  margin-top: 8px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .from-user .message-content {
