@@ -88,7 +88,10 @@ function userInitial(user: AdminUser) {
       <el-table-column label="用户" min-width="220">
         <template #default="{ row }">
           <div class="user-cell">
-            <div class="user-avatar">{{ userInitial(row) }}</div>
+            <div class="user-avatar">
+              <img v-if="row.avatarUrl" :src="row.avatarUrl" :alt="`${row.username} 头像`">
+              <span v-else>{{ userInitial(row) }}</span>
+            </div>
             <div>
               <strong>{{ row.displayName || row.username }}</strong>
               <span>{{ row.username }}</span>
@@ -280,10 +283,17 @@ function userInitial(user: AdminUser) {
   place-items: center;
   width: 38px;
   height: 38px;
+  overflow: hidden;
   border-radius: 12px;
   color: #fff;
   background: linear-gradient(135deg, var(--app-primary), #60a5fa);
   font-weight: 800;
+}
+
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .user-cell div:last-child {

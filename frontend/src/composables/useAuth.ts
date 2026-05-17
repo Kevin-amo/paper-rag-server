@@ -5,6 +5,7 @@ import {
   logout as logoutRequest,
   register as registerRequest,
   requestRegisterEmailCode as requestRegisterEmailCodeRequest,
+  uploadAvatar as uploadAvatarRequest,
 } from '../api/auth';
 import type { UserRole } from '../types';
 import { authState, clearAuthSession, getAccessToken, setAuthSession, updateCurrentUser } from './authState';
@@ -38,6 +39,12 @@ export function useAuth() {
     return user;
   }
 
+  async function uploadAvatar(file: File) {
+    const user = await uploadAvatarRequest(file);
+    updateCurrentUser(user);
+    return user;
+  }
+
   async function logout() {
     try {
       if (getAccessToken()) {
@@ -59,6 +66,7 @@ export function useAuth() {
     login,
     requestRegisterEmailCode,
     register,
+    uploadAvatar,
     logout,
     hydrateCurrentUser,
     hasRole,

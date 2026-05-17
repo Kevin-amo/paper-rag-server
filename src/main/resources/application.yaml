@@ -60,6 +60,19 @@ mybatis-plus:
   type-handlers-package: com.lqr.paperragserver.persistence.typehandler
 
 app:
+  storage:
+    oss:
+      endpoint: ${ALIYUN_OSS_ENDPOINT:}
+      bucket: ${ALIYUN_OSS_BUCKET:}
+      access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}
+      access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:}
+      public-base-url: ${ALIYUN_OSS_PUBLIC_BASE_URL:}
+      avatar-prefix: ${ALIYUN_OSS_AVATAR_PREFIX:avatars}
+      avatar-max-size: ${ALIYUN_OSS_AVATAR_MAX_SIZE:5MB}
+      allowed-content-types:
+        - image/jpeg
+        - image/png
+        - image/webp
   security:
     jwt:
       issuer: ${JWT_ISSUER:paper-rag-server}

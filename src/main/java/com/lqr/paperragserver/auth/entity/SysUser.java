@@ -23,6 +23,8 @@ public class SysUser {
     private String displayName;
     private String email;
     private String phone;
+    private String avatarObjectKey;
+    private OffsetDateTime avatarUpdatedAt;
     private String status;
     private OffsetDateTime lastLoginAt;
     private OffsetDateTime createdAt;

@@ -9,6 +9,8 @@ create table if not exists public.sys_user (
     display_name varchar(128),
     email varchar(255),
     phone varchar(32),
+    avatar_object_key varchar(512),
+    avatar_updated_at timestamptz,
     status varchar(32) not null default 'ACTIVE',
     last_login_at timestamptz,
     created_at timestamptz not null default now(),
@@ -22,6 +24,8 @@ comment on column public.sys_user.username is '登录用户名';
 comment on column public.sys_user.password_hash is 'BCrypt 密码哈希';
 comment on column public.sys_user.email is '邮箱，注册登录通道之一';
 comment on column public.sys_user.phone is '手机号，预留给后续手机号验证码登录';
+comment on column public.sys_user.avatar_object_key is '用户头像在对象存储中的 object key';
+comment on column public.sys_user.avatar_updated_at is '用户头像最近更新时间';
 comment on column public.sys_user.status is '用户状态：ACTIVE、DISABLED';
 
 create unique index if not exists uk_sys_user_email

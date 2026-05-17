@@ -38,6 +38,7 @@ public interface UserAdminService {
             String email,
             String status,
             List<String> roles,
+            String avatarUrl,
             String lastLoginAt,
             String createdAt,
             String updatedAt

@@ -29,4 +29,11 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             where id = #{id}
             """)
     int updateLastLoginAt(@Param("id") UUID id);
+
+    @Update("""
+            update public.sys_user
+            set avatar_object_key = #{avatarObjectKey}, avatar_updated_at = now(), updated_at = now()
+            where id = #{id}
+            """)
+    int updateAvatar(@Param("id") UUID id, @Param("avatarObjectKey") String avatarObjectKey);
 }

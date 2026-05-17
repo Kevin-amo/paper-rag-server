@@ -9,6 +9,7 @@ import com.lqr.paperragserver.auth.mapper.SysUserMapper;
 import com.lqr.paperragserver.auth.mapper.SysUserRoleMapper;
 import com.lqr.paperragserver.auth.security.RoleCodes;
 import com.lqr.paperragserver.auth.service.UserAdminService;
+import com.lqr.paperragserver.storage.service.ObjectStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,6 +36,7 @@ public class UserAdminServiceImpl implements UserAdminService {
     private final SysRoleMapper roleMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final PasswordEncoder passwordEncoder;
+    private final ObjectStorageService objectStorageService;
 
     @Override
     public PageResult listUsers(int page, int size, String keyword, String status) {
@@ -186,6 +188,7 @@ public class UserAdminServiceImpl implements UserAdminService {
                 user.getEmail(),
                 user.getStatus(),
                 roles,
+                objectStorageService.publicUrl(user.getAvatarObjectKey()),
                 format(user.getLastLoginAt()),
                 format(user.getCreatedAt()),
                 format(user.getUpdatedAt())

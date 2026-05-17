@@ -12,6 +12,7 @@ import com.lqr.paperragserver.auth.security.RoleCodes;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.auth.service.AuthService;
 import com.lqr.paperragserver.auth.service.VerificationCodeService;
+import com.lqr.paperragserver.storage.service.ObjectStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -44,6 +45,7 @@ public class AuthServiceImpl implements AuthService {
     private final SysRoleMapper roleMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final VerificationCodeService verificationCodeService;
+    private final ObjectStorageService objectStorageService;
 
     @Override
     public LoginResult login(String username, String password) {
@@ -120,6 +122,7 @@ public class AuthServiceImpl implements AuthService {
                 principal.getUsername(),
                 principal.getDisplayName(),
                 principal.getEmail(),
+                objectStorageService.publicUrl(principal.getAvatarObjectKey()),
                 principal.getRoles()
         );
     }

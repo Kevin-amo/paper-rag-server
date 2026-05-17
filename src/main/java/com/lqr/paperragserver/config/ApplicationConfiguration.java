@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
  * <p>这里集中注册跨模块复用的基础组件，业务服务只依赖接口或明确的基础 Bean。</p>
  */
 @Configuration
-@EnableConfigurationProperties({RagProperties.class, SecurityProperties.class})
+@EnableConfigurationProperties({RagProperties.class, SecurityProperties.class, OssProperties.class})
 public class ApplicationConfiguration {
 
     /**

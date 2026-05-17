@@ -16,6 +16,19 @@ spring:
       api-key: ${DASHSCOPE_API_KEY:}
 
 app:
+  storage:
+    oss:
+      endpoint: https://oss-cn-hangzhou.aliyuncs.com
+      bucket: your-bucket-name
+      access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}
+      access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:}
+      public-base-url: https://your-bucket-name.oss-cn-hangzhou.aliyuncs.com
+      avatar-prefix: avatars
+      avatar-max-size: 5MB
+      allowed-content-types:
+        - image/jpeg
+        - image/png
+        - image/webp
   rag:
     chunk-size: 800
     chunk-overlap: 120

@@ -23,6 +23,7 @@ const props = defineProps<{
   conversationsLoading?: boolean;
   cleaningConversations?: boolean;
   currentUserName: string;
+  currentUserAvatarUrl?: string | null;
   isAdmin?: boolean;
 }>();
 
@@ -33,6 +34,7 @@ const emit = defineEmits<{
   openDocuments: [];
   cleanEmptyConversations: [];
   goAdmin: [];
+  openAvatarUpload: [];
   logout: [];
 }>();
 
@@ -119,12 +121,13 @@ function conversationTitle(conversation: Conversation) {
     </section>
 
     <footer class="user-footer">
-      <div class="user-avatar">
-        <el-icon><User /></el-icon>
-      </div>
+      <button class="user-avatar" type="button" title="更换头像" @click="emit('openAvatarUpload')">
+        <img v-if="props.currentUserAvatarUrl" :src="props.currentUserAvatarUrl" alt="用户头像">
+        <el-icon v-else><User /></el-icon>
+      </button>
       <div class="user-meta">
         <strong>{{ props.currentUserName }}</strong>
-        <span>个人知识库</span>
+        <button type="button" class="avatar-action" @click="emit('openAvatarUpload')">更换头像</button>
       </div>
       <el-button circle text :icon="SwitchButton" title="退出登录" @click="emit('logout')" />
     </footer>
@@ -172,7 +175,8 @@ function conversationTitle(conversation: Conversation) {
 }
 
 .brand-block span,
-.user-meta span {
+.user-meta span,
+.avatar-action {
   display: block;
   margin-top: 4px;
   color: var(--app-text-muted);
@@ -305,9 +309,35 @@ function conversationTitle(conversation: Conversation) {
   place-items: center;
   width: 40px;
   height: 40px;
+  overflow: hidden;
+  border: 0;
   border-radius: 14px;
   color: var(--app-primary);
   background: var(--app-primary-soft);
+  cursor: pointer;
+  padding: 0;
+}
+
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-avatar:hover {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.avatar-action {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.avatar-action:hover {
+  color: var(--app-primary);
 }
 
 .user-meta {

@@ -196,6 +196,7 @@ export interface AuthUser {
   username: string;
   displayName: string | null;
   email: string | null;
+  avatarUrl: string | null;
   roles: UserRole[];
 }
 
@@ -227,6 +228,7 @@ export interface AdminUser {
   username: string;
   displayName: string | null;
   email: string | null;
+  avatarUrl: string | null;
   status: UserStatus;
   roles: UserRole[];
   lastLoginAt: string | null;

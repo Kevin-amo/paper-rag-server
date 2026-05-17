@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import ChatSidebar from '../components/chat/ChatSidebar.vue';
 import RagChatWorkspace from '../components/chat/RagChatWorkspace.vue';
 import DocumentLibraryDrawer from '../components/documents/DocumentLibraryDrawer.vue';
 import UploadDocumentDialog from '../components/documents/UploadDocumentDialog.vue';
 import DocumentDetailDrawer from '../components/documents/DocumentDetailDrawer.vue';
+import AvatarUploadDialog from '../components/user/AvatarUploadDialog.vue';
+import { getErrorMessage } from '../api/http';
 import { useAuth } from '../composables/useAuth';
 import { useDocuments } from '../composables/useDocuments';
 import { useConversations } from '../composables/useConversations';
@@ -17,6 +20,9 @@ const documentsState = useDocuments();
 const conversationsState = useConversations();
 const documentLibraryVisible = ref(false);
 const uploadVisible = ref(false);
+const avatarUploadVisible = ref(false);
+const avatarUploading = ref(false);
+const avatarRefreshVersion = ref(0);
 
 const ragState = useRagChat({
   activeConversationId: conversationsState.activeConversationId,
@@ -27,6 +33,7 @@ const ragState = useRagChat({
 });
 
 const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '当前用户');
+const currentUserAvatarUrl = computed(() => buildAvatarDisplayUrl(auth.state.user?.avatarUrl ?? null));
 const activeConversation = computed(() => (
   conversationsState.conversations.value.find((item) => item.id === conversationsState.activeConversationId.value) ?? null
 ));
@@ -37,6 +44,15 @@ const visibleMessages = computed(() => conversationsState.conversationMessages.v
   })
   .sort((a, b) => a.messageOrder - b.messageOrder));
 
+function buildAvatarDisplayUrl(avatarUrl: string | null) {
+  if (!avatarUrl || !avatarRefreshVersion.value) {
+    return avatarUrl;
+  }
+
+  const separator = avatarUrl.includes('?') ? '&' : '?';
+  return `${avatarUrl}${separator}t=${avatarRefreshVersion.value}`;
+}
+
 async function handleLogout() {
   await auth.logout();
   await router.replace('/login');
@@ -45,6 +61,20 @@ async function handleLogout() {
 async function handleUpload(payload: Parameters<typeof documentsState.uploadBatch>[0]) {
   await documentsState.uploadBatch(payload);
   documentLibraryVisible.value = true;
+}
+
+async function handleAvatarUpload(file: File) {
+  avatarUploading.value = true;
+  try {
+    await auth.uploadAvatar(file);
+    avatarRefreshVersion.value = Date.now();
+    avatarUploadVisible.value = false;
+    ElMessage.success('头像已更新');
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error));
+  } finally {
+    avatarUploading.value = false;
+  }
 }
 
 async function openDocumentDetail(document: Parameters<typeof documentsState.openDetail>[0]) {
@@ -70,6 +100,7 @@ onMounted(async () => {
       :conversations-loading="conversationsState.conversationsLoading.value"
       :cleaning-conversations="conversationsState.cleaningConversations.value"
       :current-user-name="currentUserName"
+      :current-user-avatar-url="currentUserAvatarUrl"
       :is-admin="auth.isAdmin.value"
       @create-conversation="conversationsState.createNewConversation"
       @select-conversation="conversationsState.selectConversation"
@@ -77,6 +108,7 @@ onMounted(async () => {
       @open-documents="documentLibraryVisible = true"
       @clean-empty-conversations="conversationsState.cleanEmptyConversations"
       @go-admin="router.push('/admin')"
+      @open-avatar-upload="avatarUploadVisible = true"
       @logout="handleLogout"
     />
 
@@ -114,6 +146,13 @@ onMounted(async () => {
       :result="documentsState.lastBatchUploadResult.value"
       :error-message="documentsState.uploadErrorMessage.value"
       @submit="handleUpload"
+    />
+
+    <AvatarUploadDialog
+      v-model="avatarUploadVisible"
+      :loading="avatarUploading"
+      :current-avatar-url="currentUserAvatarUrl"
+      @submit="handleAvatarUpload"
     />
 
     <DocumentDetailDrawer

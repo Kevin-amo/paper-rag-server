@@ -34,6 +34,7 @@ public interface AuthService {
             String username,
             String displayName,
             String email,
+            String avatarUrl,
             java.util.List<String> roles
     ) {
     }

@@ -19,6 +19,7 @@ public class SecurityUserPrincipal implements UserDetails {
     private final String password;
     private final String displayName;
     private final String email;
+    private final String avatarObjectKey;
     private final String status;
     private final List<String> roles;
     private final List<GrantedAuthority> authorities;
@@ -29,6 +30,7 @@ public class SecurityUserPrincipal implements UserDetails {
         this.password = user.getPasswordHash();
         this.displayName = user.getDisplayName();
         this.email = user.getEmail();
+        this.avatarObjectKey = user.getAvatarObjectKey();
         this.status = user.getStatus();
         this.roles = List.copyOf(roles);
         this.authorities = roles.stream()
@@ -48,6 +50,10 @@ public class SecurityUserPrincipal implements UserDetails {
 
     public String getEmail() {
         return email;
+    }
+
+    public String getAvatarObjectKey() {
+        return avatarObjectKey;
     }
 
     public String getStatus() {

@@ -1,4 +1,4 @@
-import { http } from './http';
+import { http, uploadHttp } from './http';
 import type { AuthUser, LoginPayload, LoginResponse, RegisterEmailCodePayload, RegisterPayload } from '../types';
 
 export async function login(payload: LoginPayload) {
@@ -17,6 +17,18 @@ export async function register(payload: RegisterPayload) {
 
 export async function getCurrentUser() {
   const { data } = await http.get<AuthUser>('/auth/me');
+  return data;
+}
+
+export async function uploadAvatar(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const { data } = await uploadHttp.post<AuthUser>('/auth/me/avatar', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
   return data;
 }
 
