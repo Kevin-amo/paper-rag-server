@@ -21,6 +21,7 @@ const uploadVisible = ref(false);
 const ragState = useRagChat({
   activeConversationId: conversationsState.activeConversationId,
   conversationMessages: conversationsState.conversationMessages,
+  conversations: conversationsState.conversations,
   loadConversations: () => conversationsState.loadConversations(),
   loadMessages: conversationsState.loadMessages,
 });
@@ -32,7 +33,7 @@ const activeConversation = computed(() => (
 const visibleMessages = computed(() => conversationsState.conversationMessages.value
   .filter((message) => {
     const content = message.content.trim();
-    return (content && content !== '-') || message.citations?.length;
+    return message.streaming || (content && content !== '-') || message.citations?.length;
   })
   .sort((a, b) => a.messageOrder - b.messageOrder));
 

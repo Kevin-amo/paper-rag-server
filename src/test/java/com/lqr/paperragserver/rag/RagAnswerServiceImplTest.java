@@ -5,6 +5,7 @@ import com.lqr.paperragserver.ai.service.PromptConstructionService;
 import com.lqr.paperragserver.common.model.AnswerCitation;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RagAnswer;
+import com.lqr.paperragserver.common.model.RagStreamEvent;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
 import com.lqr.paperragserver.conversation.service.ConversationService;
@@ -12,7 +13,9 @@ import com.lqr.paperragserver.rag.impl.RagAnswerServiceImpl;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -141,5 +144,39 @@ class RagAnswerServiceImplTest {
 
         // 验证检索服务确实被调用，且 topK 为 2
         verify(ragRetrievalService).retrieve(ownerUserId, "question", 2);
+    }
+
+    @Test
+    void streamAnswerShouldEmitEventsAndPersistFinalAnswer() {
+        DocumentChunk chunk = new DocumentChunk(
+                "chunk-1",
+                "source-1",
+                4,
+                "This is the relevant text of the paper.",
+                Map.of("title", "Paper A")
+        );
+        RetrievedChunk retrievedChunk = new RetrievedChunk(chunk, 0.93);
+        when(ragRetrievalService.retrieve(ownerUserId, "stream question", 5))
+                .thenReturn(List.of(retrievedChunk));
+        when(promptConstructionService.build(anyString(), anyList(), anyList()))
+                .thenReturn(new PromptConstructionService.Prompt("sys", "user"));
+        when(llmService.streamGenerate(any())).thenReturn(Flux.just("hello ", "world"));
+
+        List<RagStreamEvent> events = service.streamAnswer(ownerUserId, null, "stream question", null)
+                .collectList()
+                .block(Duration.ofSeconds(2));
+
+        assertThat(events).isNotNull();
+        assertThat(events).hasSize(4);
+        assertThat(events.get(0).type()).isEqualTo("start");
+        assertThat(events.get(0).conversationId()).isEqualTo(conversationId);
+        assertThat(events.get(1).type()).isEqualTo("delta");
+        assertThat(events.get(1).delta()).isEqualTo("hello ");
+        assertThat(events.get(2).type()).isEqualTo("delta");
+        assertThat(events.get(2).delta()).isEqualTo("world");
+        assertThat(events.get(3).type()).isEqualTo("done");
+        assertThat(events.get(3).answer()).isEqualTo("hello world");
+        assertThat(events.get(3).citations()).hasSize(1);
+        verify(conversationService).appendAssistantMessage(ownerUserId, conversationId, "hello world", events.get(3).citations());
     }
 }

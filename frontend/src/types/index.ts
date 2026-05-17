@@ -159,6 +159,15 @@ export interface RagAnswer {
   conversationId: string;
 }
 
+export interface RagStreamEvent {
+  type: 'start' | 'delta' | 'done' | 'error';
+  conversationId: string | null;
+  delta: string | null;
+  answer: string | null;
+  citations: AnswerCitation[];
+  message: string | null;
+}
+
 export interface Conversation {
   id: string;
   ownerUserId: string;
@@ -175,6 +184,7 @@ export interface ConversationMessage {
   content: string;
   citations: AnswerCitation[];
   createdAt: string;
+  streaming?: boolean;
 }
 
 export interface CreateConversationPayload {
