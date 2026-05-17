@@ -19,6 +19,7 @@ const emit = defineEmits<{
 const question = ref('');
 const topK = ref(3);
 const advancedVisible = ref(false);
+const topKOptions = Array.from({ length: 10 }, (_, index) => index + 1);
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !props.loading);
 
@@ -54,18 +55,6 @@ defineExpose({ fillQuestion });
 
 <template>
   <section class="chat-composer">
-    <el-collapse-transition>
-      <div v-if="advancedVisible" class="advanced-panel">
-        <div>
-          <strong>高级设置</strong>
-          <span>调整检索召回数量。默认配置适合大多数论文问答场景。</span>
-        </div>
-        <el-form-item label="引用召回数量 Top K">
-          <el-input-number v-model="topK" :min="1" :max="10" />
-        </el-form-item>
-      </div>
-    </el-collapse-transition>
-
     <div class="composer-box">
       <el-input
         v-model="question"
@@ -76,7 +65,7 @@ defineExpose({ fillQuestion });
         @keydown="handleKeydown"
       />
       <div class="composer-actions">
-        <el-button text :icon="Setting" @click="advancedVisible = !advancedVisible">
+        <el-button text :icon="Setting" @click="advancedVisible = true">
           高级设置
         </el-button>
         <el-button type="primary" size="large" :loading="props.loading" :disabled="!canSubmit" :icon="Promotion" @click="submitQuestion">
@@ -84,6 +73,34 @@ defineExpose({ fillQuestion });
         </el-button>
       </div>
     </div>
+
+    <el-dialog v-model="advancedVisible" title="高级设置" width="420px" class="advanced-dialog" append-to-body align-center>
+      <div class="advanced-setting-card">
+        <div class="advanced-setting-header">
+          <div>
+            <strong>引用召回数量 Top K</strong>
+            <span>控制回答时参考的论文片段数量，默认 3 条。</span>
+          </div>
+        </div>
+        <div class="topk-options" role="radiogroup" aria-label="引用召回数量 Top K">
+          <button
+            v-for="option in topKOptions"
+            :key="option"
+            type="button"
+            class="topk-option"
+            :class="{ active: topK === option }"
+            :aria-checked="topK === option"
+            role="radio"
+            @click="topK = option"
+          >
+            {{ option }}
+          </button>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="advancedVisible = false">完成</el-button>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
@@ -93,38 +110,6 @@ defineExpose({ fillQuestion });
   border-top: 1px solid rgba(226, 232, 240, 0.9);
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(16px);
-}
-
-.advanced-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 12px;
-  padding: 12px 14px;
-  border: 1px solid rgba(37, 99, 235, 0.12);
-  border-radius: 16px;
-  background: #f8fbff;
-}
-
-.advanced-panel strong,
-.advanced-panel span {
-  display: block;
-}
-
-.advanced-panel strong {
-  color: #172554;
-  font-size: 14px;
-}
-
-.advanced-panel span {
-  margin-top: 4px;
-  color: var(--app-text-muted);
-  font-size: 12px;
-}
-
-.advanced-panel :deep(.el-form-item) {
-  margin-bottom: 0;
 }
 
 .composer-box {
@@ -158,15 +143,99 @@ defineExpose({ fillQuestion });
   font-weight: 800;
 }
 
+.advanced-setting-card {
+  display: grid;
+  gap: 18px;
+  padding: 16px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.advanced-setting-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.advanced-setting-header strong,
+.advanced-setting-header span {
+  display: block;
+}
+
+.advanced-setting-header strong {
+  color: #172554;
+  font-size: 15px;
+}
+
+.advanced-setting-header span {
+  margin-top: 5px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.topk-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.topk-option {
+  height: 38px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  transition: all 0.18s ease;
+}
+
+.topk-option:hover {
+  border-color: rgba(37, 99, 235, 0.42);
+  color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.topk-option.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.32);
+}
+
+:global(.advanced-dialog .el-dialog) {
+  border-radius: 22px;
+}
+
+:global(.advanced-dialog .el-dialog__header) {
+  padding-bottom: 10px;
+}
+
+:global(.advanced-dialog .el-dialog__title) {
+  color: #0f172a;
+  font-weight: 800;
+}
+
 @media (max-width: 640px) {
   .chat-composer {
     padding: 12px;
   }
 
-  .advanced-panel,
   .composer-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .topk-options {
+    grid-template-columns: repeat(5, minmax(42px, 1fr));
+  }
+
+  :global(.advanced-dialog) {
+    width: calc(100% - 28px) !important;
   }
 }
 </style>
