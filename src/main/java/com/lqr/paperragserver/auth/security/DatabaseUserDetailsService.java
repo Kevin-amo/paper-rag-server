@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.auth.security;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.lqr.paperragserver.auth.entity.SysUserEntity;
+import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.mapper.SysRoleMapper;
 import com.lqr.paperragserver.auth.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +24,8 @@ public class DatabaseUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        SysUserEntity user = userMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getUsername, username));
+        SysUser user = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getUsername, username));
         if (user == null) {
             throw new UsernameNotFoundException("用户不存在");
         }

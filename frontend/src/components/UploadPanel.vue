@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { UploadUserFile } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue';
+import EmptyState from './common/EmptyState.vue';
 import type { BatchDocumentIngestionResponse, BatchUploadDocumentPayload } from '../types';
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'failed';
@@ -30,6 +31,7 @@ const emit = defineEmits<{
 
 const fileList = ref<UploadUserFile[]>([]);
 const uploadItems = ref<EditableUploadItem[]>([]);
+const selectedCount = computed(() => uploadItems.value.length);
 
 watch(
   fileList,
@@ -175,28 +177,32 @@ function formatFileSize(size: number) {
     <template #header>
       <div class="panel-header">
         <div>
-          <h2>文档上传</h2>
-          <p>支持批量选择文件，并为每个文件单独填写 sourceId 和标题。</p>
+          <p class="section-kicker">Ingestion</p>
+          <h2>批量上传论文</h2>
+          <p>选择 PDF、图片或文本类论文资料，补充 sourceId 与标题后统一提交解析。</p>
         </div>
-        <el-button type="primary" :loading="props.loading" @click="handleSubmit">开始批量上传</el-button>
+        <div class="header-actions">
+          <el-tag type="info">已选 {{ selectedCount }} 个文件</el-tag>
+          <el-button type="primary" :loading="props.loading" @click="handleSubmit">开始批量上传</el-button>
+        </div>
       </div>
     </template>
 
     <div class="upload-form">
-      <el-upload
-        v-model:file-list="fileList"
-        drag
-        :auto-upload="false"
-        :multiple="true"
-      >
+      <el-upload v-model:file-list="fileList" drag :auto-upload="false" :multiple="true">
         <el-icon class="upload-icon"><UploadFilled /></el-icon>
         <div class="el-upload__text">拖拽文件到这里，或 <em>点击选择多个文件</em></div>
         <template #tip>
-          <div class="el-upload__tip">已选择的文件会出现在下方列表，可逐条编辑元数据后一次性提交。</div>
+          <div class="el-upload__tip">不会自动上传；确认元数据后再提交，接口仍使用 multipart/form-data。</div>
         </template>
       </el-upload>
 
-      <el-empty v-if="!uploadItems.length" description="尚未选择文件" />
+      <EmptyState
+        v-if="!uploadItems.length"
+        compact
+        title="等待选择文件"
+        description="选择文件后，可在下方逐条编辑标题和 sourceId。"
+      />
 
       <div v-else class="upload-item-list">
         <div v-for="item in uploadItems" :key="item.uid" class="upload-item-card">
@@ -212,30 +218,24 @@ function formatFileSize(size: number) {
           </div>
 
           <el-row :gutter="16">
-            <el-col :span="10">
+            <el-col :xs="24" :sm="12" :lg="10">
               <el-form-item label="sourceId（可选）">
-                <el-input v-model="item.sourceId" :disabled="props.loading" placeholder="例如 sample-paper" clearable />
+                <el-input v-model="item.sourceId" :disabled="props.loading" placeholder="例如 transformer-survey-2024" clearable />
               </el-form-item>
             </el-col>
-            <el-col :span="10">
+            <el-col :xs="24" :sm="12" :lg="10">
               <el-form-item label="标题（可选）">
-                <el-input v-model="item.title" :disabled="props.loading" placeholder="前端展示标题" clearable />
+                <el-input v-model="item.title" :disabled="props.loading" placeholder="论文展示标题" clearable />
               </el-form-item>
             </el-col>
-            <el-col :span="4">
-              <el-form-item label="Chunks">
+            <el-col :xs="24" :sm="12" :lg="4">
+              <el-form-item label="分块数">
                 <span class="chunk-text">{{ item.chunkCount ?? '-' }}</span>
               </el-form-item>
             </el-col>
           </el-row>
 
-          <el-alert
-            v-if="item.errorMessage"
-            type="error"
-            :closable="false"
-            show-icon
-            :title="item.errorMessage"
-          />
+          <el-alert v-if="item.errorMessage" type="error" :closable="false" show-icon :title="item.errorMessage" />
         </div>
       </div>
     </div>
@@ -244,25 +244,41 @@ function formatFileSize(size: number) {
 
 <style scoped>
 .panel-card {
-  border: none;
-  border-radius: 20px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow);
 }
 
 .panel-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
 
-.panel-header h2 {
-  margin: 0;
-  font-size: 18px;
+.section-kicker {
+  margin: 0 0 6px;
+  color: var(--app-primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.panel-header p {
+.panel-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.panel-header p:last-child {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: var(--app-text-muted);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .upload-form {
@@ -272,8 +288,8 @@ function formatFileSize(size: number) {
 }
 
 .upload-icon {
-  font-size: 30px;
-  color: #2563eb;
+  font-size: 34px;
+  color: var(--app-primary);
 }
 
 .upload-item-list {
@@ -284,7 +300,7 @@ function formatFileSize(size: number) {
 
 .upload-item-card {
   padding: 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--app-border);
   border-radius: 16px;
   background: #fff;
 }
@@ -298,13 +314,20 @@ function formatFileSize(size: number) {
 }
 
 .file-meta {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
+.file-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .file-meta span {
-  color: #6b7280;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 
@@ -317,5 +340,14 @@ function formatFileSize(size: number) {
 .chunk-text {
   color: #334155;
   line-height: 32px;
+}
+
+@media (max-width: 760px) {
+  .panel-header,
+  .header-actions,
+  .upload-item-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 </style>

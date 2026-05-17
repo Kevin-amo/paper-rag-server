@@ -2,8 +2,8 @@ package com.lqr.paperragserver.auth.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.lqr.paperragserver.auth.entity.SysRoleEntity;
-import com.lqr.paperragserver.auth.entity.SysUserEntity;
+import com.lqr.paperragserver.auth.entity.SysRole;
+import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.mapper.SysRoleMapper;
 import com.lqr.paperragserver.auth.mapper.SysUserMapper;
 import com.lqr.paperragserver.auth.mapper.SysUserRoleMapper;
@@ -40,20 +40,20 @@ public class UserAdminServiceImpl implements UserAdminService {
     public PageResult listUsers(int page, int size, String keyword, String status) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
-        LambdaQueryWrapper<SysUserEntity> wrapper = new LambdaQueryWrapper<SysUserEntity>()
-                .orderByDesc(SysUserEntity::getCreatedAt);
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
+                .orderByDesc(SysUser::getCreatedAt);
         if (keyword != null && !keyword.isBlank()) {
             String like = keyword.trim();
-            wrapper.and(item -> item.like(SysUserEntity::getUsername, like)
+            wrapper.and(item -> item.like(SysUser::getUsername, like)
                     .or()
-                    .like(SysUserEntity::getDisplayName, like)
+                    .like(SysUser::getDisplayName, like)
                     .or()
-                    .like(SysUserEntity::getEmail, like));
+                    .like(SysUser::getEmail, like));
         }
         if (status != null && !status.isBlank()) {
-            wrapper.eq(SysUserEntity::getStatus, status.trim().toUpperCase());
+            wrapper.eq(SysUser::getStatus, status.trim().toUpperCase());
         }
-        Page<SysUserEntity> result = userMapper.selectPage(new Page<>(safePage + 1L, safeSize), wrapper);
+        Page<SysUser> result = userMapper.selectPage(new Page<>(safePage + 1L, safeSize), wrapper);
         List<UserView> items = result.getRecords().stream().map(this::toUserView).toList();
         return new PageResult(items, safePage, safeSize, result.getTotal());
     }
@@ -62,10 +62,10 @@ public class UserAdminServiceImpl implements UserAdminService {
     @Transactional
     public UserView createUser(CreateUserCommand command) {
         String username = requireText(command.username(), "用户名不能为空");
-        if (userMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>().eq(SysUserEntity::getUsername, username)) != null) {
+        if (userMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username)) != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "用户名已存在");
         }
-        SysUserEntity user = new SysUserEntity();
+        SysUser user = new SysUser();
         user.setId(UUID.randomUUID());
         user.setUsername(username);
         user.setPasswordHash(passwordEncoder.encode(requireText(command.password(), "密码不能为空")));
@@ -82,7 +82,7 @@ public class UserAdminServiceImpl implements UserAdminService {
 
     @Override
     public UserView updateUser(UUID id, UpdateUserCommand command) {
-        SysUserEntity user = requireUser(id);
+        SysUser user = requireUser(id);
         user.setDisplayName(blankToNull(command.displayName()));
         user.setEmail(blankToNull(command.email()));
         user.setUpdatedAt(OffsetDateTime.now());
@@ -105,7 +105,7 @@ public class UserAdminServiceImpl implements UserAdminService {
 
     @Override
     public UserView updateStatus(UUID id, String status) {
-        SysUserEntity user = requireUser(id);
+        SysUser user = requireUser(id);
         String nextStatus = requireText(status, "状态不能为空").toUpperCase();
         if (!Set.of("ACTIVE", "DISABLED").contains(nextStatus)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户状态不合法");
@@ -121,16 +121,27 @@ public class UserAdminServiceImpl implements UserAdminService {
 
     @Override
     public void resetPassword(UUID id, String password) {
-        SysUserEntity user = requireUser(id);
+        SysUser user = requireUser(id);
         user.setPasswordHash(passwordEncoder.encode(requireText(password, "密码不能为空")));
         user.setUpdatedAt(OffsetDateTime.now());
         userMapper.updateById(user);
     }
 
+    @Override
+    @Transactional
+    public void deleteUser(UUID id) {
+        SysUser user = requireUser(id);
+        if (roleMapper.selectRoleCodesByUserId(id).contains(RoleCodes.ADMIN)) {
+            ensureAnotherActiveAdmin(id);
+        }
+        userRoleMapper.deleteByUserId(id);
+        userMapper.deleteById(user.getId());
+    }
+
     private void replaceRoles(UUID userId, List<String> roles) {
         userRoleMapper.deleteByUserId(userId);
         for (String roleCode : roles) {
-            SysRoleEntity role = roleMapper.selectByCode(roleCode);
+            SysRole role = roleMapper.selectByCode(roleCode);
             if (role == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "角色不存在：" + roleCode);
             }
@@ -158,15 +169,15 @@ public class UserAdminServiceImpl implements UserAdminService {
         }
     }
 
-    private SysUserEntity requireUser(UUID id) {
-        SysUserEntity user = userMapper.selectById(id);
+    private SysUser requireUser(UUID id) {
+        SysUser user = userMapper.selectById(id);
         if (user == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在");
         }
         return user;
     }
 
-    private UserView toUserView(SysUserEntity user) {
+    private UserView toUserView(SysUser user) {
         List<String> roles = roleMapper.selectRoleCodesByUserId(user.getId());
         return new UserView(
                 user.getId().toString(),

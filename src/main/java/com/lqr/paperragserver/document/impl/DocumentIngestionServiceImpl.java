@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 默认文档入库编排实现。
@@ -38,27 +39,27 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
      * @return 入库后的文档结果摘要
      */
     @Override
-    public DocumentIngestionResult ingest(String fileName, byte[] content, Map<String, Object> metadata) {
+    public DocumentIngestionResult ingest(UUID ownerUserId, String fileName, byte[] content, Map<String, Object> metadata) {
         ParsedDocument parsedDocument = documentParsingService.parse(fileName, content, metadata);
         DocumentSource source = parsedDocument.source();
         String text = parsedDocument.text();
         try {
             // 解析文件，得到全文文本 text
-            paperDocumentPersistenceService.markParsing(source, text);
-            paperDocumentPersistenceService.replaceAssets(source.sourceId(), parsedDocument.assets());
+            paperDocumentPersistenceService.markParsing(ownerUserId, source, text);
+            paperDocumentPersistenceService.replaceAssets(ownerUserId, source.sourceId(), parsedDocument.assets());
             // 切分，保存到列表chunks
             List<DocumentChunk> chunks = documentSplittingService.split(source, text);
             // 删除旧向量，替换 chunk 表
-            vectorWriteService.deleteBySourceId(source.sourceId());
-            paperDocumentPersistenceService.replaceChunks(source.sourceId(), chunks);
+            vectorWriteService.deleteBySourceId(ownerUserId, source.sourceId());
+            paperDocumentPersistenceService.replaceChunks(ownerUserId, source.sourceId(), chunks);
             // 对每个 chunk 生成 embedding 写入vector_store
-            vectorWriteService.upsert(embeddingService.embed(chunks));
+            vectorWriteService.upsert(ownerUserId, embeddingService.embed(chunks));
             // 更新文档状态 INDEXED
-            paperDocumentPersistenceService.markIndexed(source.sourceId(), chunks.size());
+            paperDocumentPersistenceService.markIndexed(ownerUserId, source.sourceId(), chunks.size());
             return new DocumentIngestionResult(source, chunks.size());
         } catch (RuntimeException ex) {
             // 出现异常就标记为 FAILED
-            paperDocumentPersistenceService.markFailed(source.sourceId(), ex.getMessage());
+            paperDocumentPersistenceService.markFailed(ownerUserId, source.sourceId(), ex.getMessage());
             throw ex;
         }
     }
@@ -69,8 +70,8 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
      * @param sourceId 文档来源标识
      */
     @Override
-    public void deleteBySourceId(String sourceId) {
-        vectorWriteService.deleteBySourceId(sourceId);
-        paperDocumentPersistenceService.markDeleted(sourceId);
+    public void deleteBySourceId(UUID ownerUserId, String sourceId) {
+        vectorWriteService.deleteBySourceId(ownerUserId, sourceId);
+        paperDocumentPersistenceService.markDeleted(ownerUserId, sourceId);
     }
 }

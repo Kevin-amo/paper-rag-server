@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.common.model.DocumentChunk;
-import com.lqr.paperragserver.paper.entity.PaperDocumentChunkEntity;
-import com.lqr.paperragserver.paper.entity.PaperDocumentEntity;
+import com.lqr.paperragserver.paper.entity.PaperDocumentChunk;
+import com.lqr.paperragserver.paper.entity.PaperDocument;
 import com.lqr.paperragserver.paper.impl.PaperDocumentPersistenceServiceImpl;
 import com.lqr.paperragserver.paper.mapper.PaperDocumentAssetMapper;
 import com.lqr.paperragserver.paper.mapper.PaperDocumentChunkMapper;
@@ -18,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,6 +32,7 @@ class PaperDocumentPersistenceServiceImplTest {
     private final PaperDocumentChunkMapper chunkMapper = mock(PaperDocumentChunkMapper.class);
     private final PaperDocumentAssetMapper assetMapper = mock(PaperDocumentAssetMapper.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final UUID ownerUserId = UUID.randomUUID();
     private PaperDocumentPersistenceServiceImpl service;
 
     @BeforeEach
@@ -40,13 +42,13 @@ class PaperDocumentPersistenceServiceImplTest {
 
     @Test
     void listDocumentsShouldExcludeDeletedByDefaultAndSearchKeyword() {
-        Page<PaperDocumentEntity> page = new Page<>(1, 20, 0);
+        Page<PaperDocument> page = new Page<>(1, 20, 0);
         when(documentMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
 
         PaperDocumentPersistenceService.PageResult<PaperDocumentPersistenceService.DocumentSummary> result =
-                service.listDocuments("paper", null, 0, 20);
+                service.listDocuments(ownerUserId, "paper", null, 0, 20);
 
-        ArgumentCaptor<Page<PaperDocumentEntity>> pageCaptor = ArgumentCaptor.forClass(Page.class);
+        ArgumentCaptor<Page<PaperDocument>> pageCaptor = ArgumentCaptor.forClass(Page.class);
         verify(documentMapper).selectPage(pageCaptor.capture(), any(LambdaQueryWrapper.class));
 
         assertThat(result.total()).isZero();
@@ -56,21 +58,21 @@ class PaperDocumentPersistenceServiceImplTest {
 
     @Test
     void listDocumentsShouldRespectExplicitStatusAndPageOffset() {
-        PaperDocumentEntity entity = new PaperDocumentEntity();
+        PaperDocument entity = new PaperDocument();
         entity.setSourceId("source-1");
         entity.setTitle("Paper A");
         entity.setStatus("INDEXED");
         entity.setChunkCount(3);
         entity.setCreatedAt(OffsetDateTime.now());
         entity.setUpdatedAt(OffsetDateTime.now());
-        Page<PaperDocumentEntity> page = new Page<>(3, 10, 1);
+        Page<PaperDocument> page = new Page<>(3, 10, 1);
         page.setRecords(List.of(entity));
         when(documentMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
 
         PaperDocumentPersistenceService.PageResult<PaperDocumentPersistenceService.DocumentSummary> result =
-                service.listDocuments(null, "indexed", 2, 10);
+                service.listDocuments(ownerUserId, null, "indexed", 2, 10);
 
-        ArgumentCaptor<Page<PaperDocumentEntity>> pageCaptor = ArgumentCaptor.forClass(Page.class);
+        ArgumentCaptor<Page<PaperDocument>> pageCaptor = ArgumentCaptor.forClass(Page.class);
         verify(documentMapper).selectPage(pageCaptor.capture(), any(LambdaQueryWrapper.class));
 
         assertThat(pageCaptor.getValue().getCurrent()).isEqualTo(3);
@@ -95,12 +97,13 @@ class PaperDocumentPersistenceServiceImplTest {
                 Map.of("source", "manual")
         );
 
-        service.updateMetadata("source-1", update);
+        service.updateMetadata(ownerUserId, "source-1", update);
 
         ArgumentCaptor<String> authorsCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> keywordsCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> metadataCaptor = ArgumentCaptor.forClass(String.class);
         verify(documentMapper).updateMetadata(
+                org.mockito.ArgumentMatchers.eq(ownerUserId),
                 org.mockito.ArgumentMatchers.eq("source-1"),
                 org.mockito.ArgumentMatchers.eq("Paper A"),
                 authorsCaptor.capture(),
@@ -128,9 +131,9 @@ class PaperDocumentPersistenceServiceImplTest {
                 Map.of("sectionTitle", longSectionTitle)
         );
 
-        service.replaceChunks("source-1", List.of(chunk));
+        service.replaceChunks(ownerUserId, "source-1", List.of(chunk));
 
-        ArgumentCaptor<PaperDocumentChunkEntity> entityCaptor = ArgumentCaptor.forClass(PaperDocumentChunkEntity.class);
+        ArgumentCaptor<PaperDocumentChunk> entityCaptor = ArgumentCaptor.forClass(PaperDocumentChunk.class);
         verify(chunkMapper).insert(entityCaptor.capture());
 
         assertThat(entityCaptor.getValue().getSectionTitle())
@@ -140,16 +143,60 @@ class PaperDocumentPersistenceServiceImplTest {
     }
 
     @Test
-    void markIndexedShouldIgnoreDeletedDocument() {
-        service.markIndexed("source-1", 12);
+    void replaceChunksShouldAssignPrimaryKeyBeforeInsert() {
+        DocumentChunk chunk = new DocumentChunk(
+                "chunk-1",
+                "source-1",
+                0,
+                "chunk text",
+                Map.of()
+        );
 
-        verify(documentMapper).markIndexed("source-1", 12);
+        service.replaceChunks(ownerUserId, "source-1", List.of(chunk));
+
+        ArgumentCaptor<PaperDocumentChunk> entityCaptor = ArgumentCaptor.forClass(PaperDocumentChunk.class);
+        verify(chunkMapper).insert(entityCaptor.capture());
+
+        assertThat(entityCaptor.getValue().getId()).isNotNull();
+    }
+
+    @Test
+    void replaceAssetsShouldAssignPrimaryKeyBeforeInsert() {
+        com.lqr.paperragserver.common.model.DocumentAsset asset = new com.lqr.paperragserver.common.model.DocumentAsset(
+                "asset-1",
+                "source-1",
+                0,
+                "IMAGE",
+                "image.png",
+                "image/png",
+                3L,
+                "hash",
+                new byte[]{1, 2, 3},
+                "ocr text",
+                0,
+                8,
+                Map.of()
+        );
+
+        service.replaceAssets(ownerUserId, "source-1", List.of(asset));
+
+        ArgumentCaptor<com.lqr.paperragserver.paper.entity.PaperDocumentAsset> entityCaptor = ArgumentCaptor.forClass(com.lqr.paperragserver.paper.entity.PaperDocumentAsset.class);
+        verify(assetMapper).insert(entityCaptor.capture());
+
+        assertThat(entityCaptor.getValue().getId()).isNotNull();
+    }
+
+    @Test
+    void markIndexedShouldIgnoreDeletedDocument() {
+        service.markIndexed(ownerUserId, "source-1", 12);
+
+        verify(documentMapper).markIndexed(ownerUserId, "source-1", 12);
     }
 
     @Test
     void restoreShouldOnlyRestoreDeletedDocumentAsPending() {
-        service.restore("source-1");
+        service.restore(ownerUserId, "source-1");
 
-        verify(documentMapper).restore("source-1");
+        verify(documentMapper).restore(ownerUserId, "source-1");
     }
 }

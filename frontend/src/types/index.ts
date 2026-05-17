@@ -5,6 +5,11 @@ export interface PageResponse<T> {
   total: number;
 }
 
+export type UserRole = 'USER' | 'ADMIN';
+export type UserStatus = 'ACTIVE' | 'DISABLED';
+export type DocumentStatus = 'PENDING' | 'PROCESSING' | 'INDEXED' | 'READY' | 'FAILED' | string;
+export type MessageRole = 'USER' | 'ASSISTANT';
+
 export interface DocumentSource {
   sourceId: string;
   title: string;
@@ -19,12 +24,13 @@ export interface DocumentIngestionResult {
 
 export interface DocumentSummary {
   sourceId: string;
+  ownerUserId: string;
   title: string;
   origin: string;
   fileName: string;
   fileType: string;
   fileSize: number | null;
-  status: string;
+  status: DocumentStatus;
   chunkCount: number;
   publishYear: number | null;
   createdAt: string;
@@ -33,6 +39,7 @@ export interface DocumentSummary {
 
 export interface DocumentDetail {
   sourceId: string;
+  ownerUserId: string;
   title: string;
   origin: string;
   fileName: string;
@@ -46,7 +53,7 @@ export interface DocumentDetail {
   keywords: unknown;
   contentText: string | null;
   metadata: Record<string, unknown> | null;
-  status: string;
+  status: DocumentStatus;
   chunkCount: number;
   errorMessage: string | null;
   createdAt: string;
@@ -56,6 +63,7 @@ export interface DocumentDetail {
 
 export interface DocumentChunk {
   chunkId: string;
+  ownerUserId: string;
   chunkIndex: number;
   content: string;
   contentHash: string;
@@ -72,6 +80,7 @@ export interface DocumentChunk {
 export interface DocumentAsset {
   assetId: string;
   sourceId: string;
+  ownerUserId: string;
   assetIndex: number;
   assetType: string;
   fileName: string | null;
@@ -88,7 +97,7 @@ export interface DocumentAsset {
 
 export interface ListDocumentsParams {
   keyword?: string;
-  status?: string;
+  status?: DocumentStatus;
   page?: number;
   size?: number;
 }
@@ -130,6 +139,7 @@ export interface BatchDocumentIngestionResponse {
 }
 
 export interface AskQuestionPayload {
+  conversationId?: string;
   question: string;
   topK?: number;
 }
@@ -146,6 +156,29 @@ export interface AnswerCitation {
 export interface RagAnswer {
   answer: string;
   citations: AnswerCitation[];
+  conversationId: string;
+}
+
+export interface Conversation {
+  id: string;
+  ownerUserId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversationMessage {
+  id: string;
+  conversationId: string;
+  role: MessageRole;
+  messageOrder: number;
+  content: string;
+  citations: AnswerCitation[];
+  createdAt: string;
+}
+
+export interface CreateConversationPayload {
+  title?: string;
 }
 
 export interface AuthUser {
@@ -153,7 +186,7 @@ export interface AuthUser {
   username: string;
   displayName: string | null;
   email: string | null;
-  roles: string[];
+  roles: UserRole[];
 }
 
 export interface LoginPayload {
@@ -184,8 +217,8 @@ export interface AdminUser {
   username: string;
   displayName: string | null;
   email: string | null;
-  status: string;
-  roles: string[];
+  status: UserStatus;
+  roles: UserRole[];
   lastLoginAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -196,7 +229,7 @@ export interface CreateAdminUserPayload {
   password: string;
   displayName?: string;
   email?: string;
-  roles: string[];
+  roles: UserRole[];
 }
 
 export interface UpdateAdminUserPayload {

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import StatusTag from './common/StatusTag.vue';
+import EmptyState from './common/EmptyState.vue';
+import ConfirmDeleteButton from './common/ConfirmDeleteButton.vue';
 import type { DocumentSummary } from '../types';
 
 const props = defineProps<{
@@ -22,6 +25,7 @@ const emit = defineEmits<{
 }>();
 
 const localKeyword = ref(props.keyword);
+const currentPage = computed(() => props.page + 1);
 
 watch(
   () => props.keyword,
@@ -29,23 +33,6 @@ watch(
     localKeyword.value = value;
   },
 );
-
-const currentPage = computed(() => props.page + 1);
-
-function statusTagType(status: string) {
-  switch (status?.toUpperCase()) {
-    case 'INDEXED':
-    case 'READY':
-      return 'success';
-    case 'FAILED':
-      return 'danger';
-    case 'PROCESSING':
-    case 'PENDING':
-      return 'warning';
-    default:
-      return 'info';
-  }
-}
 
 function fileTypeTagType(fileType: string) {
   if (!fileType) {
@@ -61,11 +48,7 @@ function fileTypeTagType(fileType: string) {
 }
 
 function formatDate(value: string) {
-  if (!value) {
-    return '-';
-  }
-
-  return new Date(value).toLocaleString();
+  return value ? new Date(value).toLocaleString() : '-';
 }
 
 function handleCurrentChange(value: number) {
@@ -78,8 +61,9 @@ function handleCurrentChange(value: number) {
     <template #header>
       <div class="table-header">
         <div>
-          <h2>文档列表</h2>
-          <p>点击任意一行可查看文档详情与 chunks。</p>
+          <p class="section-kicker">Document Library</p>
+          <h2>文档管理</h2>
+          <p>检索已上传论文，查看解析详情、分块内容与关联图片。</p>
         </div>
 
         <div class="toolbar">
@@ -95,97 +79,103 @@ function handleCurrentChange(value: number) {
       </div>
     </template>
 
-    <el-table :data="props.documents" stripe border height="520" :loading="props.loading" @row-click="emit('rowClick', $event)">
-      <el-table-column prop="title" label="标题" min-width="220" show-overflow-tooltip>
-        <template #default="{ row }">
-          <div class="title-cell">
-            <strong>{{ row.title || row.fileName || row.sourceId }}</strong>
-            <span>{{ row.sourceId }}</span>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column prop="fileType" label="类型" width="140">
-        <template #default="{ row }">
-          <el-tag :type="fileTypeTagType(row.fileType)" size="small">{{ row.fileType || '-' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="status" label="状态" width="110">
-        <template #default="{ row }">
-          <el-tag :type="statusTagType(row.status)">{{ row.status }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="chunkCount" label="Chunks" width="90" />
-      <el-table-column prop="publishYear" label="年份" width="90" />
-      <el-table-column prop="updatedAt" label="更新时间" min-width="170">
-        <template #default="{ row }">
-          {{ formatDate(row.updatedAt) }}
-        </template>
-      </el-table-column>
-      <el-table-column v-if="props.canDelete" label="操作" width="120" fixed="right">
-        <template #default="{ row }">
-          <el-popconfirm
-            title="确认移除这篇文档吗？"
-            confirm-button-text="确认"
-            cancel-button-text="取消"
-            @confirm="emit('delete', row)"
-          >
-            <template #reference>
-              <el-button
-                text
-                type="danger"
-                :loading="props.deletingSourceId === row.sourceId"
-                @click.stop
-              >
-                删除
-              </el-button>
-            </template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
+    <EmptyState
+      v-if="!props.loading && !props.documents.length"
+      title="暂无文档"
+      description="上传论文后会在这里展示解析状态、分块数量与更新时间。"
+    />
 
-    <div class="pagination-wrap">
-      <el-pagination
-        background
-        layout="total, prev, pager, next"
-        :total="props.total"
-        :page-size="props.size"
-        :current-page="currentPage"
-        @current-change="handleCurrentChange"
-      />
-    </div>
+    <template v-else>
+      <el-table :data="props.documents" stripe height="520" :loading="props.loading" @row-click="emit('rowClick', $event)">
+        <el-table-column prop="title" label="标题" min-width="240" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div class="title-cell">
+              <strong>{{ row.title || row.fileName || row.sourceId }}</strong>
+              <span>{{ row.sourceId }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="fileType" label="类型" width="140">
+          <template #default="{ row }">
+            <el-tag :type="fileTypeTagType(row.fileType)" size="small">{{ row.fileType || '-' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="120">
+          <template #default="{ row }">
+            <StatusTag :status="row.status" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="chunkCount" label="分块" width="86" />
+        <el-table-column prop="publishYear" label="年份" width="86">
+          <template #default="{ row }">{{ row.publishYear || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="updatedAt" label="更新时间" min-width="170">
+          <template #default="{ row }">{{ formatDate(row.updatedAt) }}</template>
+        </el-table-column>
+        <el-table-column v-if="props.canDelete" label="操作" width="110" fixed="right">
+          <template #default="{ row }">
+            <ConfirmDeleteButton
+              title="确认删除这篇文档吗？"
+              :loading="props.deletingSourceId === row.sourceId"
+              @confirm="emit('delete', row)"
+            />
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="pagination-wrap">
+        <el-pagination
+          background
+          layout="total, prev, pager, next"
+          :total="props.total"
+          :page-size="props.size"
+          :current-page="currentPage"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </template>
   </el-card>
 </template>
 
 <style scoped>
 .table-card {
   height: 100%;
-  border: none;
-  border-radius: 20px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow);
 }
 
 .table-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
 
-.table-header h2 {
-  margin: 0;
-  font-size: 18px;
+.section-kicker {
+  margin: 0 0 6px;
+  color: var(--app-primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.table-header p {
+.table-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.table-header p:last-child {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: var(--app-text-muted);
 }
 
 .toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 420px;
+  min-width: min(430px, 100%);
 }
 
 .title-cell {
@@ -195,7 +185,7 @@ function handleCurrentChange(value: number) {
 }
 
 .title-cell span {
-  color: #6b7280;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 
@@ -203,5 +193,17 @@ function handleCurrentChange(value: number) {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+:deep(.el-table__row) {
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .table-header,
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 </style>

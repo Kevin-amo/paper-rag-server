@@ -7,6 +7,8 @@ import com.lqr.paperragserver.vector.service.VectorWriteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -30,8 +32,10 @@ class DocumentManagementServiceTest {
 
     @Test
     void restoreShouldDelegateToPersistenceLayer() {
-        service.restore("source-1");
+        UUID ownerUserId = UUID.randomUUID();
 
-        verify(paperDocumentPersistenceService).restore("source-1");
+        service.restore(ownerUserId, "source-1");
+
+        verify(paperDocumentPersistenceService).restore(ownerUserId, "source-1");
     }
 }

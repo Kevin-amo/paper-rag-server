@@ -3,6 +3,7 @@ package com.lqr.paperragserver.document.service;
 import com.lqr.paperragserver.common.model.DocumentIngestionResult;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 文档入库编排服务。
@@ -19,12 +20,12 @@ public interface DocumentIngestionService {
      * @param metadata 额外元数据
      * @return 入库结果
      */
-    DocumentIngestionResult ingest(String fileName, byte[] content, Map<String, Object> metadata);
+    DocumentIngestionResult ingest(UUID ownerUserId, String fileName, byte[] content, Map<String, Object> metadata);
 
     /**
      * 根据来源标识删除文档对应的向量数据。
      *
      * @param sourceId 文档来源标识
      */
-    void deleteBySourceId(String sourceId);
+    void deleteBySourceId(UUID ownerUserId, String sourceId);
 }

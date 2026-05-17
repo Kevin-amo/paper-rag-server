@@ -15,6 +15,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,6 +28,7 @@ class RagRetrievalServiceImplTest {
     private final VectorStore vectorStore = mock(VectorStore.class);
     private final PaperDocumentPersistenceService paperDocumentPersistenceService = mock(PaperDocumentPersistenceService.class);
     private final RagProperties ragProperties = new RagProperties(800, 120, 5, 0);
+    private final UUID ownerUserId = UUID.randomUUID();
     private RagRetrievalServiceImpl service;
 
     @BeforeEach
@@ -45,16 +47,16 @@ class RagRetrievalServiceImplTest {
                 "学生姓名：李勤燃 张俊豪 王家豪",
                 Map.of("sectionTitle", "前置内容", "title", "课程设计")
         );
-        when(paperDocumentPersistenceService.searchChunks("这篇文章的学生姓名是谁", 9))
+        when(paperDocumentPersistenceService.searchChunks(ownerUserId, "这篇文章的学生姓名是谁", 9))
                 .thenReturn(List.of(lexicalHit));
 
-        List<RetrievedChunk> results = service.retrieve("这篇文章的学生姓名是谁", 3);
+        List<RetrievedChunk> results = service.retrieve(ownerUserId, "这篇文章的学生姓名是谁", 3);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).chunk().chunkId()).isEqualTo("chunk-0");
         assertThat(results.get(0).rankScore()).isGreaterThan(0d);
         assertThat(results.get(0).chunk().content()).contains("学生姓名");
-        verify(paperDocumentPersistenceService).searchChunks("这篇文章的学生姓名是谁", 9);
+        verify(paperDocumentPersistenceService).searchChunks(ownerUserId, "这篇文章的学生姓名是谁", 9);
         verify(vectorStore).similaritySearch(any(SearchRequest.class));
     }
 
@@ -62,13 +64,14 @@ class RagRetrievalServiceImplTest {
     void retrieveShouldSortByFusionScoreDescending() {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(
                 new Document("vector-only hit", Map.of(
+                        "ownerUserId", ownerUserId.toString(),
                         "chunkId", "chunk-b",
                         "sourceId", "source-1",
                         "chunkIndex", 1,
                         "title", "Paper B"
                 ))
         ));
-        when(paperDocumentPersistenceService.findDocument("source-1"))
+        when(paperDocumentPersistenceService.findDocument(ownerUserId, "source-1"))
                 .thenReturn(Optional.of(indexedDocument("source-1")));
 
         DocumentChunk lexicalFirst = new DocumentChunk(
@@ -85,10 +88,10 @@ class RagRetrievalServiceImplTest {
                 "B content",
                 Map.of("title", "Paper B")
         );
-        when(paperDocumentPersistenceService.searchChunks("排序测试", 9))
+        when(paperDocumentPersistenceService.searchChunks(ownerUserId, "排序测试", 9))
                 .thenReturn(List.of(lexicalFirst, lexicalSecond));
 
-        List<RetrievedChunk> results = service.retrieve("排序测试", 3);
+        List<RetrievedChunk> results = service.retrieve(ownerUserId, "排序测试", 3);
 
         assertThat(results).hasSize(2);
         assertThat(results.get(0).chunk().chunkId()).isEqualTo("chunk-b");
@@ -101,6 +104,7 @@ class RagRetrievalServiceImplTest {
         OffsetDateTime now = OffsetDateTime.now();
         return new PaperDocumentPersistenceService.DocumentDetail(
                 sourceId,
+                ownerUserId,
                 "Paper",
                 "paper.pdf",
                 "paper.pdf",

@@ -20,6 +20,8 @@ public interface UserAdminService {
 
     void resetPassword(UUID id, String password);
 
+    void deleteUser(UUID id);
+
     /**
      * 用户分页查询结果。
      */

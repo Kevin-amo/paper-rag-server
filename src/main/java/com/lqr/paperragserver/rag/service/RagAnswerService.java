@@ -2,6 +2,8 @@ package com.lqr.paperragserver.rag.service;
 
 import com.lqr.paperragserver.common.model.RagAnswer;
 
+import java.util.UUID;
+
 /**
  * 问答编排服务接口。
  *
@@ -16,15 +18,5 @@ public interface RagAnswerService {
      * @param topK 召回片段数量，传空时使用默认值
      * @return 包含答案和引用的结果对象
      */
-    RagAnswer answer(String question, Integer topK);
-
-    /**
-     * 使用默认召回数量生成问答结果。
-     *
-     * @param question 用户问题
-     * @return 包含答案和引用的结果对象
-     */
-    default RagAnswer answer(String question) {
-        return answer(question, null);
-    }
+    RagAnswer answer(UUID ownerUserId, UUID conversationId, String question, Integer topK);
 }

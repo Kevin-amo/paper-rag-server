@@ -13,7 +13,7 @@ import java.util.UUID;
  */
 @Data
 @TableName("public.sys_user")
-public class SysUserEntity {
+public class SysUser {
 
     @TableId(value = "id", type = IdType.INPUT)
     private UUID id;

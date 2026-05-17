@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -85,15 +86,16 @@ class DocumentIngestionServiceImplTest {
         when(documentSplittingService.split(source, "页面文本")).thenReturn(List.of(chunk));
         when(embeddingService.embed(List.of(chunk))).thenReturn(List.of());
 
-        DocumentIngestionResult result = service.ingest("scan.png", content, metadata);
+        UUID ownerUserId = UUID.randomUUID();
+        DocumentIngestionResult result = service.ingest(ownerUserId, "scan.png", content, metadata);
 
         assertThat(result.source()).isEqualTo(source);
         assertThat(result.chunkCount()).isEqualTo(1);
-        verify(paperDocumentPersistenceService).markParsing(source, "页面文本");
-        verify(paperDocumentPersistenceService).replaceAssets("source-1", List.of(asset));
-        verify(paperDocumentPersistenceService).replaceChunks("source-1", List.of(chunk));
-        verify(paperDocumentPersistenceService).markIndexed("source-1", 1);
-        verify(vectorWriteService).deleteBySourceId("source-1");
-        verify(vectorWriteService).upsert(any());
+        verify(paperDocumentPersistenceService).markParsing(ownerUserId, source, "页面文本");
+        verify(paperDocumentPersistenceService).replaceAssets(ownerUserId, "source-1", List.of(asset));
+        verify(paperDocumentPersistenceService).replaceChunks(ownerUserId, "source-1", List.of(chunk));
+        verify(paperDocumentPersistenceService).markIndexed(ownerUserId, "source-1", 1);
+        verify(vectorWriteService).deleteBySourceId(ownerUserId, "source-1");
+        verify(vectorWriteService).upsert(eq(ownerUserId), any());
     }
 }

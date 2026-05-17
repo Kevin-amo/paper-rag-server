@@ -1,11 +1,19 @@
 import { http } from './http';
-import type { AdminUser, CreateAdminUserPayload, PageResponse, ResetPasswordPayload, UpdateAdminUserPayload } from '../types';
+import type {
+  AdminUser,
+  CreateAdminUserPayload,
+  PageResponse,
+  ResetPasswordPayload,
+  UpdateAdminUserPayload,
+  UserRole,
+  UserStatus,
+} from '../types';
 
 export interface ListAdminUsersParams {
   page?: number;
   size?: number;
   keyword?: string;
-  status?: string;
+  status?: UserStatus | '';
 }
 
 function compactParams(params: Record<string, unknown>) {
@@ -36,16 +44,20 @@ export async function updateAdminUser(id: string, payload: UpdateAdminUserPayloa
   return data;
 }
 
-export async function updateAdminUserRoles(id: string, roles: string[]) {
+export async function updateAdminUserRoles(id: string, roles: UserRole[]) {
   const { data } = await http.patch<AdminUser>(`/admin/users/${id}/roles`, { roles });
   return data;
 }
 
-export async function updateAdminUserStatus(id: string, status: string) {
+export async function updateAdminUserStatus(id: string, status: UserStatus) {
   const { data } = await http.patch<AdminUser>(`/admin/users/${id}/status`, { status });
   return data;
 }
 
 export async function resetAdminUserPassword(id: string, payload: ResetPasswordPayload) {
   await http.post(`/admin/users/${id}/reset-password`, payload);
+}
+
+export async function deleteAdminUser(id: string) {
+  await http.delete(`/admin/users/${id}`);
 }

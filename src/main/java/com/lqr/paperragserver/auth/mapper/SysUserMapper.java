@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.auth.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.lqr.paperragserver.auth.entity.SysUserEntity;
+import com.lqr.paperragserver.auth.entity.SysUser;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -11,7 +11,7 @@ import java.util.UUID;
 /**
  * 系统用户 Mapper，提供账号查询、统计和登录时间更新能力。
  */
-public interface SysUserMapper extends BaseMapper<SysUserEntity> {
+public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @Select("""
             select count(*)

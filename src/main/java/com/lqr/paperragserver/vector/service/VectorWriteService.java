@@ -3,6 +3,7 @@ package com.lqr.paperragserver.vector.service;
 import com.lqr.paperragserver.ai.service.EmbeddingService;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 向量写入服务接口。
@@ -16,12 +17,12 @@ public interface VectorWriteService {
      *
      * @param vectors 片段向量结果列表
      */
-    void upsert(List<EmbeddingService.EmbeddingVector> vectors);
+    void upsert(UUID ownerUserId, List<EmbeddingService.EmbeddingVector> vectors);
 
     /**
      * 按文档来源删除向量记录。
      *
      * @param sourceId 文档来源标识
      */
-    void deleteBySourceId(String sourceId);
+    void deleteBySourceId(UUID ownerUserId, String sourceId);
 }

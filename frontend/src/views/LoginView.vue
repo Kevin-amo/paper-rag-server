@@ -2,6 +2,7 @@
 import { onUnmounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import AuthLayout from '../layouts/AuthLayout.vue';
 import { getErrorMessage } from '../api/http';
 import { useAuth } from '../composables/useAuth';
 
@@ -52,16 +53,17 @@ function validateRegisterForm() {
   const username = registerForm.username.trim();
   const email = registerForm.email.trim();
   const emailCode = registerForm.emailCode.trim();
-  if (!username) {
-    ElMessage.warning('请输入用户名');
+
+  if (username.length < 3) {
+    ElMessage.warning('用户名至少需要 3 个字符');
     return false;
   }
   if (!emailPattern.test(email)) {
     ElMessage.warning('请输入有效邮箱');
     return false;
   }
-  if (!registerForm.password) {
-    ElMessage.warning('请输入密码');
+  if (registerForm.password.length < 6) {
+    ElMessage.warning('密码至少需要 6 位');
     return false;
   }
   if (registerForm.password !== registerForm.confirmPassword) {
@@ -139,35 +141,60 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="login-page">
-    <section class="login-card">
-      <div class="brand-panel">
-        <p class="eyebrow">Paper RAG</p>
-        <h1>进入知识库</h1>
-        <p>使用账号登录或通过邮箱验证码注册，进入论文检索、文档管理和 RAG 问答系统。</p>
-      </div>
+  <AuthLayout>
+    <section class="login-shell">
+      <aside class="brand-panel">
+        <div>
+          <p class="eyebrow">Paper RAG</p>
+          <h1>论文知识库与 RAG 问答系统</h1>
+          <p class="brand-desc">
+            面向论文资料管理、文档解析、分块检索与引用可追溯问答的一体化工作台。
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <div class="feature-card">
+            <strong>文档管理</strong>
+            <span>批量上传、解析状态、详情与分块查看</span>
+          </div>
+          <div class="feature-card">
+            <strong>RAG 问答</strong>
+            <span>会话持久化、上下文追踪、引用来源展示</span>
+          </div>
+          <div class="feature-card">
+            <strong>权限控制</strong>
+            <span>普通用户工作台与管理员用户管理分离</span>
+          </div>
+        </div>
+      </aside>
 
       <el-card class="form-card" shadow="never">
-        <el-tabs v-model="activeMode" stretch>
-          <el-tab-pane label="账号登录" name="login">
-            <h2>欢迎回来</h2>
-            <p class="form-subtitle">输入用户名和密码继续访问系统。</p>
+        <div class="form-heading">
+          <p>{{ activeMode === 'login' ? '账号登录' : '邮箱注册' }}</p>
+          <h2>{{ activeMode === 'login' ? '欢迎回来' : '创建普通用户账号' }}</h2>
+          <span>{{ activeMode === 'login' ? '登录后将根据角色进入对应工作台。' : '验证码将发送到你的邮箱，用于完成注册。' }}</span>
+        </div>
+
+        <el-tabs v-model="activeMode" stretch class="auth-tabs">
+          <el-tab-pane label="登录" name="login">
             <el-form label-position="top" @submit.prevent>
-              <el-form-item label="用户名">
+              <el-form-item label="用户名" required>
                 <el-input
                   v-model="loginForm.username"
                   size="large"
                   autocomplete="username"
+                  placeholder="请输入用户名"
                   @keyup.enter="handleLogin"
                 />
               </el-form-item>
-              <el-form-item label="密码">
+              <el-form-item label="密码" required>
                 <el-input
                   v-model="loginForm.password"
                   size="large"
                   type="password"
                   show-password
                   autocomplete="current-password"
+                  placeholder="请输入密码"
                   @keyup.enter="handleLogin"
                 />
               </el-form-item>
@@ -177,20 +204,19 @@ onUnmounted(() => {
             </el-form>
           </el-tab-pane>
 
-          <el-tab-pane label="邮箱注册" name="register">
-            <h2>创建账号</h2>
-            <p class="form-subtitle">使用邮箱验证码创建普通用户账号。</p>
+          <el-tab-pane label="注册" name="register">
             <el-form label-position="top" @submit.prevent>
-              <el-form-item label="用户名">
+              <el-form-item label="用户名" required>
                 <el-input
                   v-model="registerForm.username"
                   size="large"
                   autocomplete="username"
+                  placeholder="至少 3 个字符"
                   @keyup.enter="handleRegister"
                 />
               </el-form-item>
-              <el-form-item label="邮箱">
-                <el-input v-model="registerForm.email" size="large" autocomplete="email">
+              <el-form-item label="邮箱" required>
+                <el-input v-model="registerForm.email" size="large" autocomplete="email" placeholder="name@example.com">
                   <template #append>
                     <el-button :loading="codeLoading" :disabled="codeCountdown > 0" @click="handleSendRegisterCode">
                       {{ codeCountdown > 0 ? `${codeCountdown}s` : '发送验证码' }}
@@ -198,42 +224,39 @@ onUnmounted(() => {
                   </template>
                 </el-input>
               </el-form-item>
-              <el-form-item label="验证码">
+              <el-form-item label="邮箱验证码" required>
                 <el-input
                   v-model="registerForm.emailCode"
                   size="large"
                   maxlength="6"
                   autocomplete="one-time-code"
+                  placeholder="6 位数字验证码"
                   @keyup.enter="handleRegister"
                 />
               </el-form-item>
-              <el-form-item label="密码">
+              <el-form-item label="密码" required>
                 <el-input
                   v-model="registerForm.password"
                   size="large"
                   type="password"
                   show-password
                   autocomplete="new-password"
+                  placeholder="至少 6 位"
                   @keyup.enter="handleRegister"
                 />
               </el-form-item>
-              <el-form-item label="确认密码">
+              <el-form-item label="确认密码" required>
                 <el-input
                   v-model="registerForm.confirmPassword"
                   size="large"
                   type="password"
                   show-password
                   autocomplete="new-password"
+                  placeholder="再次输入密码"
                   @keyup.enter="handleRegister"
                 />
               </el-form-item>
-              <el-button
-                class="primary-button"
-                type="primary"
-                size="large"
-                :loading="registerLoading"
-                @click="handleRegister"
-              >
+              <el-button class="primary-button" type="primary" size="large" :loading="registerLoading" @click="handleRegister">
                 注册并登录
               </el-button>
             </el-form>
@@ -241,57 +264,86 @@ onUnmounted(() => {
         </el-tabs>
       </el-card>
     </section>
-  </div>
+  </AuthLayout>
 </template>
 
 <style scoped>
-.login-page {
-  min-height: 100vh;
+.login-shell {
+  width: min(1120px, 100%);
   display: grid;
-  place-items: center;
-  padding: 32px;
-  background: radial-gradient(circle at top left, #dbeafe 0, transparent 36%), #f8fafc;
-}
-
-.login-card {
-  width: min(1040px, 100%);
-  display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
+  grid-template-columns: minmax(0, 1.05fr) minmax(380px, 0.95fr);
   overflow: hidden;
-  border-radius: 28px;
+  border: 1px solid rgba(226, 232, 240, 0.75);
+  border-radius: 30px;
   background: #fff;
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.16);
 }
 
 .brand-panel {
-  padding: 56px;
+  min-height: 620px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 36px;
+  padding: clamp(36px, 5vw, 58px);
   color: #fff;
-  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 52%, #60a5fa 100%);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.22), transparent 18rem),
+    linear-gradient(135deg, #1e3a8a 0%, #2563eb 54%, #4f46e5 100%);
 }
 
 .eyebrow {
   margin: 0 0 12px;
-  font-size: 13px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   color: rgba(255, 255, 255, 0.76);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .brand-panel h1 {
+  max-width: 520px;
   margin: 0;
-  font-size: 38px;
+  font-size: clamp(34px, 5vw, 52px);
+  line-height: 1.12;
 }
 
-.brand-panel p:last-child {
-  margin: 18px 0 0;
-  line-height: 1.7;
+.brand-desc {
+  max-width: 520px;
+  margin: 20px 0 0;
   color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.feature-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.feature-card {
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.feature-card strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.feature-card span {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .form-card {
   display: flex;
   align-items: center;
-  padding: 42px 40px;
+  padding: clamp(30px, 4vw, 46px);
   border: none;
 }
 
@@ -299,16 +351,34 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.form-card h2 {
-  margin: 18px 0 8px;
-  font-size: 24px;
-  color: #0f172a;
+.form-heading {
+  margin-bottom: 18px;
 }
 
-.form-subtitle {
-  margin: 0 0 24px;
-  color: #64748b;
+.form-heading p {
+  margin: 0 0 8px;
+  color: var(--app-primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.form-heading h2 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 28px;
+}
+
+.form-heading span {
+  display: block;
+  margin-top: 8px;
+  color: var(--app-text-muted);
   line-height: 1.6;
+}
+
+.auth-tabs {
+  margin-top: 10px;
 }
 
 .primary-button {
@@ -316,14 +386,24 @@ onUnmounted(() => {
   margin-top: 8px;
 }
 
-@media (max-width: 820px) {
-  .login-card {
+@media (max-width: 900px) {
+  .login-shell {
     grid-template-columns: 1fr;
+  }
+
+  .brand-panel {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .login-shell {
+    border-radius: 22px;
   }
 
   .brand-panel,
   .form-card {
-    padding: 36px;
+    padding: 26px;
   }
 }
 </style>

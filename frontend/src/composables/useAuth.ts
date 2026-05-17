@@ -6,6 +6,7 @@ import {
   register as registerRequest,
   requestRegisterEmailCode as requestRegisterEmailCodeRequest,
 } from '../api/auth';
+import type { UserRole } from '../types';
 import { authState, clearAuthSession, getAccessToken, setAuthSession, updateCurrentUser } from './authState';
 
 export function useAuth() {
@@ -47,7 +48,7 @@ export function useAuth() {
     }
   }
 
-  function hasRole(role: string) {
+  function hasRole(role: UserRole) {
     return authState.user?.roles.includes(role) === true;
   }
 

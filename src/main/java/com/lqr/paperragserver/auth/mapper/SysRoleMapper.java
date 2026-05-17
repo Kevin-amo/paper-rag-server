@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.auth.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.lqr.paperragserver.auth.entity.SysRoleEntity;
+import com.lqr.paperragserver.auth.entity.SysRole;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
@@ -11,7 +11,7 @@ import java.util.UUID;
 /**
  * 系统角色 Mapper，提供角色查询和用户角色编码查询能力。
  */
-public interface SysRoleMapper extends BaseMapper<SysRoleEntity> {
+public interface SysRoleMapper extends BaseMapper<SysRole> {
 
     @Select("""
             select r.code
@@ -27,5 +27,5 @@ public interface SysRoleMapper extends BaseMapper<SysRoleEntity> {
             from public.sys_role
             where code = #{code}
             """)
-    SysRoleEntity selectByCode(@Param("code") String code);
+    SysRole selectByCode(@Param("code") String code);
 }

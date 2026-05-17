@@ -27,6 +27,7 @@ class VectorWriteServiceTest {
     private final VectorStoreMapper vectorStoreMapper = mock(VectorStoreMapper.class);
     private final PaperDocumentChunkMapper chunkMapper = mock(PaperDocumentChunkMapper.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final UUID ownerUserId = UUID.randomUUID();
     private VectorWriteServiceImpl service;
 
     @BeforeEach
@@ -47,19 +48,20 @@ class VectorWriteServiceTest {
         float[] vector = new float[1024];
         vector[0] = 1.5f;
 
-        service.upsert(List.of(new EmbeddingService.EmbeddingVector(chunk, vector, Map.of("pageNumber", 3))));
+        service.upsert(ownerUserId, List.of(new EmbeddingService.EmbeddingVector(chunk, vector, Map.of("pageNumber", 3))));
 
-        UUID expectedVectorStoreId = UUID.nameUUIDFromBytes("chunk-1".getBytes(StandardCharsets.UTF_8));
+        UUID expectedVectorStoreId = UUID.nameUUIDFromBytes((ownerUserId + "::chunk-1").getBytes(StandardCharsets.UTF_8));
         ArgumentCaptor<UUID> idCaptor = ArgumentCaptor.forClass(UUID.class);
         ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> metadataCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> embeddingCaptor = ArgumentCaptor.forClass(String.class);
         verify(vectorStoreMapper).upsert(idCaptor.capture(), contentCaptor.capture(), metadataCaptor.capture(), embeddingCaptor.capture());
-        verify(chunkMapper).updateVectorStoreId("chunk-1", expectedVectorStoreId);
+        verify(chunkMapper).updateVectorStoreId(ownerUserId, "chunk-1", expectedVectorStoreId);
 
         assertThat(idCaptor.getValue()).isEqualTo(expectedVectorStoreId);
         assertThat(contentCaptor.getValue()).isEqualTo("chunk text");
         assertThat(metadataCaptor.getValue())
+                .contains("\"ownerUserId\":\"" + ownerUserId + "\"")
                 .contains("\"sourceId\":\"source-1\"")
                 .contains("\"chunkId\":\"chunk-1\"")
                 .contains("\"chunkIndex\":2")
@@ -72,7 +74,7 @@ class VectorWriteServiceTest {
         DocumentChunk chunk = new DocumentChunk("chunk-1", "source-1", 0, "chunk text", Map.of());
         float[] vector = new float[512];
 
-        assertThatThrownBy(() -> service.upsert(List.of(new EmbeddingService.EmbeddingVector(chunk, vector, Map.of()))))
+        assertThatThrownBy(() -> service.upsert(ownerUserId, List.of(new EmbeddingService.EmbeddingVector(chunk, vector, Map.of()))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("1024");
         verifyNoInteractions(vectorStoreMapper, chunkMapper);
@@ -80,9 +82,9 @@ class VectorWriteServiceTest {
 
     @Test
     void deleteBySourceIdShouldDelegateToVectorStoreMapper() {
-        service.deleteBySourceId("source-1");
+        service.deleteBySourceId(ownerUserId, "source-1");
 
-        verify(vectorStoreMapper).deleteBySourceId("source-1");
+        verify(vectorStoreMapper).deleteBySourceId(ownerUserId.toString(), "source-1");
         verifyNoInteractions(chunkMapper);
     }
 }

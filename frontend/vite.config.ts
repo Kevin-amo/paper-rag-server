@@ -19,6 +19,10 @@ export default defineConfig(({ mode }) => {
           target,
           changeOrigin: true,
         },
+        '/conversations': {
+          target,
+          changeOrigin: true,
+        },
         '/auth': {
           target,
           changeOrigin: true,

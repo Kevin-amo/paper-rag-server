@@ -14,11 +14,12 @@ import java.util.UUID;
 
 @Data
 @TableName(value = "public.paper_document_chunk", autoResultMap = true)
-public class PaperDocumentChunkEntity {
+public class PaperDocumentChunk {
 
     @TableId(value = "id", type = IdType.INPUT)
     private UUID id;
 
+    private UUID ownerUserId;
     private String chunkId;
     private String sourceId;
     private Integer chunkIndex;
