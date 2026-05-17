@@ -19,6 +19,7 @@ import reactor.core.scheduler.Schedulers;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 默认问答编排实现。
@@ -96,17 +97,38 @@ public class RagAnswerServiceImpl implements RagAnswerService {
     private AnswerContext prepareAnswerContext(UUID ownerUserId, UUID conversationId, String question, Integer topK) {
         ConversationService.ConversationView conversation = conversationService.getOrCreateConversation(ownerUserId, conversationId, question);
         conversationService.appendUserMessage(ownerUserId, conversation.id(), question);
-
-        int resolvedTopK = topK == null || topK <= 0 ? ragProperties.defaultTopK() : topK;
-        List<RetrievedChunk> chunks = ragRetrievalService.retrieve(ownerUserId, question, resolvedTopK);
         List<ConversationService.MessageView> history = conversationService.recentMessages(
                 ownerUserId,
                 conversation.id(),
                 ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT
         );
+
+        int resolvedTopK = topK == null || topK <= 0 ? ragProperties.defaultTopK() : topK;
+        String retrievalQuestion = rewriteQuestionForRetrieval(question, history);
+        List<RetrievedChunk> chunks = ragRetrievalService.retrieve(ownerUserId, retrievalQuestion, resolvedTopK);
         PromptConstructionService.Prompt prompt = promptConstructionService.build(question, chunks, history);
         List<AnswerCitation> citations = buildCitations(chunks);
         return new AnswerContext(conversation.id(), prompt, citations);
+    }
+
+    private String rewriteQuestionForRetrieval(String question, List<ConversationService.MessageView> history) {
+        if (history == null || history.size() <= 1) {
+            return question;
+        }
+        String historyText = history.stream()
+                .map(message -> message.role() + "：" + message.content())
+                .collect(Collectors.joining("\n"));
+        PromptConstructionService.Prompt rewritePrompt = new PromptConstructionService.Prompt(
+                "你是一个检索查询改写器。只输出一个适合论文知识库检索的独立问题，不要解释。",
+                "历史对话：\n" + historyText
+                        + "\n\n当前问题：" + question
+                        + "\n\n如果当前问题依赖历史上下文，请改写为语义完整的独立问题；如果不依赖历史，请原样输出当前问题。"
+        );
+        String rewritten = llmService.generate(rewritePrompt);
+        if (rewritten == null || rewritten.isBlank()) {
+            return question;
+        }
+        return rewritten.trim();
     }
 
     private List<AnswerCitation> buildCitations(List<RetrievedChunk> chunks) {

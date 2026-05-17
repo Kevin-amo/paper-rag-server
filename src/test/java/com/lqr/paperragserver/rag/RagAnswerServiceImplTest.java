@@ -99,7 +99,6 @@ class RagAnswerServiceImplTest {
         // 提示构造服务任意调用都返回一个简单的 Prompt 对象
         when(promptConstructionService.build(anyString(), anyList(), anyList()))
                 .thenReturn(new PromptConstructionService.Prompt("sys", "user"));
-        // LLM 服务任意调用都返回固定答案
         when(llmService.generate(any())).thenReturn("final answer");
 
         // --- 执行被测方法 ---
@@ -144,6 +143,28 @@ class RagAnswerServiceImplTest {
 
         // 验证检索服务确实被调用，且 topK 为 2
         verify(ragRetrievalService).retrieve(ownerUserId, "question", 2);
+    }
+
+    @Test
+    void answerShouldRewriteFollowUpQuestionBeforeRetrieval() {
+        List<ConversationService.MessageView> history = List.of(
+                new ConversationService.MessageView(UUID.randomUUID(), conversationId, "USER", 1, "这篇文章的作者是谁", List.of(), null),
+                new ConversationService.MessageView(UUID.randomUUID(), conversationId, "ASSISTANT", 2, "作者是 Yufan Gao 等。", List.of(), null),
+                new ConversationService.MessageView(UUID.randomUUID(), conversationId, "USER", 3, "回答上一个问题", List.of(), null)
+        );
+        when(conversationService.recentMessages(ownerUserId, conversationId, ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT))
+                .thenReturn(history);
+        when(ragRetrievalService.retrieve(ownerUserId, "这篇文章的作者是谁", 2)).thenReturn(List.of());
+        when(promptConstructionService.build(anyString(), anyList(), anyList()))
+                .thenReturn(new PromptConstructionService.Prompt("sys", "user"));
+        when(llmService.generate(any()))
+                .thenReturn("这篇文章的作者是谁")
+                .thenReturn("作者是 Yufan Gao 等。");
+
+        RagAnswer answer = service.answer(ownerUserId, conversationId, "回答上一个问题", 2);
+
+        assertThat(answer.answer()).isEqualTo("作者是 Yufan Gao 等。");
+        verify(ragRetrievalService).retrieve(ownerUserId, "这篇文章的作者是谁", 2);
     }
 
     @Test
