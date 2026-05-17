@@ -15,13 +15,18 @@ const props = defineProps<{
 
 const visibleCitations = computed(() => props.citations.filter((citation) => citation.excerpt || citation.title || citation.sourceId));
 
+const maxRankScore = computed(() => Math.max(
+  0,
+  ...visibleCitations.value.map((citation) => Number.isFinite(citation.rankScore) ? citation.rankScore : 0),
+));
+
 function scorePercent(score: number) {
-  if (!Number.isFinite(score)) {
+  if (!Number.isFinite(score) || maxRankScore.value <= 0) {
     return '—';
   }
 
-  const normalized = score > 1 ? Math.min(score, 100) : Math.round(score * 100);
-  return `${normalized}%`;
+  const normalized = Math.round((score / maxRankScore.value) * 100);
+  return `${Math.max(0, Math.min(normalized, 100))}%`;
 }
 </script>
 

@@ -1,5 +1,5 @@
 -- RAG 数据表总入口。
--- 本地 compose.yaml 会把该目录挂载到 /docker-entrypoint-initdb.d，首次创建数据库时按文件名顺序自动执行。
+-- 本地 docker-compose.yml 会把该目录挂载到 /docker-entrypoint-initdb.d，首次创建数据库时按文件名顺序自动执行。
 -- 手动初始化时，可在 psql 中按顺序执行以下脚本：
 --   \i 00_extensions.sql
 --   \i 01_vector_store.sql

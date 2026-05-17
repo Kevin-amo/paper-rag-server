@@ -169,7 +169,14 @@ function formatFileSize(size: number) {
       <span>支持批量选择或拖拽上传。上传后系统会解析并建立索引，完成后即可在问答中引用。</span>
     </div>
 
-    <el-upload v-model:file-list="fileList" drag :auto-upload="false" :multiple="true" class="compact-upload">
+    <el-upload
+      v-model:file-list="fileList"
+      drag
+      :auto-upload="false"
+      :multiple="true"
+      :show-file-list="false"
+      class="compact-upload"
+    >
       <el-icon class="upload-icon"><UploadFilled /></el-icon>
       <div class="el-upload__text">拖拽论文文件到这里，或 <em>点击选择</em></div>
       <template #tip>

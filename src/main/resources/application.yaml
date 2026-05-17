@@ -6,10 +6,6 @@
       max-request-size: 50MB
       max-file-size: 50MB
 
-  docker:
-    compose:
-      enabled: false
-
   config:
     import: optional:classpath:application-local.yaml
 
