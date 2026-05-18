@@ -1,6 +1,8 @@
 package com.lqr.paperragserver.document;
 
 import com.lqr.paperragserver.ai.service.EmbeddingService;
+import com.lqr.paperragserver.document.impl.DocumentManagementServiceImpl;
+import com.lqr.paperragserver.document.service.DocumentManagementService;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
@@ -22,7 +24,7 @@ class DocumentManagementServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DocumentManagementService(
+        service = new DocumentManagementServiceImpl(
                 paperDocumentPersistenceService,
                 documentSplittingService,
                 embeddingService,

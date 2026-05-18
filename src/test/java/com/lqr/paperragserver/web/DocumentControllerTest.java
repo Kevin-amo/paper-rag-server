@@ -6,7 +6,7 @@ import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.common.model.DocumentIngestionResult;
 import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
-import com.lqr.paperragserver.document.DocumentManagementService;
+import com.lqr.paperragserver.document.service.DocumentManagementService;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

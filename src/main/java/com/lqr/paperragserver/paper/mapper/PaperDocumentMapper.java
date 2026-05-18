@@ -15,9 +15,13 @@ public interface PaperDocumentMapper extends BaseMapper<PaperDocument> {
      */
     @Update("""
             insert into public.paper_document (
-                owner_user_id, source_id, title, origin, file_name, file_type, file_size, content_text, metadata, status, chunk_count, error_message
+                owner_user_id, source_id, title, origin, file_name, file_type, file_size,
+                authors, abstract, doi, journal, publish_year, keywords,
+                content_text, metadata, status, chunk_count, error_message
             ) values (
-                #{ownerUserId}, #{sourceId}, #{title}, #{origin,jdbcType=VARCHAR}, #{fileName,jdbcType=VARCHAR}, #{fileType,jdbcType=VARCHAR}, #{fileSize,jdbcType=BIGINT}, #{contentText,jdbcType=LONGVARCHAR}, cast(#{metadataJson} as jsonb), 'PARSING', 0, null
+                #{ownerUserId}, #{sourceId}, #{title}, #{origin,jdbcType=VARCHAR}, #{fileName,jdbcType=VARCHAR}, #{fileType,jdbcType=VARCHAR}, #{fileSize,jdbcType=BIGINT},
+                cast(#{authorsJson,jdbcType=VARCHAR} as jsonb), #{abstractText,jdbcType=LONGVARCHAR}, #{doi,jdbcType=VARCHAR}, #{journal,jdbcType=VARCHAR}, #{publishYear,jdbcType=INTEGER}, cast(#{keywordsJson,jdbcType=VARCHAR} as jsonb),
+                #{contentText,jdbcType=LONGVARCHAR}, cast(#{metadataJson} as jsonb), 'PARSING', 0, null
             )
             on conflict (owner_user_id, source_id) do update set
                 title = excluded.title,
@@ -25,6 +29,12 @@ public interface PaperDocumentMapper extends BaseMapper<PaperDocument> {
                 file_name = excluded.file_name,
                 file_type = excluded.file_type,
                 file_size = excluded.file_size,
+                authors = excluded.authors,
+                abstract = excluded.abstract,
+                doi = excluded.doi,
+                journal = excluded.journal,
+                publish_year = excluded.publish_year,
+                keywords = excluded.keywords,
                 content_text = excluded.content_text,
                 metadata = excluded.metadata,
                 status = 'PARSING',
@@ -40,6 +50,12 @@ public interface PaperDocumentMapper extends BaseMapper<PaperDocument> {
                       @Param("fileName") String fileName,
                       @Param("fileType") String fileType,
                       @Param("fileSize") Long fileSize,
+                      @Param("authorsJson") String authorsJson,
+                      @Param("abstractText") String abstractText,
+                      @Param("doi") String doi,
+                      @Param("journal") String journal,
+                      @Param("publishYear") Integer publishYear,
+                      @Param("keywordsJson") String keywordsJson,
                       @Param("contentText") String contentText,
                       @Param("metadataJson") String metadataJson);
 

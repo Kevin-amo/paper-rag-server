@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.common.model.DocumentIngestionResult;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
-import com.lqr.paperragserver.document.DocumentManagementService;
+import com.lqr.paperragserver.document.service.DocumentManagementService;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import jakarta.validation.Valid;

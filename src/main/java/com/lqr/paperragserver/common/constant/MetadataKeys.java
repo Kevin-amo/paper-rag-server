@@ -8,6 +8,12 @@ public final class MetadataKeys {
     public static final String SOURCE_ID = "sourceId";
     public static final String OWNER_USER_ID = "ownerUserId";
     public static final String TITLE = "title";
+    public static final String AUTHORS = "authors";
+    public static final String ABSTRACT_TEXT = "abstractText";
+    public static final String DOI = "doi";
+    public static final String JOURNAL = "journal";
+    public static final String PUBLISH_YEAR = "publishYear";
+    public static final String KEYWORDS = "keywords";
     public static final String FILE_NAME = "fileName";
     public static final String CONTENT_TYPE = "contentType";
     public static final String CONTENT_LENGTH = "contentLength";

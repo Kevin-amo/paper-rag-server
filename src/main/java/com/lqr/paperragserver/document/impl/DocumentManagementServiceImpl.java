@@ -1,8 +1,9 @@
-package com.lqr.paperragserver.document;
+package com.lqr.paperragserver.document.impl;
 
 import com.lqr.paperragserver.ai.service.EmbeddingService;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.DocumentSource;
+import com.lqr.paperragserver.document.service.DocumentManagementService;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
@@ -14,33 +15,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * 文档管理编排服务。
- */
 @Service
 @RequiredArgsConstructor
-public class DocumentManagementService {
+public class DocumentManagementServiceImpl implements DocumentManagementService {
 
     private final PaperDocumentPersistenceService paperDocumentPersistenceService;
     private final DocumentSplittingService documentSplittingService;
     private final EmbeddingService embeddingService;
     private final VectorWriteService vectorWriteService;
 
-    /**
-     * 恢复指定文档的可见状态。
-     *
-     * @param sourceId 文档来源 ID
-     */
+    @Override
     public void restore(UUID ownerUserId, String sourceId) {
         paperDocumentPersistenceService.restore(ownerUserId, sourceId);
     }
 
-    /**
-     * 基于已持久化的文档全文重建分块和向量索引。
-     *
-     * @param sourceId 文档来源 ID
-     * @return 重建后的分块统计结果
-     */
+    @Override
     @Transactional
     public ReindexResult reindex(UUID ownerUserId, String sourceId) {
         PaperDocumentPersistenceService.DocumentDetail document = paperDocumentPersistenceService.findDocument(ownerUserId, sourceId)
@@ -66,8 +55,5 @@ public class DocumentManagementService {
             paperDocumentPersistenceService.markFailed(ownerUserId, sourceId, ex.getMessage());
             throw ex;
         }
-    }
-
-    public record ReindexResult(String sourceId, int chunkCount) {
     }
 }

@@ -7,8 +7,10 @@ import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService.DocumentMultimodalExtractionResult;
 import com.lqr.paperragserver.document.service.DocumentParsingService;
+import com.lqr.paperragserver.paper.service.PaperMetadataService;
 import lombok.RequiredArgsConstructor;
 import org.apache.tika.Tika;
+import org.apache.tika.metadata.Metadata;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -53,6 +55,7 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
 
     private final Tika tika;
     private final DocumentMultimodalExtractionService documentMultimodalExtractionService;
+    private final PaperMetadataService paperMetadataService;
 
     /**
      * 规范化文件信息并生成统一的解析结果。
@@ -83,7 +86,11 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
                 : normalizedFileName;
 
         DocumentSource provisionalSource = new DocumentSource(sourceId, title, normalizedFileName, mergedMetadata);
-        ExtractionResult extractionResult = extractContent(provisionalSource, content, contentType);
+        DocumentSource enrichedSource = paperMetadataService.enrich(provisionalSource, metadata);
+        mergedMetadata = new LinkedHashMap<>(enrichedSource.metadata());
+        ExtractionResult extractionResult = extractContent(enrichedSource, content, contentType, mergedMetadata);
+        enrichedSource = paperMetadataService.enrich(new DocumentSource(sourceId, enrichedSource.title(), normalizedFileName, mergedMetadata), Map.of());
+        mergedMetadata = new LinkedHashMap<>(enrichedSource.metadata());
         mergedMetadata.put(MetadataKeys.EXTRACTION_MODE, extractionResult.mode().name());
         mergedMetadata.put(MetadataKeys.EXTRACTED_TEXT_LENGTH, extractionResult.text().length());
         if (!extractionResult.assets().isEmpty()) {
@@ -98,14 +105,38 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         if (extractionResult.truncated()) {
             mergedMetadata.put(MetadataKeys.MULTIMODAL_TRUNCATED, true);
         }
-        DocumentSource source = new DocumentSource(sourceId, title, normalizedFileName, mergedMetadata);
+        DocumentSource source = new DocumentSource(sourceId, enrichedSource.title(), normalizedFileName, mergedMetadata);
         return new ParsedDocument(source, extractionResult.text(), extractionResult.assets());
+    }
+
+    /**
+     * 根据 Tika 解析出的文件属性补充常见论文元数据候选键。
+     */
+    private void mergeTikaMetadata(Map<String, Object> metadata, Metadata tikaMetadata) {
+        putTikaValueIfAbsent(metadata, MetadataKeys.TITLE, tikaMetadata, "dc:title", "title");
+        putTikaValueIfAbsent(metadata, MetadataKeys.AUTHORS, tikaMetadata, "dc:creator", "Author", "creator", "meta:author");
+        putTikaValueIfAbsent(metadata, MetadataKeys.ABSTRACT_TEXT, tikaMetadata, "dc:description", "description", "subject");
+        putTikaValueIfAbsent(metadata, MetadataKeys.KEYWORDS, tikaMetadata, "meta:keyword", "Keywords", "pdf:docinfo:keywords");
+        putTikaValueIfAbsent(metadata, MetadataKeys.PUBLISH_YEAR, tikaMetadata, "dcterms:created", "created", "Creation-Date", "date");
+    }
+
+    private void putTikaValueIfAbsent(Map<String, Object> metadata, String targetKey, Metadata tikaMetadata, String... tikaKeys) {
+        if (metadata.containsKey(targetKey) && metadata.get(targetKey) != null && !String.valueOf(metadata.get(targetKey)).isBlank()) {
+            return;
+        }
+        for (String tikaKey : tikaKeys) {
+            String value = tikaMetadata.get(tikaKey);
+            if (value != null && !value.isBlank()) {
+                metadata.put(targetKey, value);
+                return;
+            }
+        }
     }
 
     /**
      * 根据文件类型选择文本抽取路径，必要时回退到多模态抽取。
      */
-    private ExtractionResult extractContent(DocumentSource source, byte[] content, String contentType) {
+    private ExtractionResult extractContent(DocumentSource source, byte[] content, String contentType, Map<String, Object> metadata) {
         String normalizedContentType = contentType == null ? "" : contentType.toLowerCase(Locale.ROOT);
         if (normalizedContentType.startsWith("image/")) {
             DocumentMultimodalExtractionResult result = documentMultimodalExtractionService.extract(source, content);
@@ -116,7 +147,7 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
             return new ExtractionResult(text, ExtractionMode.MULTIMODAL, result.pageCount(), result.truncated(), List.of());
         }
 
-        TextExtractionResult tikaText = extractTextWithTika(source, content, contentType);
+        TextExtractionResult tikaText = extractTextWithTika(source, content, contentType, metadata);
         if (normalizedContentType.contains("pdf") && tikaText.text().isBlank()) {
             DocumentMultimodalExtractionResult result = documentMultimodalExtractionService.extract(source, content);
             String text = normalizeExtractedText(result.text());
@@ -132,9 +163,12 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
     /**
      * 使用 Tika 抽取文本，并对 Office 文档中的图片内容做增强处理。
      */
-    private TextExtractionResult extractTextWithTika(DocumentSource source, byte[] content, String contentType) {
+    private TextExtractionResult extractTextWithTika(DocumentSource source, byte[] content, String contentType, Map<String, Object> metadata) {
         try {
-            String extractedText = normalizeExtractedText(tika.parseToString(new ByteArrayInputStream(content)));
+            Metadata tikaMetadata = new Metadata();
+            tikaMetadata.set("resourceName", source.origin());
+            String extractedText = normalizeExtractedText(tika.parseToString(new ByteArrayInputStream(content), tikaMetadata));
+            mergeTikaMetadata(metadata, tikaMetadata);
             if (!isOfficeDocument(contentType)) {
                 return new TextExtractionResult(extractedText, List.of());
             }

@@ -169,6 +169,12 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
                 stringValue(metadata.get(MetadataKeys.FILE_NAME)),
                 stringValue(metadata.get(MetadataKeys.CONTENT_TYPE)),
                 longValue(metadata.get(MetadataKeys.CONTENT_LENGTH)),
+                toNullableJson(metadata.get(MetadataKeys.AUTHORS)),
+                blankToNull(stringValue(metadata.get(MetadataKeys.ABSTRACT_TEXT))),
+                blankToNull(stringValue(metadata.get(MetadataKeys.DOI))),
+                blankToNull(stringValue(metadata.get(MetadataKeys.JOURNAL))),
+                intValue(metadata, MetadataKeys.PUBLISH_YEAR),
+                toNullableJson(metadata.get(MetadataKeys.KEYWORDS)),
                 contentText,
                 toJson(metadata)
         );

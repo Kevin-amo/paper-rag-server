@@ -4,6 +4,7 @@ import com.lqr.paperragserver.common.model.ParsedDocument;
 import com.lqr.paperragserver.document.impl.DocumentParsingServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService.DocumentMultimodalExtractionResult;
+import com.lqr.paperragserver.paper.impl.PaperMetadataServiceImpl;
 import org.apache.tika.Tika;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,7 @@ class DocumentParsingServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new DocumentParsingServiceImpl(tika, documentMultimodalExtractionService);
+        service = new DocumentParsingServiceImpl(tika, documentMultimodalExtractionService, new PaperMetadataServiceImpl());
     }
 
     @Test
@@ -42,7 +43,7 @@ class DocumentParsingServiceImplTest {
         metadata.put("title", "Deep Paper");
         metadata.put("author", "Alice");
         when(tika.detect(content, "paper.txt")).thenReturn("text/plain");
-        when(tika.parseToString(any(ByteArrayInputStream.class))).thenReturn("hello rag");
+        when(tika.parseToString(any(ByteArrayInputStream.class), any(org.apache.tika.metadata.Metadata.class))).thenReturn("hello rag");
 
         ParsedDocument parsedDocument = service.parse("paper.txt", content, metadata);
 
@@ -85,7 +86,7 @@ class DocumentParsingServiceImplTest {
     void parseShouldFallBackToMultimodalExtractionForScannedPdfWhenTikaExtractsNothing() throws Exception {
         byte[] content = "pdf-bytes".getBytes(StandardCharsets.UTF_8);
         when(tika.detect(content, "scan.pdf")).thenReturn("application/pdf");
-        when(tika.parseToString(any(ByteArrayInputStream.class))).thenReturn("   ");
+        when(tika.parseToString(any(ByteArrayInputStream.class), any(org.apache.tika.metadata.Metadata.class))).thenReturn("   ");
         when(documentMultimodalExtractionService.extract(any(), any()))
                 .thenReturn(new DocumentMultimodalExtractionResult("第1页 文本", 1, false));
 
@@ -105,7 +106,7 @@ class DocumentParsingServiceImplTest {
         byte[] content = "docx-bytes".getBytes(StandardCharsets.UTF_8);
         when(tika.detect(content, "paper.docx"))
                 .thenReturn("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-        when(tika.parseToString(any(ByteArrayInputStream.class))).thenReturn("""
+        when(tika.parseToString(any(ByteArrayInputStream.class), any(org.apache.tika.metadata.Metadata.class))).thenReturn("""
                 参考文献
                 [1] Spring Boot Reference Documentation.
                 image3.png
@@ -131,7 +132,7 @@ class DocumentParsingServiceImplTest {
         byte[] content = minimalDocxWithSingleImage();
         when(tika.detect(content, "paper.docx"))
                 .thenReturn("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-        when(tika.parseToString(any(ByteArrayInputStream.class))).thenReturn("""
+        when(tika.parseToString(any(ByteArrayInputStream.class), any(org.apache.tika.metadata.Metadata.class))).thenReturn("""
                 2 系统设计
                 image1.png
                 2.1 后续章节
@@ -161,7 +162,7 @@ class DocumentParsingServiceImplTest {
     void parseShouldGenerateStableSourceIdAndFallbackTitle() throws Exception {
         byte[] content = "plain text content".getBytes(StandardCharsets.UTF_8);
         when(tika.detect(content, "paper.txt")).thenReturn("text/plain");
-        when(tika.parseToString(any(ByteArrayInputStream.class))).thenReturn("plain text content");
+        when(tika.parseToString(any(ByteArrayInputStream.class), any(org.apache.tika.metadata.Metadata.class))).thenReturn("plain text content");
 
         ParsedDocument first = service.parse("paper.txt", content, Map.of());
         ParsedDocument second = service.parse("paper.txt", content, Map.of());
