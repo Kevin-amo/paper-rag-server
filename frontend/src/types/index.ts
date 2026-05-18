@@ -123,18 +123,27 @@ export interface BatchUploadDocumentPayload {
   items: BatchUploadDocumentItemPayload[];
 }
 
+export interface DocumentUploadAcceptedResponse {
+  jobId: string;
+  sourceId: string;
+  status: string;
+  message: string;
+}
+
 export interface BatchDocumentIngestionItemResponse {
   index: number;
   fileName: string;
-  success: boolean;
+  accepted: boolean;
   errorMessage: string | null;
-  source: DocumentSource | null;
-  chunkCount: number | null;
+  jobId: string | null;
+  sourceId: string | null;
+  status: string;
+  message: string;
 }
 
 export interface BatchDocumentIngestionResponse {
   items: BatchDocumentIngestionItemResponse[];
-  successCount: number;
+  acceptedCount: number;
   failureCount: number;
 }
 

@@ -73,12 +73,11 @@ watch(
         return;
       }
 
-      target.status = itemResult.success ? 'success' : 'failed';
+      target.status = itemResult.accepted ? 'success' : 'failed';
       target.errorMessage = itemResult.errorMessage ?? '';
-      target.chunkCount = itemResult.chunkCount ?? null;
-      if (itemResult.success && itemResult.source) {
-        target.sourceId = itemResult.source.sourceId || target.sourceId;
-        target.title = itemResult.source.title || target.title;
+      target.chunkCount = null;
+      if (itemResult.accepted && itemResult.sourceId) {
+        target.sourceId = itemResult.sourceId || target.sourceId;
       }
     });
   },
@@ -151,9 +150,9 @@ function statusTagType(status: UploadStatus) {
 function statusText(status: UploadStatus) {
   switch (status) {
     case 'uploading':
-      return '上传中';
+      return '提交中';
     case 'success':
-      return '成功';
+      return '已入队';
     case 'failed':
       return '失败';
     default:
@@ -193,7 +192,7 @@ function formatFileSize(size: number) {
         <el-icon class="upload-icon"><UploadFilled /></el-icon>
         <div class="el-upload__text">拖拽文件到这里，或 <em>点击选择多个文件</em></div>
         <template #tip>
-          <div class="el-upload__tip">不会自动上传；确认元数据后再提交，接口仍使用 multipart/form-data。</div>
+          <div class="el-upload__tip">不会自动上传；确认元数据后提交到异步处理队列，接口仍使用 multipart/form-data。</div>
         </template>
       </el-upload>
 
@@ -230,7 +229,7 @@ function formatFileSize(size: number) {
             </el-col>
             <el-col :xs="24" :sm="12" :lg="4">
               <el-form-item label="分块数">
-                <span class="chunk-text">{{ item.chunkCount ?? '-' }}</span>
+                <span class="chunk-text">异步完成后更新</span>
               </el-form-item>
             </el-col>
           </el-row>

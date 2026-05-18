@@ -81,12 +81,9 @@ watch(
         return;
       }
 
-      target.status = itemResult.success ? 'success' : 'failed';
+      target.status = itemResult.accepted ? 'success' : 'failed';
       target.errorMessage = itemResult.errorMessage ?? '';
-      target.chunkCount = itemResult.chunkCount ?? null;
-      if (itemResult.success && itemResult.source?.title) {
-        target.title = itemResult.source.title;
-      }
+      target.chunkCount = null;
     });
   },
 );
@@ -149,9 +146,9 @@ function statusType(status: UploadStatus) {
 }
 
 function statusText(status: UploadStatus) {
-  if (status === 'success') return '上传完成';
+  if (status === 'success') return '已入队';
   if (status === 'failed') return '上传失败';
-  if (status === 'uploading') return '处理中';
+  if (status === 'uploading') return '提交中';
   return '待上传';
 }
 
@@ -203,7 +200,7 @@ function formatFileSize(size: number) {
       type="success"
       show-icon
       :closable="false"
-      :title="`上传完成：成功 ${props.result.successCount} 个，失败 ${props.result.failureCount} 个`"
+      :title="`上传请求已提交：已入队 ${props.result.acceptedCount} 个，失败 ${props.result.failureCount} 个`"
     />
 
     <template #footer>

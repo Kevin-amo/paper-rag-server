@@ -1,4 +1,4 @@
-import { reactive, ref } from 'vue';
+import { onUnmounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   deleteDocument,
@@ -34,9 +34,48 @@ export function useDocuments() {
 
   const pagination = reactive({ page: 0, size: 10, total: 0 });
   const chunkPagination = reactive({ page: 0, size: 50, total: 0 });
+  let uploadRefreshTimer: ReturnType<typeof window.setTimeout> | null = null;
 
-  async function loadDocuments(page = pagination.page) {
-    documentsLoading.value = true;
+  function stopUploadRefreshPolling() {
+    if (uploadRefreshTimer !== null) {
+      window.clearTimeout(uploadRefreshTimer);
+      uploadRefreshTimer = null;
+    }
+  }
+
+  function startUploadRefreshPolling(sourceIds: string[]) {
+    stopUploadRefreshPolling();
+
+    const pendingSourceIds = new Set(sourceIds.filter(Boolean));
+    if (!pendingSourceIds.size) {
+      return;
+    }
+
+    let remainingAttempts = 10;
+    const poll = async () => {
+      await loadDocuments(0, { silent: true, suppressError: true });
+
+      const activeStatuses = new Set(['PENDING', 'PROCESSING', 'INDEXING']);
+      const trackedDocuments = documents.value.filter((document) => pendingSourceIds.has(document.sourceId));
+      const shouldContinue = trackedDocuments.length < pendingSourceIds.size || trackedDocuments.some((document) => (
+        activeStatuses.has(String(document.status).toUpperCase())
+      ));
+
+      remainingAttempts -= 1;
+      if (shouldContinue && remainingAttempts > 0) {
+        uploadRefreshTimer = window.setTimeout(poll, 1500);
+      } else {
+        uploadRefreshTimer = null;
+      }
+    };
+
+    uploadRefreshTimer = window.setTimeout(poll, 500);
+  }
+
+  async function loadDocuments(page = pagination.page, options: { silent?: boolean; suppressError?: boolean } = {}) {
+    if (!options.silent) {
+      documentsLoading.value = true;
+    }
     try {
       const result = await listDocuments({
         keyword: keyword.value || undefined,
@@ -48,9 +87,13 @@ export function useDocuments() {
       pagination.size = result.size;
       pagination.total = result.total;
     } catch (error) {
-      ElMessage.error(getErrorMessage(error));
+      if (!options.suppressError) {
+        ElMessage.error(getErrorMessage(error));
+      }
     } finally {
-      documentsLoading.value = false;
+      if (!options.silent) {
+        documentsLoading.value = false;
+      }
     }
   }
 
@@ -87,15 +130,18 @@ export function useDocuments() {
 
     try {
       lastBatchUploadResult.value = await uploadDocumentsBatch(payload);
-      const { successCount, failureCount } = lastBatchUploadResult.value;
-      if (successCount > 0 && failureCount === 0) {
-        ElMessage.success(`批量上传成功，共 ${successCount} 个文件`);
-      } else if (successCount > 0) {
-        ElMessage.warning(`上传完成：成功 ${successCount} 个，失败 ${failureCount} 个`);
+      const { acceptedCount, failureCount } = lastBatchUploadResult.value;
+      if (acceptedCount > 0 && failureCount === 0) {
+        ElMessage.success(`上传请求已提交，共 ${acceptedCount} 个文件进入处理队列`);
+      } else if (acceptedCount > 0) {
+        ElMessage.warning(`上传请求已提交：已入队 ${acceptedCount} 个，失败 ${failureCount} 个`);
       } else {
-        ElMessage.error('批量上传失败，请检查文件格式或后端日志');
+        ElMessage.error('上传请求提交失败，请检查文件格式或后端日志');
       }
       await loadDocuments(0);
+      startUploadRefreshPolling(lastBatchUploadResult.value.items
+        .filter((item) => item.accepted && item.sourceId)
+        .map((item) => item.sourceId as string));
     } catch (error) {
       const message = getErrorMessage(error);
       uploadErrorMessage.value = `上传请求失败，后端可能仍在处理；请刷新文档列表确认状态。${message}`;
@@ -169,6 +215,8 @@ export function useDocuments() {
     keyword.value = nextKeyword.trim();
     void loadDocuments(0);
   }
+
+  onUnmounted(stopUploadRefreshPolling);
 
   return {
     uploadLoading,
