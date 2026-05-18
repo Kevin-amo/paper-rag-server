@@ -154,6 +154,11 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
         documentMapper.restore(ownerUserId, sourceId);
     }
 
+    @Override
+    public void markStatus(UUID ownerUserId, String sourceId, String status, int progress) {
+        documentMapper.markStatus(ownerUserId, sourceId, status, clamp(progress, 0, 100));
+    }
+
     /**
      * 标记文档进入解析中状态并保存正文与基础元数据。
      */

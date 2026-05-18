@@ -1,6 +1,7 @@
 package com.lqr.paperragserver.auth.security;
 
 import com.lqr.paperragserver.auth.entity.SysUser;
+import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -14,13 +15,19 @@ import java.util.UUID;
  */
 public class SecurityUserPrincipal implements UserDetails {
 
+    @Getter
     private final UUID id;
     private final String username;
     private final String password;
+    @Getter
     private final String displayName;
+    @Getter
     private final String email;
+    @Getter
     private final String avatarObjectKey;
+    @Getter
     private final String status;
+    @Getter
     private final List<String> roles;
     private final List<GrantedAuthority> authorities;
 
@@ -38,30 +45,6 @@ public class SecurityUserPrincipal implements UserDetails {
                 .map(SimpleGrantedAuthority::new)
                 .map(GrantedAuthority.class::cast)
                 .toList();
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getAvatarObjectKey() {
-        return avatarObjectKey;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public List<String> getRoles() {
-        return roles;
     }
 
     @Override

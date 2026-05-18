@@ -3,24 +3,30 @@ package com.lqr.paperragserver.web;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
-import com.lqr.paperragserver.common.model.DocumentIngestionResult;
-import com.lqr.paperragserver.common.model.DocumentSource;
+import com.lqr.paperragserver.document.model.DocumentIngestionMessage;
+import com.lqr.paperragserver.document.service.DocumentIngestionProducer;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.service.DocumentManagementService;
+import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
+import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.paper.service.DocumentIngestionJobService;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
+import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,6 +36,9 @@ class DocumentControllerTest {
     private final DocumentIngestionService documentIngestionService = mock(DocumentIngestionService.class);
     private final DocumentManagementService documentManagementService = mock(DocumentManagementService.class);
     private final PaperDocumentPersistenceService paperDocumentPersistenceService = mock(PaperDocumentPersistenceService.class);
+    private final DocumentIngestionJobService documentIngestionJobService = mock(DocumentIngestionJobService.class);
+    private final DocumentUploadStorageService documentUploadStorageService = mock(DocumentUploadStorageService.class);
+    private final DocumentIngestionProducer documentIngestionProducer = mock(DocumentIngestionProducer.class);
     private DocumentController controller;
     private UUID ownerUserId;
     private SecurityUserPrincipal principal;
@@ -40,6 +49,9 @@ class DocumentControllerTest {
                 documentIngestionService,
                 documentManagementService,
                 paperDocumentPersistenceService,
+                documentIngestionJobService,
+                documentUploadStorageService,
+                documentIngestionProducer,
                 new ObjectMapper()
         );
         ownerUserId = UUID.randomUUID();
@@ -47,56 +59,88 @@ class DocumentControllerTest {
     }
 
     @Test
-    void ingestBatchShouldReturnPerFileResultsForSuccessAndFailure() {
+    void ingestShouldReturnAcceptedJobWithoutSynchronousIngestion() throws Exception {
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "paper-a.pdf", "application/pdf", "a".getBytes()
+        );
+        DocumentIngestionJob job = job("source-a", "paper-a.pdf", "Paper A", DocumentIngestionJobService.STATUS_QUEUED);
+        when(documentUploadStorageService.store(eq(ownerUserId), eq("source-a"), any(UUID.class), eq(file), eq("paper-a.pdf")))
+                .thenReturn(new DocumentUploadStorageService.StoredUpload("paper-a.pdf", "storage/paper-a.pdf"));
+        when(documentIngestionJobService.createJob(any(UUID.class), eq(ownerUserId), eq("source-a"), eq("paper-a.pdf"), eq("storage/paper-a.pdf"), eq("Paper A")))
+                .thenReturn(job);
+        when(documentIngestionJobService.findJob(ownerUserId, job.getId())).thenReturn(Optional.of(job));
+
+        ResponseEntity<DocumentController.DocumentUploadAcceptedResponse> response = controller.ingest(principal, file, "source-a", "Paper A");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().jobId()).isEqualTo(job.getId());
+        assertThat(response.getBody().sourceId()).isEqualTo("source-a");
+        assertThat(response.getBody().status()).isEqualTo(DocumentIngestionJobService.STATUS_QUEUED);
+        verify(documentIngestionProducer).publish(new DocumentIngestionMessage(job.getId(), ownerUserId, "source-a"));
+        verify(documentIngestionService, never()).ingest(any(), any(), any(), any());
+    }
+
+    @Test
+    void ingestBatchShouldCreateJobsForEachFile() throws Exception {
         org.springframework.mock.web.MockMultipartFile file1 = new org.springframework.mock.web.MockMultipartFile(
                 "files", "paper-a.pdf", "application/pdf", "a".getBytes()
         );
         org.springframework.mock.web.MockMultipartFile file2 = new org.springframework.mock.web.MockMultipartFile(
                 "files", "paper-b.pdf", "application/pdf", "b".getBytes()
         );
-
-        when(documentIngestionService.ingest(eq(ownerUserId), eq("paper-a.pdf"), any(), eq(Map.of("sourceId", "source-a", "title", "Paper A"))))
-                .thenReturn(new DocumentIngestionResult(
-                        new DocumentSource("source-a", "Paper A", "paper-a.pdf", Map.of("sourceId", "source-a")),
-                        3
-                ));
-        doThrow(new IllegalStateException("解析失败"))
-                .when(documentIngestionService)
-                .ingest(eq(ownerUserId), eq("paper-b.pdf"), any(), eq(Map.of("title", "Paper B")));
+        DocumentIngestionJob job1 = job("source-a", "paper-a.pdf", "Paper A", DocumentIngestionJobService.STATUS_QUEUED);
+        DocumentIngestionJob job2 = job("source-b", "paper-b.pdf", "Paper B", DocumentIngestionJobService.STATUS_QUEUED);
+        when(documentUploadStorageService.store(eq(ownerUserId), eq("source-a"), any(UUID.class), eq(file1), eq("paper-a.pdf")))
+                .thenReturn(new DocumentUploadStorageService.StoredUpload("paper-a.pdf", "storage/paper-a.pdf"));
+        when(documentUploadStorageService.store(eq(ownerUserId), eq("source-b"), any(UUID.class), eq(file2), eq("paper-b.pdf")))
+                .thenReturn(new DocumentUploadStorageService.StoredUpload("paper-b.pdf", "storage/paper-b.pdf"));
+        when(documentIngestionJobService.createJob(any(UUID.class), eq(ownerUserId), eq("source-a"), eq("paper-a.pdf"), eq("storage/paper-a.pdf"), eq("Paper A")))
+                .thenReturn(job1);
+        when(documentIngestionJobService.createJob(any(UUID.class), eq(ownerUserId), eq("source-b"), eq("paper-b.pdf"), eq("storage/paper-b.pdf"), eq("Paper B")))
+                .thenReturn(job2);
+        when(documentIngestionJobService.findJob(ownerUserId, job1.getId())).thenReturn(Optional.of(job1));
+        when(documentIngestionJobService.findJob(ownerUserId, job2.getId())).thenReturn(Optional.of(job2));
 
         String itemsJson = """
                 [
                   {"fileName":"paper-a.pdf","sourceId":"source-a","title":"Paper A"},
-                  {"fileName":"paper-b.pdf","title":"Paper B"}
+                  {"fileName":"paper-b.pdf","sourceId":"source-b","title":"Paper B"}
                 ]
                 """;
 
-        DocumentController.BatchDocumentIngestionResponse response = controller.ingestBatch(
+        ResponseEntity<DocumentController.BatchDocumentIngestionResponse> response = controller.ingestBatch(
                 principal,
                 new org.springframework.web.multipart.MultipartFile[]{file1, file2},
                 itemsJson
         );
 
-        assertThat(response.successCount()).isEqualTo(1);
-        assertThat(response.failureCount()).isEqualTo(1);
-        assertThat(response.items()).hasSize(2);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().acceptedCount()).isEqualTo(2);
+        assertThat(response.getBody().failureCount()).isZero();
+        assertThat(response.getBody().items()).extracting(DocumentController.BatchDocumentIngestionItemResponse::jobId)
+                .containsExactly(job1.getId(), job2.getId());
+        verify(documentIngestionProducer, times(2)).publish(any(DocumentIngestionMessage.class));
+        verify(documentIngestionService, never()).ingest(any(), any(), any(), any());
+    }
 
-        DocumentController.BatchDocumentIngestionItemResponse successItem = response.items().get(0);
-        assertThat(successItem.index()).isEqualTo(0);
-        assertThat(successItem.success()).isTrue();
-        assertThat(successItem.fileName()).isEqualTo("paper-a.pdf");
-        assertThat(successItem.chunkCount()).isEqualTo(3);
-        assertThat(successItem.source()).isNotNull();
-        assertThat(successItem.source().sourceId()).isEqualTo("source-a");
+    @Test
+    void jobShouldReturnJobStatus() {
+        DocumentIngestionJob job = job("source-a", "paper-a.pdf", "Paper A", DocumentIngestionJobService.STATUS_FAILED);
+        job.setProgress(70);
+        job.setErrorMessage("解析失败");
+        job.setRetryCount(2);
+        when(documentIngestionJobService.findJob(ownerUserId, job.getId())).thenReturn(Optional.of(job));
 
-        DocumentController.BatchDocumentIngestionItemResponse failureItem = response.items().get(1);
-        assertThat(failureItem.index()).isEqualTo(1);
-        assertThat(failureItem.success()).isFalse();
-        assertThat(failureItem.fileName()).isEqualTo("paper-b.pdf");
-        assertThat(failureItem.errorMessage()).isEqualTo("解析失败");
-        assertThat(failureItem.source()).isNull();
+        DocumentController.DocumentJobResponse response = controller.job(principal, job.getId());
 
-        verify(documentIngestionService, times(2)).ingest(eq(ownerUserId), any(), any(), any());
+        assertThat(response.jobId()).isEqualTo(job.getId());
+        assertThat(response.sourceId()).isEqualTo("source-a");
+        assertThat(response.status()).isEqualTo(DocumentIngestionJobService.STATUS_FAILED);
+        assertThat(response.progress()).isEqualTo(70);
+        assertThat(response.errorMessage()).isEqualTo("解析失败");
+        assertThat(response.retryCount()).isEqualTo(2);
     }
 
     @Test
@@ -119,6 +163,22 @@ class DocumentControllerTest {
         controller.deleteBySourceId(principal, "source-1");
 
         verify(documentIngestionService).deleteBySourceId(ownerUserId, "source-1");
+    }
+
+    private DocumentIngestionJob job(String sourceId, String fileName, String title, String status) {
+        DocumentIngestionJob job = new DocumentIngestionJob();
+        job.setId(UUID.randomUUID());
+        job.setOwnerUserId(ownerUserId);
+        job.setSourceId(sourceId);
+        job.setFileName(fileName);
+        job.setTitle(title);
+        job.setFilePath("storage/" + fileName);
+        job.setStatus(status);
+        job.setProgress(DocumentIngestionJobService.STATUS_QUEUED.equals(status) ? 5 : 0);
+        job.setRetryCount(0);
+        job.setCreatedAt(OffsetDateTime.now());
+        job.setUpdatedAt(OffsetDateTime.now());
+        return job;
     }
 
     private SecurityUserPrincipal principal(UUID userId) {

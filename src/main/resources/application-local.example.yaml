@@ -8,8 +8,14 @@ spring:
     redis:
       host: localhost
       port: 6379
-      password: ""
+      password:
       database: 0
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
 
   ai:
     dashscope:
@@ -34,3 +40,10 @@ app:
     chunk-overlap: 120
     default-top-k: 5
     similarity-threshold: 0
+  document-ingestion:
+    storage-dir: storage/document-ingestion
+    keep-upload-file: true
+    max-retry-count: 3
+    listener:
+      concurrency: 2
+      max-concurrency: 4

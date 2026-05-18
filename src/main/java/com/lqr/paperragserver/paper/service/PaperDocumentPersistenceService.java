@@ -46,6 +46,11 @@ public interface PaperDocumentPersistenceService {
     void restore(UUID ownerUserId, String sourceId);
 
     /**
+     * 标记文档进入指定处理状态。
+     */
+    void markStatus(UUID ownerUserId, String sourceId, String status, int progress);
+
+    /**
      * 标记文档进入解析中状态并保存正文。
      */
     void markParsing(UUID ownerUserId, DocumentSource source, String contentText);

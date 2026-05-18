@@ -1,6 +1,7 @@
 package com.lqr.paperragserver.document.service;
 
 import com.lqr.paperragserver.common.model.DocumentIngestionResult;
+import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
 
 import java.util.Map;
 import java.util.UUID;
@@ -21,6 +22,14 @@ public interface DocumentIngestionService {
      * @return 入库结果
      */
     DocumentIngestionResult ingest(UUID ownerUserId, String fileName, byte[] content, Map<String, Object> metadata);
+
+    /**
+     * 处理已持久化的异步入库任务。
+     *
+     * @param job 入库任务
+     * @return 入库结果
+     */
+    DocumentIngestionResult processJob(DocumentIngestionJob job);
 
     /**
      * 根据来源标识删除文档对应的向量数据。

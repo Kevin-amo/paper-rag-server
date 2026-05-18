@@ -32,7 +32,7 @@ create table if not exists public.paper_document (
     updated_at timestamptz not null default now(),
     deleted_at timestamptz,
 
-    constraint chk_paper_document_status check (status in ('PENDING', 'PARSING', 'INDEXED', 'FAILED', 'DELETED')),
+    constraint chk_paper_document_status check (status in ('PENDING', 'QUEUED', 'PARSING', 'CHUNKING', 'EMBEDDING', 'INDEXING', 'INDEXED', 'FAILED', 'DELETED')),
     constraint chk_paper_document_publish_year check (publish_year is null or publish_year between 1500 and 3000),
     constraint chk_paper_document_chunk_count check (chunk_count >= 0)
 );
@@ -42,7 +42,7 @@ comment on column public.paper_document.owner_user_id is '文档归属用户 ID'
 comment on column public.paper_document.source_id is '文档来源唯一标识，对应代码中的 DocumentSource.sourceId';
 comment on column public.paper_document.content_text is '解析后的全文文本，便于重建索引和问题排查';
 comment on column public.paper_document.metadata is '文档级扩展元数据';
-comment on column public.paper_document.status is '入库状态：PENDING、PARSING、INDEXED、FAILED、DELETED';
+comment on column public.paper_document.status is '入库状态：PENDING、QUEUED、PARSING、CHUNKING、EMBEDDING、INDEXING、INDEXED、FAILED、DELETED';
 
 create index if not exists idx_paper_document_owner_updated_at
     on public.paper_document using btree (owner_user_id, updated_at desc)

@@ -115,6 +115,22 @@ public interface PaperDocumentMapper extends BaseMapper<PaperDocument> {
                     @Param("chunkCount") int chunkCount);
 
     /**
+     * 标记文档进入指定处理状态。
+     */
+    @Update("""
+            update public.paper_document
+            set status = #{status}, updated_at = now()
+            where owner_user_id = #{ownerUserId}
+              and source_id = #{sourceId}
+              and deleted_at is null
+              and status <> 'DELETED'
+            """)
+    int markStatus(@Param("ownerUserId") UUID ownerUserId,
+                   @Param("sourceId") String sourceId,
+                   @Param("status") String status,
+                   @Param("progress") int progress);
+
+    /**
      * 标记文档处理失败并保存错误信息。
      */
     @Update("""

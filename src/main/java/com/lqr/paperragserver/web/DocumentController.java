@@ -3,10 +3,13 @@ package com.lqr.paperragserver.web;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
-import com.lqr.paperragserver.common.model.DocumentIngestionResult;
+import com.lqr.paperragserver.document.model.DocumentIngestionMessage;
+import com.lqr.paperragserver.document.service.DocumentIngestionProducer;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.service.DocumentManagementService;
-import com.lqr.paperragserver.common.constant.MetadataKeys;
+import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
+import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.paper.service.DocumentIngestionJobService;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -32,7 +35,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -48,6 +50,9 @@ public class DocumentController {
     private final DocumentIngestionService documentIngestionService;
     private final DocumentManagementService documentManagementService;
     private final PaperDocumentPersistenceService paperDocumentPersistenceService;
+    private final DocumentIngestionJobService documentIngestionJobService;
+    private final DocumentUploadStorageService documentUploadStorageService;
+    private final DocumentIngestionProducer documentIngestionProducer;
     private final ObjectMapper objectMapper;
 
     /**
@@ -60,11 +65,13 @@ public class DocumentController {
      * @throws IOException 读取上传文件失败时抛出
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public DocumentIngestionResult ingest(@AuthenticationPrincipal SecurityUserPrincipal principal,
-                                          @RequestParam("file") MultipartFile file,
-                                          @RequestParam(value = "sourceId", required = false) String sourceId,
-                                          @RequestParam(value = "title", required = false) String title) throws IOException {
-        return documentIngestionService.ingest(principal.getId(), file.getOriginalFilename(), file.getBytes(), buildMetadata(sourceId, title));
+    public ResponseEntity<DocumentUploadAcceptedResponse> ingest(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                                 @RequestParam("file") MultipartFile file,
+                                                                 @RequestParam(value = "sourceId", required = false) String sourceId,
+                                                                 @RequestParam(value = "title", required = false) String title) throws IOException {
+        DocumentIngestionJob job = createAndPublishJob(principal.getId(), file, sourceId, title, null);
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(DocumentUploadAcceptedResponse.from(job));
     }
 
     /**
@@ -75,38 +82,33 @@ public class DocumentController {
      * @return 批量入库结果
      */
     @PostMapping(path = "/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public BatchDocumentIngestionResponse ingestBatch(@AuthenticationPrincipal SecurityUserPrincipal principal,
-                                                      @RequestParam("files") MultipartFile[] files,
-                                                      @RequestParam(value = "items", required = false) String items) {
+    public ResponseEntity<BatchDocumentIngestionResponse> ingestBatch(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                                      @RequestParam("files") MultipartFile[] files,
+                                                                      @RequestParam(value = "items", required = false) String items) {
         if (files == null || files.length == 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请至少上传一个文件");
         }
 
         List<BatchDocumentIngestionItemRequest> requests = parseBatchItems(items, files.length);
         List<BatchDocumentIngestionItemResponse> results = new java.util.ArrayList<>(files.length);
-        int successCount = 0;
+        int acceptedCount = 0;
 
         for (int index = 0; index < files.length; index++) {
             MultipartFile file = files[index];
             BatchDocumentIngestionItemRequest item = requests.get(index);
             String fileName = originalFileName(file, item);
             try {
-                // 入库
-                DocumentIngestionResult result = documentIngestionService.ingest(
-                        principal.getId(),
-                        fileName,
-                        file.getBytes(),
-                        buildMetadata(item.sourceId(), item.title())
-                );
-                results.add(BatchDocumentIngestionItemResponse.success(index, fileName, result));
-                successCount++;
+                DocumentIngestionJob job = createAndPublishJob(principal.getId(), file, item.sourceId(), item.title(), fileName);
+                results.add(BatchDocumentIngestionItemResponse.accepted(index, fileName, job));
+                acceptedCount++;
             } catch (Exception ex) {
                 String errorMessage = ex.getMessage() == null || ex.getMessage().isBlank() ? "上传失败" : ex.getMessage();
                 results.add(BatchDocumentIngestionItemResponse.failure(index, fileName, errorMessage));
             }
         }
 
-        return new BatchDocumentIngestionResponse(results, successCount, files.length - successCount);
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(new BatchDocumentIngestionResponse(results, acceptedCount, files.length - acceptedCount));
     }
 
     /**
@@ -132,6 +134,14 @@ public class DocumentController {
                 result.size(),
                 result.total()
         );
+    }
+
+    @GetMapping("/jobs/{jobId}")
+    public DocumentJobResponse job(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                   @PathVariable UUID jobId) {
+        return documentIngestionJobService.findJob(principal.getId(), jobId)
+                .map(DocumentJobResponse::from)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在"));
     }
 
     /**
@@ -263,22 +273,31 @@ public class DocumentController {
         return new ReindexResponse(result.sourceId(), result.chunkCount());
     }
 
-    /**
-     * 构建入库时传递给解析流程的基础元数据。
-     *
-     * @param sourceId 可选来源 ID
-     * @param title 可选标题
-     * @return 元数据映射
-     */
-    private Map<String, Object> buildMetadata(String sourceId, String title) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        if (sourceId != null && !sourceId.isBlank()) {
-            metadata.put(MetadataKeys.SOURCE_ID, sourceId);
-        }
-        if (title != null && !title.isBlank()) {
-            metadata.put(MetadataKeys.TITLE, title);
-        }
-        return metadata;
+    private DocumentIngestionJob createAndPublishJob(UUID ownerUserId,
+                                                     MultipartFile file,
+                                                     String sourceId,
+                                                     String title,
+                                                     String fallbackFileName) throws IOException {
+        UUID jobId = UUID.randomUUID();
+        String resolvedSourceId = sourceId == null || sourceId.isBlank() ? UUID.randomUUID().toString() : sourceId.trim();
+        String fileName = fallbackFileName == null || fallbackFileName.isBlank() ? file.getOriginalFilename() : fallbackFileName;
+        DocumentUploadStorageService.StoredUpload upload = documentUploadStorageService.store(
+                ownerUserId,
+                resolvedSourceId,
+                jobId,
+                file,
+                fileName
+        );
+        DocumentIngestionJob job = documentIngestionJobService.createJob(
+                jobId,
+                ownerUserId,
+                resolvedSourceId,
+                upload.fileName(),
+                upload.filePath(),
+                title
+        );
+        documentIngestionProducer.publish(new DocumentIngestionMessage(job.getId(), ownerUserId, resolvedSourceId));
+        return documentIngestionJobService.findJob(ownerUserId, job.getId()).orElse(job);
     }
 
     /**
@@ -349,7 +368,7 @@ public class DocumentController {
 
     public record BatchDocumentIngestionResponse(
             List<BatchDocumentIngestionItemResponse> items,
-            int successCount,
+            int acceptedCount,
             int failureCount
     ) {
     }
@@ -357,44 +376,77 @@ public class DocumentController {
     public record BatchDocumentIngestionItemResponse(
             int index,
             String fileName,
-            boolean success,
+            boolean accepted,
             String errorMessage,
-            DocumentSourceResponse source,
-            Integer chunkCount
+            UUID jobId,
+            String sourceId,
+            String status,
+            String message
     ) {
-        /**
-         * 构建批量入库成功项响应。
-         *
-         * @param index 文件序号
-         * @param fileName 文件名
-         * @param result 入库结果
-         * @return 成功项响应
-         */
-        static BatchDocumentIngestionItemResponse success(int index, String fileName, DocumentIngestionResult result) {
+        static BatchDocumentIngestionItemResponse accepted(int index, String fileName, DocumentIngestionJob job) {
             return new BatchDocumentIngestionItemResponse(
                     index,
                     fileName,
                     true,
                     null,
-                    DocumentSourceResponse.from(result.source()),
-                    result.chunkCount()
+                    job.getId(),
+                    job.getSourceId(),
+                    job.getStatus(),
+                    "文档已进入异步入库队列"
             );
         }
 
-        /**
-         * 构建批量入库失败项响应。
-         *
-         * @param index 文件序号
-         * @param fileName 文件名
-         * @param errorMessage 错误信息
-         * @return 失败项响应
-         */
         static BatchDocumentIngestionItemResponse failure(int index, String fileName, String errorMessage) {
-            return new BatchDocumentIngestionItemResponse(index, fileName, false, errorMessage, null, null);
+            return new BatchDocumentIngestionItemResponse(index, fileName, false, errorMessage, null, null, DocumentIngestionJobService.STATUS_FAILED, "任务创建失败");
         }
     }
 
     public record BatchDocumentIngestionItemRequest(String fileName, String sourceId, String title) {
+    }
+
+    public record DocumentUploadAcceptedResponse(
+            UUID jobId,
+            String sourceId,
+            String status,
+            String message
+    ) {
+        static DocumentUploadAcceptedResponse from(DocumentIngestionJob job) {
+            return new DocumentUploadAcceptedResponse(job.getId(), job.getSourceId(), job.getStatus(), "文档已进入异步入库队列");
+        }
+    }
+
+    public record DocumentJobResponse(
+            UUID jobId,
+            UUID ownerUserId,
+            String sourceId,
+            String fileName,
+            String title,
+            String status,
+            int progress,
+            String errorMessage,
+            int retryCount,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            OffsetDateTime startedAt,
+            OffsetDateTime finishedAt
+    ) {
+        static DocumentJobResponse from(DocumentIngestionJob job) {
+            return new DocumentJobResponse(
+                    job.getId(),
+                    job.getOwnerUserId(),
+                    job.getSourceId(),
+                    job.getFileName(),
+                    job.getTitle(),
+                    job.getStatus(),
+                    job.getProgress() == null ? 0 : job.getProgress(),
+                    job.getErrorMessage(),
+                    job.getRetryCount() == null ? 0 : job.getRetryCount(),
+                    job.getCreatedAt(),
+                    job.getUpdatedAt(),
+                    job.getStartedAt(),
+                    job.getFinishedAt()
+            );
+        }
     }
 
     public record DocumentSourceResponse(

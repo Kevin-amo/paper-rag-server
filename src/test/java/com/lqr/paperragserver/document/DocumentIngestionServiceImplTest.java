@@ -6,9 +6,13 @@ import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.DocumentIngestionResult;
 import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.common.model.ParsedDocument;
+import com.lqr.paperragserver.config.DocumentIngestionProperties;
 import com.lqr.paperragserver.document.impl.DocumentIngestionServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentParsingService;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
+import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
+import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.paper.service.DocumentIngestionJobService;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +36,8 @@ class DocumentIngestionServiceImplTest {
     private final EmbeddingService embeddingService = mock(EmbeddingService.class);
     private final VectorWriteService vectorWriteService = mock(VectorWriteService.class);
     private final PaperDocumentPersistenceService paperDocumentPersistenceService = mock(PaperDocumentPersistenceService.class);
+    private final DocumentIngestionJobService documentIngestionJobService = mock(DocumentIngestionJobService.class);
+    private final DocumentUploadStorageService documentUploadStorageService = mock(DocumentUploadStorageService.class);
     private DocumentIngestionServiceImpl service;
 
     @BeforeEach
@@ -41,7 +47,10 @@ class DocumentIngestionServiceImplTest {
                 documentSplittingService,
                 embeddingService,
                 vectorWriteService,
-                paperDocumentPersistenceService
+                paperDocumentPersistenceService,
+                documentIngestionJobService,
+                documentUploadStorageService,
+                new DocumentIngestionProperties("storage", true, 3, new DocumentIngestionProperties.Listener(2, 4))
         );
     }
 
@@ -49,6 +58,53 @@ class DocumentIngestionServiceImplTest {
     void ingestShouldUseParsedDocumentTextAndMetadata() {
         byte[] content = "scan-bytes".getBytes();
         Map<String, Object> metadata = Map.of("title", "Scan Paper");
+        Fixture fixture = fixture();
+        when(documentParsingService.parse("scan.png", content, metadata)).thenReturn(fixture.parsedDocument());
+        when(documentSplittingService.split(fixture.source(), "页面文本")).thenReturn(List.of(fixture.chunk()));
+        when(embeddingService.embed(List.of(fixture.chunk()))).thenReturn(List.of());
+
+        UUID ownerUserId = UUID.randomUUID();
+        DocumentIngestionResult result = service.ingest(ownerUserId, "scan.png", content, metadata);
+
+        assertThat(result.source()).isEqualTo(fixture.source());
+        assertThat(result.chunkCount()).isEqualTo(1);
+        verify(paperDocumentPersistenceService).markParsing(ownerUserId, fixture.source(), "页面文本");
+        verify(paperDocumentPersistenceService).replaceAssets(ownerUserId, "source-1", List.of(fixture.asset()));
+        verify(paperDocumentPersistenceService).replaceChunks(ownerUserId, "source-1", List.of(fixture.chunk()));
+        verify(paperDocumentPersistenceService).markIndexed(ownerUserId, "source-1", 1);
+        verify(vectorWriteService).deleteBySourceId(ownerUserId, "source-1");
+        verify(vectorWriteService).upsert(eq(ownerUserId), any());
+    }
+
+    @Test
+    void processJobShouldUpdateStagesAndMarkIndexed() throws Exception {
+        Fixture fixture = fixture();
+        UUID ownerUserId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        DocumentIngestionJob job = new DocumentIngestionJob();
+        job.setId(jobId);
+        job.setOwnerUserId(ownerUserId);
+        job.setSourceId("source-1");
+        job.setFileName("scan.png");
+        job.setTitle("Scan Paper");
+        job.setFilePath("storage/scan.png");
+        byte[] content = "scan-bytes".getBytes();
+        when(documentUploadStorageService.read("storage/scan.png")).thenReturn(content);
+        when(documentParsingService.parse(eq("scan.png"), eq(content), any())).thenReturn(fixture.parsedDocument());
+        when(documentSplittingService.split(fixture.source(), "页面文本")).thenReturn(List.of(fixture.chunk()));
+        when(embeddingService.embed(List.of(fixture.chunk()))).thenReturn(List.of());
+
+        DocumentIngestionResult result = service.processJob(job);
+
+        assertThat(result.chunkCount()).isEqualTo(1);
+        verify(documentIngestionJobService).markRunningStage(ownerUserId, jobId, "source-1", DocumentIngestionJobService.STATUS_PARSING, 20);
+        verify(documentIngestionJobService).markRunningStage(ownerUserId, jobId, "source-1", DocumentIngestionJobService.STATUS_CHUNKING, 45);
+        verify(documentIngestionJobService).markRunningStage(ownerUserId, jobId, "source-1", DocumentIngestionJobService.STATUS_EMBEDDING, 80);
+        verify(documentIngestionJobService).markIndexed(ownerUserId, jobId, "source-1");
+        verify(paperDocumentPersistenceService).markIndexed(ownerUserId, "source-1", 1);
+    }
+
+    private Fixture fixture() {
         DocumentSource source = new DocumentSource(
                 "source-1",
                 "Scan Paper",
@@ -82,20 +138,9 @@ class DocumentIngestionServiceImplTest {
                 "页面文本",
                 Map.of("sectionTitle", "摘要", "extractionMode", "MULTIMODAL")
         );
-        when(documentParsingService.parse("scan.png", content, metadata)).thenReturn(parsedDocument);
-        when(documentSplittingService.split(source, "页面文本")).thenReturn(List.of(chunk));
-        when(embeddingService.embed(List.of(chunk))).thenReturn(List.of());
+        return new Fixture(source, asset, parsedDocument, chunk);
+    }
 
-        UUID ownerUserId = UUID.randomUUID();
-        DocumentIngestionResult result = service.ingest(ownerUserId, "scan.png", content, metadata);
-
-        assertThat(result.source()).isEqualTo(source);
-        assertThat(result.chunkCount()).isEqualTo(1);
-        verify(paperDocumentPersistenceService).markParsing(ownerUserId, source, "页面文本");
-        verify(paperDocumentPersistenceService).replaceAssets(ownerUserId, "source-1", List.of(asset));
-        verify(paperDocumentPersistenceService).replaceChunks(ownerUserId, "source-1", List.of(chunk));
-        verify(paperDocumentPersistenceService).markIndexed(ownerUserId, "source-1", 1);
-        verify(vectorWriteService).deleteBySourceId(ownerUserId, "source-1");
-        verify(vectorWriteService).upsert(eq(ownerUserId), any());
+    private record Fixture(DocumentSource source, DocumentAsset asset, ParsedDocument parsedDocument, DocumentChunk chunk) {
     }
 }

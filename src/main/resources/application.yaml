@@ -21,7 +21,12 @@
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
-      timeout: 5s
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:192.168.200.129}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:admin}
+    password: ${RABBITMQ_PASSWORD:admin}
 
   ai:
     dashscope:
@@ -73,6 +78,13 @@ app:
         - image/jpeg
         - image/png
         - image/webp
+  document-ingestion:
+    storage-dir: ${DOCUMENT_INGESTION_STORAGE_DIR:storage/document-ingestion}
+    keep-upload-file: ${DOCUMENT_INGESTION_KEEP_UPLOAD_FILE:true}
+    max-retry-count: ${DOCUMENT_INGESTION_MAX_RETRY_COUNT:3}
+    listener:
+      concurrency: ${DOCUMENT_INGESTION_LISTENER_CONCURRENCY:2}
+      max-concurrency: ${DOCUMENT_INGESTION_LISTENER_MAX_CONCURRENCY:4}
   security:
     jwt:
       issuer: ${JWT_ISSUER:paper-rag-server}
