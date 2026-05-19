@@ -6,7 +6,7 @@ export default {
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Promotion, Setting } from '@element-plus/icons-vue';
+import { Promotion, Setting, UploadFilled, Collection } from '@element-plus/icons-vue';
 
 const props = defineProps<{
   loading?: boolean;
@@ -14,6 +14,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   submit: [payload: { question: string; topK?: number }];
+  openDocuments: [];
+  openUpload: [];
 }>();
 
 const question = ref('');
@@ -65,12 +67,27 @@ defineExpose({ fillQuestion });
         @keydown="handleKeydown"
       />
       <div class="composer-actions">
-        <el-button text :icon="Setting" @click="advancedVisible = true">
-          高级设置
-        </el-button>
-        <el-button type="primary" size="large" :loading="props.loading" :disabled="!canSubmit" :icon="Promotion" @click="submitQuestion">
-          发送
-        </el-button>
+        <div class="composer-left-actions">
+          <el-button class="composer-pill" text :icon="Setting" @click="advancedVisible = true">
+            高级设置 · Top K {{ topK }}
+          </el-button>
+          <el-button class="composer-pill hide-on-small" text :icon="Collection" @click="emit('openDocuments')">
+            文档库
+          </el-button>
+          <el-button class="composer-pill hide-on-small" text :icon="UploadFilled" @click="emit('openUpload')">
+            上传
+          </el-button>
+        </div>
+        <el-button
+          class="send-button"
+          type="primary"
+          circle
+          :loading="props.loading"
+          :disabled="!canSubmit"
+          :icon="Promotion"
+          aria-label="发送"
+          @click="submitQuestion"
+        />
       </div>
     </div>
 
@@ -106,28 +123,38 @@ defineExpose({ fillQuestion });
 
 <style scoped>
 .chat-composer {
-  padding: 14px 22px 20px;
-  border-top: 1px solid rgba(226, 232, 240, 0.9);
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(16px);
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding: 0 0 20px;
+  background: #ffffff;
 }
 
 .composer-box {
   display: grid;
-  gap: 12px;
-  padding: 13px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
-  border-radius: 22px;
-  background: #fff;
-  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+  gap: 10px;
+  width: min(960px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 28px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
 }
 
 .composer-box :deep(.el-textarea__inner) {
+  min-height: 56px !important;
   border: 0;
+  background: transparent;
   box-shadow: none;
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 15px;
   line-height: 1.7;
+  padding: 2px 4px;
+}
+
+.composer-box :deep(.el-textarea__inner::placeholder) {
+  color: #9ca3af;
 }
 
 .composer-actions {
@@ -137,19 +164,52 @@ defineExpose({ fillQuestion });
   gap: 12px;
 }
 
-.composer-actions .el-button--primary {
-  min-width: 104px;
-  border-radius: 14px;
-  font-weight: 800;
+.composer-left-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.composer-pill {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: #f9fafb;
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.composer-pill:hover {
+  border-color: #d9e2ff;
+  background: #f3f6ff;
+  color: var(--app-primary);
+}
+
+.send-button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: var(--app-primary);
+  box-shadow: 0 8px 18px rgba(91, 124, 250, 0.22);
+}
+
+.send-button.is-disabled,
+.send-button.is-disabled:hover {
+  background: #d1d5db;
+  color: #ffffff;
+  box-shadow: none;
 }
 
 .advanced-setting-card {
   display: grid;
   gap: 18px;
   padding: 16px;
-  border: 1px solid rgba(37, 99, 235, 0.12);
-  border-radius: 18px;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border: 1px solid var(--app-border);
+  border-radius: 20px;
+  background: #ffffff;
 }
 
 .advanced-setting-header {
@@ -165,7 +225,7 @@ defineExpose({ fillQuestion });
 }
 
 .advanced-setting-header strong {
-  color: #172554;
+  color: var(--app-text);
   font-size: 15px;
 }
 
@@ -184,50 +244,52 @@ defineExpose({ fillQuestion });
 
 .topk-option {
   height: 38px;
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  border-radius: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
   background: #fff;
-  color: #334155;
+  color: #374151;
   cursor: pointer;
   font: inherit;
   font-weight: 700;
-  transition: all 0.18s ease;
+  transition: all 0.16s ease;
 }
 
 .topk-option:hover {
-  border-color: rgba(37, 99, 235, 0.42);
-  color: #1d4ed8;
-  transform: translateY(-1px);
+  border-color: #d9e2ff;
+  color: var(--app-primary);
 }
 
 .topk-option.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.32);
+  border-color: #d9e2ff;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
 }
 
 :global(.advanced-dialog .el-dialog) {
-  border-radius: 22px;
-}
-
-:global(.advanced-dialog .el-dialog__header) {
-  padding-bottom: 10px;
+  border-radius: 24px;
 }
 
 :global(.advanced-dialog .el-dialog__title) {
-  color: #0f172a;
+  color: var(--app-text);
   font-weight: 800;
 }
 
 @media (max-width: 640px) {
   .chat-composer {
-    padding: 12px;
+    padding-bottom: 12px;
   }
 
+  .composer-box {
+    width: calc(100% - 24px);
+    border-radius: 24px;
+  }
+ 
   .composer-actions {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .hide-on-small {
+    display: none;
   }
 
   .topk-options {

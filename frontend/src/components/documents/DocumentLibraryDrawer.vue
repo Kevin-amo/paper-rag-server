@@ -65,12 +65,17 @@ const visible = computed({
 </template>
 
 <style scoped>
+.drawer-heading {
+  display: grid;
+  gap: 4px;
+}
+
 .drawer-heading p {
-  margin: 0 0 6px;
+  margin: 0;
   color: var(--app-primary);
   font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -82,7 +87,7 @@ const visible = computed({
 
 .drawer-heading span {
   display: block;
-  margin-top: 6px;
+  margin-top: 2px;
   color: var(--app-text-muted);
   line-height: 1.6;
 }

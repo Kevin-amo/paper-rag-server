@@ -1,17 +1,19 @@
 :root {
-  --app-bg: #f5f7fb;
+  --app-bg: #ffffff;
+  --app-sidebar-bg: #f5f6f8;
   --app-surface: #ffffff;
-  --app-surface-soft: #f8fafc;
-  --app-border: #e2e8f0;
-  --app-text: #0f172a;
-  --app-text-muted: #64748b;
-  --app-primary: #2563eb;
-  --app-primary-dark: #1d4ed8;
-  --app-primary-soft: #eff6ff;
+  --app-surface-soft: #f7f8fa;
+  --app-border: #e5e7eb;
+  --app-text: #111827;
+  --app-text-muted: #6b7280;
+  --app-primary: #5b7cfa;
+  --app-primary-dark: #4f7cff;
+  --app-primary-soft: #eef3ff;
   --app-danger: #dc2626;
   --app-radius-lg: 24px;
   --app-radius-md: 16px;
-  --app-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+  --app-shadow: 0 12px 36px rgba(15, 23, 42, 0.08);
+  --app-shadow-subtle: 0 8px 24px rgba(15, 23, 42, 0.05);
 
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   color: var(--app-text);
@@ -33,9 +35,7 @@ body,
 body {
   margin: 0;
   min-width: 0;
-  background:
-    radial-gradient(circle at 0 0, rgba(37, 99, 235, 0.12), transparent 32rem),
-    linear-gradient(180deg, #fbfdff 0%, var(--app-bg) 100%);
+  background: var(--app-bg);
 }
 
 button,
@@ -51,14 +51,52 @@ a {
 .el-card,
 .el-dialog,
 .el-drawer {
-  --el-border-radius-base: 12px;
+  --el-border-radius-base: 14px;
+}
+
+.el-button {
+  --el-button-hover-bg-color: #f3f6ff;
+  --el-button-hover-border-color: #d9e2ff;
+  font-weight: 700;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--app-primary);
+  --el-button-border-color: var(--app-primary);
+  --el-button-hover-bg-color: var(--app-primary-dark);
+  --el-button-hover-border-color: var(--app-primary-dark);
+}
+
+.el-drawer {
+  background: #ffffff;
+}
+
+.el-drawer__header {
+  margin-bottom: 0;
+  padding: 22px 24px 14px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.el-drawer__body {
+  padding: 20px 24px 24px;
+  background: #ffffff;
+}
+
+.el-dialog {
+  border-radius: 24px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
+}
+
+.el-dialog__title {
+  color: var(--app-text);
+  font-weight: 800;
 }
 
 .app-card {
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  border: 1px solid var(--app-border);
   border-radius: var(--app-radius-lg);
   background: var(--app-surface);
-  box-shadow: var(--app-shadow);
+  box-shadow: var(--app-shadow-subtle);
 }
 
 .app-muted {
@@ -67,6 +105,6 @@ a {
 
 @media (max-width: 768px) {
   body {
-    background: var(--app-bg);
+    background: #ffffff;
   }
 }

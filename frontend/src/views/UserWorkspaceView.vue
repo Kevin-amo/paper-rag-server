@@ -88,7 +88,7 @@ onMounted(async () => {
     await router.replace('/login');
     return;
   }
-  await Promise.all([documentsState.loadDocuments(0), conversationsState.loadConversations(true)]);
+  await Promise.all([documentsState.loadDocuments(0), conversationsState.loadConversations()]);
 });
 </script>
 
@@ -98,15 +98,14 @@ onMounted(async () => {
       :conversations="conversationsState.conversations.value"
       :active-conversation-id="conversationsState.activeConversationId.value"
       :conversations-loading="conversationsState.conversationsLoading.value"
-      :cleaning-conversations="conversationsState.cleaningConversations.value"
       :current-user-name="currentUserName"
       :current-user-avatar-url="currentUserAvatarUrl"
       :is-admin="auth.isAdmin.value"
       @create-conversation="conversationsState.createNewConversation"
       @select-conversation="conversationsState.selectConversation"
       @delete-conversation="conversationsState.removeConversation"
+      @rename-conversation="conversationsState.renameConversation"
       @open-documents="documentLibraryVisible = true"
-      @clean-empty-conversations="conversationsState.cleanEmptyConversations"
       @go-admin="router.push('/admin')"
       @open-avatar-upload="avatarUploadVisible = true"
       @logout="handleLogout"
@@ -118,6 +117,7 @@ onMounted(async () => {
       :active-conversation="activeConversation"
       :messages-loading="conversationsState.messagesLoading.value"
       :document-total="documentsState.pagination.total"
+      :current-user-avatar-url="currentUserAvatarUrl"
       @submit="ragState.ask"
       @open-documents="documentLibraryVisible = true"
       @open-upload="uploadVisible = true"
@@ -158,7 +158,14 @@ onMounted(async () => {
     <DocumentDetailDrawer
       v-model="documentsState.detailVisible.value"
       :detail="documentsState.detail.value"
+      :chunks="documentsState.chunks.value"
       :loading="documentsState.detailLoading.value"
+      :chunk-loading="documentsState.chunkLoading.value"
+      :chunk-page="documentsState.chunkPagination.page"
+      :chunk-size="documentsState.chunkPagination.size"
+      :chunk-total="documentsState.chunkPagination.total"
+      @chunk-page-change="documentsState.changeChunkPage"
+      @chunk-size-change="documentsState.changeChunkSize"
     />
   </div>
 </template>
@@ -168,15 +175,14 @@ onMounted(async () => {
   min-height: 100vh;
   display: flex;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 70% 0, rgba(37, 99, 235, 0.1), transparent 30rem),
-    #f8fafc;
+  background: #ffffff;
 }
 
 @media (max-width: 900px) {
   .user-app-shell {
     flex-direction: column;
     overflow: visible;
+    background: #ffffff;
   }
 }
 </style>

@@ -135,11 +135,21 @@ function handleCurrentChange(value: number) {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) auto auto;
   gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--app-border);
+  border-radius: 20px;
+  background: #f7f8fa;
 }
 
 .library-toolbar .el-button,
 .library-toolbar :deep(.el-input__wrapper) {
-  border-radius: 13px;
+  height: 38px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.library-toolbar :deep(.el-input__wrapper) {
+  background: #ffffff;
 }
 
 .library-content {
@@ -156,17 +166,17 @@ function handleCurrentChange(value: number) {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 16px;
-  border: 1px solid rgba(226, 232, 240, 0.92);
+  padding: 15px;
+  border: 1px solid var(--app-border);
   border-radius: 18px;
   background: #fff;
   cursor: pointer;
-  transition: 0.16s ease;
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
 }
 
 .paper-card:hover {
-  border-color: rgba(37, 99, 235, 0.3);
-  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+  border-color: #d9e2ff;
+  background: #fbfcff;
   transform: translateY(-1px);
 }
 
@@ -184,8 +194,8 @@ function handleCurrentChange(value: number) {
 .paper-title-row h3 {
   overflow: hidden;
   margin: 0;
-  color: #0f172a;
-  font-size: 16px;
+  color: var(--app-text);
+  font-size: 15px;
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -195,14 +205,14 @@ function handleCurrentChange(value: number) {
 .paper-subtle {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: 7px 12px;
   margin-top: 8px;
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 13px;
 }
 
 .paper-subtle {
-  color: #94a3b8;
+  color: #9ca3af;
   font-size: 12px;
 }
 
@@ -210,6 +220,10 @@ function handleCurrentChange(value: number) {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.paper-actions .el-button {
+  border-radius: 999px;
 }
 
 .pagination-wrap {

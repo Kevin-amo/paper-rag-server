@@ -21,10 +21,12 @@ defineProps<{
   place-items: center;
   gap: 8px;
   min-height: 220px;
-  padding: 28px;
-  border: 1px dashed var(--app-border);
-  border-radius: 18px;
-  background: var(--app-surface-soft);
+  padding: 32px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.92));
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.07);
   text-align: center;
 }
 
