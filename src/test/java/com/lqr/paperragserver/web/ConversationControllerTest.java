@@ -56,6 +56,22 @@ class ConversationControllerTest {
     }
 
     @Test
+    void updateShouldDelegateWithCurrentUserIdConversationIdAndTitle() {
+        UUID conversationId = UUID.randomUUID();
+        ConversationService.ConversationView conversation = conversationView("重命名会话");
+        when(conversationService.renameConversation(ownerUserId, conversationId, "重命名会话")).thenReturn(conversation);
+
+        ConversationService.ConversationView response = controller.update(
+                principal,
+                conversationId,
+                new ConversationController.UpdateConversationRequest("重命名会话")
+        );
+
+        assertThat(response).isEqualTo(conversation);
+        verify(conversationService).renameConversation(ownerUserId, conversationId, "重命名会话");
+    }
+
+    @Test
     void messagesShouldDelegateWithCurrentUserIdAndConversationId() {
         UUID conversationId = UUID.randomUUID();
         ConversationService.MessageView message = new ConversationService.MessageView(

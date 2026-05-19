@@ -46,6 +46,14 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
+    @Transactional
+    public ConversationView renameConversation(UUID ownerUserId, UUID conversationId, String title) {
+        requireConversation(ownerUserId, conversationId);
+        conversationMapper.updateTitle(conversationId, ownerUserId, normalizeTitle(title));
+        return requireConversation(ownerUserId, conversationId);
+    }
+
+    @Override
     public ConversationView requireConversation(UUID ownerUserId, UUID conversationId) {
         if (conversationId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "会话 ID 不能为空");

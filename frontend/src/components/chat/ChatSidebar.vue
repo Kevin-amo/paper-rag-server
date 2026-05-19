@@ -5,23 +5,29 @@ export default {
 </script>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import {
   ChatDotRound,
   Collection,
+  Delete,
+  EditPen,
+  MoreFilled,
   Plus,
   SwitchButton,
   User,
   Setting,
 } from '@element-plus/icons-vue';
-import ConfirmDeleteButton from '../common/ConfirmDeleteButton.vue';
+import { ElMessage } from 'element-plus';
 import type { Conversation } from '../../types';
+
+const PINNED_CONVERSATIONS_STORAGE_KEY = 'paper-rag:pinned-conversations';
+
+type ConversationMenuCommand = 'pin' | 'unpin' | 'rename' | 'delete';
 
 const props = defineProps<{
   conversations: Conversation[];
   activeConversationId: string | null;
   conversationsLoading?: boolean;
-  cleaningConversations?: boolean;
   currentUserName: string;
   currentUserAvatarUrl?: string | null;
   isAdmin?: boolean;
@@ -31,28 +37,138 @@ const emit = defineEmits<{
   createConversation: [];
   selectConversation: [conversationId: string];
   deleteConversation: [conversationId: string];
+  renameConversation: [conversationId: string, title: string];
   openDocuments: [];
-  cleanEmptyConversations: [];
   goAdmin: [];
   openAvatarUpload: [];
   logout: [];
 }>();
 
-const sortedConversations = computed(() => [...props.conversations].sort((a, b) => (
-  new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-)));
+const pinnedConversationIds = ref<string[]>(loadPinnedConversationIds());
+const deleteDialogVisible = ref(false);
+const operatingConversation = ref<Conversation | null>(null);
+const editingConversationId = ref<string | null>(null);
+const renameTitle = ref('');
+const renameInputRef = ref<HTMLInputElement | null>(null);
 
-function formatDate(value: string) {
-  if (!value) {
-    return '暂无时间';
+const sortedConversations = computed(() => [...props.conversations].sort((a, b) => {
+  const aPinned = isPinned(a.id);
+  const bPinned = isPinned(b.id);
+
+  if (aPinned !== bPinned) {
+    return aPinned ? -1 : 1;
   }
 
-  const date = new Date(value);
-  const now = new Date();
-  const sameDay = date.toDateString() === now.toDateString();
-  return date.toLocaleString('zh-CN', sameDay
-    ? { hour: '2-digit', minute: '2-digit' }
-    : { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+}));
+
+function loadPinnedConversationIds() {
+  try {
+    const rawValue = localStorage.getItem(PINNED_CONVERSATIONS_STORAGE_KEY);
+    if (!rawValue) {
+      return [];
+    }
+
+    const parsedValue = JSON.parse(rawValue);
+    return Array.isArray(parsedValue)
+      ? parsedValue.filter((item): item is string => typeof item === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePinnedConversationIds() {
+  try {
+    localStorage.setItem(PINNED_CONVERSATIONS_STORAGE_KEY, JSON.stringify(pinnedConversationIds.value));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function isPinned(conversationId: string) {
+  return pinnedConversationIds.value.includes(conversationId);
+}
+
+function togglePinned(conversationId: string) {
+  if (isPinned(conversationId)) {
+    pinnedConversationIds.value = pinnedConversationIds.value.filter((id) => id !== conversationId);
+  } else {
+    pinnedConversationIds.value = [conversationId, ...pinnedConversationIds.value.filter((id) => id !== conversationId)];
+  }
+  savePinnedConversationIds();
+}
+
+function handleDropdownCommand(conversation: Conversation, command: string | number | object) {
+  if (command === 'pin' || command === 'unpin' || command === 'rename' || command === 'delete') {
+    handleMenuCommand(conversation, command);
+  }
+}
+
+function handleMenuCommand(conversation: Conversation, command: ConversationMenuCommand) {
+  if (command === 'pin' || command === 'unpin') {
+    togglePinned(conversation.id);
+    return;
+  }
+
+  if (command === 'rename') {
+    startInlineRename(conversation);
+    return;
+  }
+
+  cancelInlineRename();
+  operatingConversation.value = conversation;
+  deleteDialogVisible.value = true;
+}
+
+async function startInlineRename(conversation: Conversation) {
+  operatingConversation.value = conversation;
+  editingConversationId.value = conversation.id;
+  renameTitle.value = conversationTitle(conversation);
+  await nextTick();
+  renameInputRef.value?.focus();
+  renameInputRef.value?.select();
+}
+
+function confirmRename() {
+  if (!operatingConversation.value) {
+    return;
+  }
+
+  const normalizedTitle = renameTitle.value.trim();
+  if (!normalizedTitle) {
+    ElMessage.warning('会话名称不能为空');
+    return;
+  }
+
+  if (normalizedTitle !== conversationTitle(operatingConversation.value)) {
+    emit('renameConversation', operatingConversation.value.id, normalizedTitle);
+  }
+
+  editingConversationId.value = null;
+  operatingConversation.value = null;
+  renameTitle.value = '';
+}
+
+function cancelInlineRename() {
+  editingConversationId.value = null;
+  operatingConversation.value = null;
+  renameTitle.value = '';
+}
+
+function confirmDelete() {
+  if (!operatingConversation.value) {
+    return;
+  }
+
+  emit('deleteConversation', operatingConversation.value.id);
+  deleteDialogVisible.value = false;
+  operatingConversation.value = null;
+}
+
+function closeOperationDialog() {
+  deleteDialogVisible.value = false;
+  operatingConversation.value = null;
 }
 
 function conversationTitle(conversation: Conversation) {
@@ -92,9 +208,6 @@ function conversationTitle(conversation: Conversation) {
     <section class="conversation-section">
       <div class="section-title">
         <span>最近会话</span>
-        <el-button text size="small" :loading="props.cleaningConversations" @click="emit('cleanEmptyConversations')">
-          清理
-        </el-button>
       </div>
 
       <div v-loading="props.conversationsLoading" class="conversation-list">
@@ -104,18 +217,58 @@ function conversationTitle(conversation: Conversation) {
           v-else
           :key="conversation.id"
           class="conversation-item"
-          :class="{ active: conversation.id === props.activeConversationId }"
+          :class="{ active: conversation.id === props.activeConversationId, pinned: isPinned(conversation.id) }"
         >
-          <button type="button" class="conversation-select" @click="emit('selectConversation', conversation.id)">
-            <span class="conversation-title">{{ conversationTitle(conversation) }}</span>
-            <small>{{ formatDate(conversation.updatedAt) }}</small>
+          <template v-if="editingConversationId === conversation.id">
+            <input
+              ref="renameInputRef"
+              v-model="renameTitle"
+              class="conversation-rename-input"
+              maxlength="60"
+              @click.stop
+              @keydown.enter.prevent="confirmRename"
+              @keydown.esc.prevent="cancelInlineRename"
+              @blur="cancelInlineRename"
+            >
+          </template>
+          <button v-else type="button" class="conversation-select" @click="emit('selectConversation', conversation.id)">
+            <span class="conversation-title-row">
+              <span class="conversation-title">{{ conversationTitle(conversation) }}</span>
+              <span v-if="isPinned(conversation.id)" class="conversation-pin-badge" aria-label="已置顶" title="已置顶">📌</span>
+            </span>
           </button>
-          <ConfirmDeleteButton
-            class="conversation-delete"
-            title="确认删除这个问答会话吗？"
-            confirm-text="删除"
-            @confirm="emit('deleteConversation', conversation.id)"
-          />
+
+          <el-dropdown
+            trigger="click"
+            popper-class="conversation-action-popper"
+            @command="handleDropdownCommand(conversation, $event)"
+          >
+            <el-button
+              text
+              circle
+              class="conversation-menu-button"
+              :aria-label="isPinned(conversation.id) ? '会话菜单：已置顶' : '会话菜单：未置顶'"
+              @click.stop
+            >
+              <el-icon><MoreFilled /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu class="conversation-action-menu">
+                <el-dropdown-item :command="isPinned(conversation.id) ? 'unpin' : 'pin'" class="conversation-action-item">
+                  <span class="action-icon">📌</span>
+                  <span>{{ isPinned(conversation.id) ? '取消置顶' : '置顶会话' }}</span>
+                </el-dropdown-item>
+                <el-dropdown-item command="rename" class="conversation-action-item">
+                  <el-icon><EditPen /></el-icon>
+                  <span>重命名</span>
+                </el-dropdown-item>
+                <el-dropdown-item command="delete" class="conversation-action-item danger">
+                  <el-icon><Delete /></el-icon>
+                  <span>删除会话</span>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </div>
     </section>
@@ -131,40 +284,59 @@ function conversationTitle(conversation: Conversation) {
       </div>
       <el-button circle text :icon="SwitchButton" title="退出登录" @click="emit('logout')" />
     </footer>
+
+    <el-dialog
+      v-model="deleteDialogVisible"
+      title="删除会话"
+      width="400px"
+      class="conversation-dialog danger-dialog"
+      append-to-body
+      align-center
+      @closed="closeOperationDialog"
+    >
+      <div class="conversation-dialog-body">
+        <strong>确认删除这个问答会话吗？</strong>
+        <span class="dialog-caption">“{{ operatingConversation ? conversationTitle(operatingConversation) : '' }}” 删除后不可恢复。</span>
+      </div>
+      <template #footer>
+        <el-button @click="deleteDialogVisible = false">取消</el-button>
+        <el-button class="delete-confirm-button" type="danger" @click="confirmDelete">删除</el-button>
+      </template>
+    </el-dialog>
   </aside>
 </template>
 
 <style scoped>
 .chat-sidebar {
-  width: 292px;
-  min-width: 260px;
+  width: 300px;
+  min-width: 300px;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 22px 18px;
-  border-right: 1px solid rgba(226, 232, 240, 0.86);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(18px);
+  gap: 14px;
+  padding: 18px 14px;
+  border-right: 1px solid var(--app-border);
+  background: var(--app-sidebar-bg);
 }
 
 .brand-block {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 4px 10px;
+  gap: 10px;
+  padding: 2px 8px 8px;
 }
 
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 15px;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
   color: #fff;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  background: var(--app-primary);
+  font-size: 15px;
   font-weight: 900;
-  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.24);
+  box-shadow: 0 8px 18px rgba(91, 124, 250, 0.22);
 }
 
 .brand-block strong,
@@ -174,25 +346,42 @@ function conversationTitle(conversation: Conversation) {
   line-height: 1.2;
 }
 
+.brand-block strong {
+  font-size: 15px;
+}
+
 .brand-block span,
 .user-meta span,
 .avatar-action {
   display: block;
-  margin-top: 4px;
+  margin-top: 3px;
   color: var(--app-text-muted);
   font-size: 12px;
 }
 
 .new-chat-button {
   width: 100%;
+  height: 46px;
   justify-content: center;
-  border-radius: 14px;
-  font-weight: 700;
+  border: 1px solid var(--app-border);
+  border-radius: 18px;
+  background: #fff;
+  color: var(--app-text);
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
+}
+
+.new-chat-button:hover,
+.new-chat-button:focus {
+  border-color: #d9e2ff;
+  background: #fff;
+  color: var(--app-primary);
+  box-shadow: 0 8px 20px rgba(91, 124, 250, 0.1);
 }
 
 .sidebar-nav {
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .nav-item {
@@ -200,20 +389,20 @@ function conversationTitle(conversation: Conversation) {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 13px;
+  padding: 10px 12px;
   border: 1px solid transparent;
   border-radius: 14px;
   background: transparent;
-  color: #475569;
+  color: var(--app-text-muted);
   cursor: pointer;
   text-align: left;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .nav-item:hover,
 .nav-item.active {
-  border-color: rgba(37, 99, 235, 0.12);
-  background: var(--app-primary-soft);
-  color: var(--app-primary);
+  background: #ffffff;
+  color: var(--app-text);
 }
 
 .conversation-section {
@@ -221,18 +410,17 @@ function conversationTitle(conversation: Conversation) {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .section-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 4px;
-  color: #64748b;
+  padding: 6px 8px 0;
+  color: var(--app-text-muted);
   font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-weight: 700;
 }
 
 .conversation-list {
@@ -241,77 +429,213 @@ function conversationTitle(conversation: Conversation) {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 8px;
+  gap: 3px;
   padding-right: 2px;
 }
 
 .conversation-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 4px;
-  padding: 10px;
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 15px;
-  background: #fff;
-  transition: 0.16s ease;
+  gap: 2px;
+  min-height: 38px;
+  padding: 4px 5px 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: transparent;
+  transition: background 0.16s ease, border-color 0.16s ease;
 }
 
-.conversation-item:hover,
+.conversation-item:hover {
+  background: #ffffff;
+}
+
 .conversation-item.active {
-  border-color: rgba(37, 99, 235, 0.34);
-  background: #f8fbff;
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+  border-color: #dbe6ff;
+  background: #eaf1ff;
 }
 
 .conversation-select {
   min-width: 0;
+  min-height: 30px;
   border: 0;
   background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
+  padding: 0;
+}
+
+.conversation-rename-input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  border: 1px solid #c7d2fe;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #1f2937;
+  outline: none;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 0 0 3px rgba(91, 124, 250, 0.12);
+}
+
+.conversation-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
 }
 
 .conversation-title {
   display: block;
   overflow: hidden;
-  color: #172554;
+  color: #1f2937;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.conversation-select small {
-  display: block;
-  margin-top: 5px;
-  color: #94a3b8;
+.conversation-pin-badge {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(91, 124, 250, 0.12);
+  font-size: 11px;
+  line-height: 1;
 }
 
-.conversation-delete {
-  opacity: 0.6;
+.conversation-menu-button {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  color: #9ca3af;
+  opacity: 0;
+}
+
+.conversation-item:hover .conversation-menu-button,
+.conversation-item.active .conversation-menu-button {
+  opacity: 1;
+}
+
+.conversation-menu-button:hover {
+  color: var(--app-text-muted);
+  background: rgba(17, 24, 39, 0.04);
+}
+
+:global(.conversation-action-popper) {
+  border: 1px solid var(--app-border) !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12) !important;
+}
+
+:global(.conversation-action-popper .el-popper__arrow) {
+  display: none;
+}
+
+:global(.conversation-action-menu) {
+  min-width: 156px;
+  padding: 6px;
+}
+
+:global(.conversation-action-menu .el-dropdown-menu__item) {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+:global(.conversation-action-menu .el-dropdown-menu__item:not(.is-disabled):focus),
+:global(.conversation-action-menu .el-dropdown-menu__item:not(.is-disabled):hover) {
+  background: #f7f8fa;
+  color: #111827;
+}
+
+:global(.conversation-action-menu .el-dropdown-menu__item.danger) {
+  color: #dc2626;
+}
+
+:global(.conversation-action-menu .el-dropdown-menu__item.danger:not(.is-disabled):focus),
+:global(.conversation-action-menu .el-dropdown-menu__item.danger:not(.is-disabled):hover) {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.action-icon {
+  width: 1em;
+  text-align: center;
+  line-height: 1;
+}
+
+.conversation-dialog-body {
+  display: grid;
+  gap: 12px;
+}
+
+.conversation-dialog-body strong {
+  color: var(--app-text);
+  font-size: 15px;
+}
+
+.dialog-caption {
+  color: var(--app-text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+:global(.conversation-dialog .el-dialog) {
+  border-radius: 22px;
+}
+
+:global(.conversation-dialog .el-button) {
+  border-radius: 12px;
+}
+
+:global(.danger-dialog .delete-confirm-button) {
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+:global(.danger-dialog .delete-confirm-button:hover),
+:global(.danger-dialog .delete-confirm-button:focus) {
+  background: var(--el-color-danger);
+  border-color: var(--el-color-danger);
+  color: #ffffff;
+  transform: scale(1.02);
+  box-shadow: 0 8px 18px rgba(220, 38, 38, 0.22);
 }
 
 .user-footer {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 12px;
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  margin-top: auto;
+  padding: 10px;
+  border: 1px solid var(--app-border);
   border-radius: 18px;
-  background: #fff;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
 }
 
 .user-avatar {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   overflow: hidden;
   border: 0;
-  border-radius: 14px;
+  border-radius: 999px;
   color: var(--app-primary);
   background: var(--app-primary-soft);
   cursor: pointer;
@@ -325,7 +649,7 @@ function conversationTitle(conversation: Conversation) {
 }
 
 .user-avatar:hover {
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(91, 124, 250, 0.12);
 }
 
 .avatar-action {
@@ -355,9 +679,23 @@ function conversationTitle(conversation: Conversation) {
     width: 100%;
     min-width: 0;
     height: auto;
-    max-height: 48vh;
+    max-height: 46vh;
     border-right: 0;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.86);
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .sidebar-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .chat-sidebar {
+    padding: 12px;
+  }
+
+  .sidebar-nav {
+    grid-template-columns: 1fr;
   }
 }
 </style>

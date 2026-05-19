@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,6 +38,13 @@ public class ConversationController {
         return conversationService.createConversation(principal.getId(), request.title());
     }
 
+    @PatchMapping("/{conversationId}")
+    public ConversationService.ConversationView update(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                       @PathVariable UUID conversationId,
+                                                       @Valid @RequestBody UpdateConversationRequest request) {
+        return conversationService.renameConversation(principal.getId(), conversationId, request.title());
+    }
+
     @GetMapping("/{conversationId}/messages")
     public List<ConversationService.MessageView> messages(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                           @PathVariable UUID conversationId) {
@@ -51,5 +59,8 @@ public class ConversationController {
     }
 
     public record CreateConversationRequest(@Size(max = 160, message = "会话标题不能超过160个字符") String title) {
+    }
+
+    public record UpdateConversationRequest(@Size(max = 160, message = "会话标题不能超过160个字符") String title) {
     }
 }

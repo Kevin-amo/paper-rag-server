@@ -12,6 +12,8 @@ public interface ConversationService {
 
     ConversationView createConversation(UUID ownerUserId, String title);
 
+    ConversationView renameConversation(UUID ownerUserId, UUID conversationId, String title);
+
     ConversationView requireConversation(UUID ownerUserId, UUID conversationId);
 
     ConversationView getOrCreateConversation(UUID ownerUserId, UUID conversationId, String firstQuestion);

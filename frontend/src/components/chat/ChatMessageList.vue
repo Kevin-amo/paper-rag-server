@@ -14,6 +14,7 @@ import type { ConversationMessage } from '../../types';
 const props = defineProps<{
   messages: ConversationMessage[];
   loading?: boolean;
+  currentUserAvatarUrl?: string | null;
 }>();
 
 const listRef = ref<HTMLElement | null>(null);
@@ -26,10 +27,6 @@ const scrollSignal = computed(() => {
   const last = props.messages[props.messages.length - 1];
   return `${props.messages.length}:${last?.id ?? ''}:${last?.content ?? ''}:${last?.streaming ?? false}`;
 });
-
-function formatDate(value: string) {
-  return value ? new Date(value).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
-}
 
 function assistantHtml(content: string) {
   return renderMarkdown(content || '正在生成回答...');
@@ -45,7 +42,12 @@ watch(
 </script>
 
 <template>
-  <div ref="listRef" v-loading="props.loading && !props.messages.some((message) => message.streaming)" class="message-list">
+  <div
+    ref="listRef"
+    v-loading="props.loading && !props.messages.some((message) => message.streaming)"
+    class="message-list"
+    :class="{ 'is-empty': !props.messages.length }"
+  >
     <EmptyState
       v-if="!props.messages.length"
       title="开始和你的论文知识库对话"
@@ -71,12 +73,11 @@ watch(
         class="message-row"
         :class="message.role === 'USER' ? 'from-user' : 'from-assistant'"
       >
-        <div class="message-avatar">{{ message.role === 'USER' ? '我' : 'AI' }}</div>
+        <div class="message-avatar">
+          <img v-if="message.role === 'USER' && props.currentUserAvatarUrl" :src="props.currentUserAvatarUrl" alt="用户头像">
+          <span v-else>{{ message.role === 'USER' ? '我' : 'AI' }}</span>
+        </div>
         <div class="message-body">
-          <div class="message-meta">
-            <strong>{{ message.role === 'USER' ? '你' : '论文助手' }}</strong>
-            <time>{{ formatDate(message.createdAt) }}</time>
-          </div>
           <div v-if="message.role === 'USER'" class="message-content">{{ message.content }}</div>
           <div v-else class="message-content markdown-content" v-html="assistantHtml(message.content)" />
           <span v-if="message.streaming" class="streaming-indicator">正在生成...</span>
@@ -94,11 +95,32 @@ watch(
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 18px;
-  padding: clamp(18px, 3vw, 30px);
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.06), transparent 28rem),
-    linear-gradient(180deg, #f8fbff, #f8fafc);
+  gap: 22px;
+  padding: clamp(24px, 4vw, 44px) 0 150px;
+  background: #ffffff;
+}
+
+.message-list.is-empty {
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 48px 0 64px;
+}
+
+.message-list.is-empty :deep(.empty-state) {
+  width: min(820px, calc(100% - 48px));
+  min-height: 220px;
+  border-color: #e5e7eb;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.message-list.is-empty :deep(.empty-state p) {
+  max-width: 560px;
+}
+
+.message-list.is-empty :deep(.empty-icon) {
+  background: #f3f4f6;
 }
 
 .example-prompts {
@@ -106,96 +128,98 @@ watch(
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .example-prompts button {
-  padding: 9px 13px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
+  padding: 9px 14px;
+  border: 1px solid var(--app-border);
   border-radius: 999px;
   background: #fff;
-  color: var(--app-primary);
+  color: #374151;
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
 }
 
 .example-prompts button:hover {
-  border-color: var(--app-primary);
-  background: var(--app-primary-soft);
+  border-color: #d9e2ff;
+  color: var(--app-primary);
+  transform: translateY(-1px);
 }
 
 .message-row {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: 12px;
-  max-width: min(860px, 92%);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  width: min(910px, calc(100% - 48px));
+  margin-inline: auto;
+  animation: message-in 0.2s ease both;
 }
 
-.from-user {
-  align-self: flex-end;
-  grid-template-columns: minmax(0, 1fr) 38px;
-}
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 
-.from-user .message-avatar {
-  order: 2;
-  color: #fff;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .from-user .message-body {
-  order: 1;
-  border-color: rgba(37, 99, 235, 0.24);
-  background: #2563eb;
-  color: #fff;
+  justify-self: end;
+  max-width: 72%;
+  border-color: #dbe6ff;
+  background: #edf4ff;
+  color: #1f2937;
+  box-shadow: none;
+}
+
+.from-assistant .message-body {
+  width: 100%;
+  max-width: 100%;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .message-avatar {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 14px;
-  background: #e0ecff;
-  color: var(--app-primary);
-  font-size: 12px;
-  font-weight: 900;
+  display: none;
 }
 
 .message-body {
-  padding: 15px 16px;
-  border: 1px solid rgba(226, 232, 240, 0.86);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 14px 38px rgba(15, 23, 42, 0.07);
+  width: fit-content;
+  max-width: 100%;
+  padding: 15px 17px;
+  border: 1px solid var(--app-border);
+  border-radius: 22px;
+  background: #ffffff;
 }
 
-.message-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-  font-size: 12px;
-}
-
-.message-meta time {
-  color: inherit;
-  opacity: 0.68;
+.from-assistant .message-body {
+  padding: 6px 4px;
+  border-radius: 0;
 }
 
 .message-content {
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.78;
+  color: var(--app-text);
+  line-height: 1.82;
 }
 
 .markdown-content {
   white-space: normal;
+  font-size: 15px;
 }
 
 .markdown-content :deep(p) {
-  margin: 0 0 0.75em;
+  margin: 0 0 0.85em;
 }
 
 .markdown-content :deep(p:last-child),
@@ -207,24 +231,46 @@ watch(
 
 .markdown-content :deep(ul),
 .markdown-content :deep(ol) {
-  padding-left: 1.4em;
-  margin: 0.5em 0 0.85em;
+  padding-left: 1.45em;
+  margin: 0.55em 0 0.9em;
+}
+
+.markdown-content :deep(li + li) {
+  margin-top: 0.25em;
 }
 
 .markdown-content :deep(code) {
-  padding: 0.15em 0.35em;
+  padding: 0.15em 0.36em;
   border-radius: 6px;
-  background: #f1f5f9;
-  color: #334155;
+  background: #f3f4f6;
+  color: #374151;
   font-size: 0.92em;
 }
 
 .markdown-content :deep(pre) {
+  position: relative;
   overflow-x: auto;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: #0f172a;
-  color: #e2e8f0;
+  margin: 1em 0;
+  padding: 42px 16px 16px;
+  border: 1px solid #111827;
+  border-radius: 14px;
+  background: #111827;
+  color: #e5e7eb;
+}
+
+.markdown-content :deep(pre::before) {
+  content: 'code';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.1);
+  color: #9ca3af;
+  font-size: 12px;
 }
 
 .markdown-content :deep(pre code) {
@@ -234,15 +280,22 @@ watch(
 }
 
 .markdown-content :deep(blockquote) {
-  margin: 0.7em 0;
-  padding-left: 1em;
-  border-left: 3px solid #cbd5e1;
-  color: #475569;
+  margin: 0.85em 0;
+  padding: 10px 14px;
+  border-left: 3px solid #d9e2ff;
+  border-radius: 0 12px 12px 0;
+  background: #f7f8fa;
+  color: #4b5563;
 }
 
 .markdown-content :deep(a) {
   color: var(--app-primary);
   font-weight: 700;
+  text-decoration: none;
+}
+
+.markdown-content :deep(a:hover) {
+  text-decoration: underline;
 }
 
 .streaming-indicator {
@@ -253,23 +306,34 @@ watch(
   font-weight: 700;
 }
 
-.from-user .message-content {
-  color: #fff;
+.streaming-indicator::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin: 6px 7px 0 0;
+  border-radius: 999px;
+  background: var(--app-primary);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
 }
 
 @media (max-width: 640px) {
+  .message-list {
+    padding-bottom: 178px;
+  }
+
   .message-row,
   .from-user {
-    max-width: 100%;
+    width: calc(100% - 24px);
     grid-template-columns: 1fr;
   }
 
-  .message-avatar {
-    display: none;
-  }
-
   .from-user .message-body {
-    order: initial;
+    max-width: 86%;
   }
 }
 </style>

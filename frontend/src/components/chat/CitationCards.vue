@@ -33,20 +33,26 @@ function scorePercent(score: number) {
 <template>
   <div v-if="visibleCitations.length" class="citation-cards">
     <div class="citation-heading">
-      <el-icon><Document /></el-icon>
-      <span>引用依据</span>
+      <div class="citation-title">
+        <el-icon><Document /></el-icon>
+        <span>引用依据</span>
+      </div>
+      <span class="citation-count">{{ visibleCitations.length }} 条</span>
     </div>
 
     <article v-for="citation in visibleCitations" :key="`${citation.sourceId}-${citation.chunkIndex}`" class="citation-card">
       <div class="citation-topline">
         <strong>{{ citation.title || citation.sourceId || '未命名论文' }}</strong>
-        <el-tag size="small" effect="light" type="success">
+        <span class="score-pill">
           <el-icon><TrendCharts /></el-icon>
           相关度 {{ scorePercent(citation.rankScore) }}
-        </el-tag>
+        </span>
       </div>
-      <p>{{ citation.excerpt || '暂无片段摘要' }}</p>
-      <small>{{ citation.sourceId || '未知来源' }} · 片段 {{ citation.chunkIndex + 1 }}</small>
+      <p :title="citation.excerpt || '暂无片段摘要'">{{ citation.excerpt || '暂无片段摘要' }}</p>
+      <div class="citation-meta">
+        <span>{{ citation.sourceId || '未知来源' }}</span>
+        <span>片段 {{ citation.chunkIndex + 1 }}</span>
+      </div>
     </article>
   </div>
 </template>
@@ -54,24 +60,41 @@ function scorePercent(score: number) {
 <style scoped>
 .citation-cards {
   display: grid;
-  gap: 9px;
-  margin-top: 14px;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 18px;
+  background: #f7f8fa;
 }
 
 .citation-heading {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: #475569;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
 }
 
+.citation-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.citation-count {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .citation-card {
   padding: 12px;
-  border: 1px solid rgba(37, 99, 235, 0.12);
+  border: 1px solid #edf0f4;
   border-radius: 14px;
-  background: linear-gradient(180deg, #fff, #f8fbff);
+  background: #ffffff;
 }
 
 .citation-topline {
@@ -83,27 +106,41 @@ function scorePercent(score: number) {
 
 .citation-topline strong {
   min-width: 0;
-  color: #172554;
+  color: var(--app-text);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.score-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .citation-card p {
   display: -webkit-box;
   overflow: hidden;
-  margin: 8px 0 6px;
-  color: #475569;
+  margin: 9px 0 8px;
+  color: #4b5563;
   font-size: 13px;
-  line-height: 1.65;
+  line-height: 1.7;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
 
-.citation-card small {
-  color: #94a3b8;
-}
-
-.el-tag :deep(.el-icon) {
-  margin-right: 3px;
+.citation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #9ca3af;
+  font-size: 12px;
 }
 </style>

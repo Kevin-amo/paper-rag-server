@@ -200,6 +200,10 @@ export interface CreateConversationPayload {
   title?: string;
 }
 
+export interface UpdateConversationPayload {
+  title: string;
+}
+
 export interface AuthUser {
   id: string;
   username: string;

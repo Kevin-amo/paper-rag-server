@@ -5,6 +5,7 @@ import {
   deleteConversation,
   listConversationMessages,
   listConversations,
+  updateConversation,
 } from '../api/conversations';
 import { getErrorMessage } from '../api/http';
 import type { Conversation, ConversationMessage } from '../types';
@@ -33,13 +34,10 @@ export function useConversations() {
   const activeConversationId = ref<string | null>(null);
   const conversationMessages = ref<ConversationMessage[]>([]);
 
-  async function loadConversations(selectFirst = false) {
+  async function loadConversations() {
     conversationsLoading.value = true;
     try {
       conversations.value = asArray<Conversation>(await listConversations(), '会话列表');
-      if (selectFirst && !activeConversationId.value && conversations.value.length > 0) {
-        await selectConversation(conversations.value[0].id);
-      }
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
     } finally {
@@ -108,6 +106,28 @@ export function useConversations() {
     }
   }
 
+  async function renameConversation(conversationId: string, title: string) {
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) {
+      ElMessage.warning('会话名称不能为空');
+      return;
+    }
+
+    try {
+      const updatedConversation = await updateConversation(conversationId, { title: normalizedTitle });
+      conversations.value = conversations.value.map((conversation) => (
+        conversation.id === conversationId ? updatedConversation : conversation
+      ));
+    } catch (error) {
+      if (isNotFound(error)) {
+        conversations.value = conversations.value.filter((conversation) => conversation.id !== conversationId);
+        ElMessage.success('会话已从列表移除');
+        return;
+      }
+      ElMessage.error(getErrorMessage(error));
+    }
+  }
+
   function isDisposableMessage(message: ConversationMessage) {
     const content = message.content.trim();
     return (!content || content === '-') && !message.citations?.length;
@@ -157,7 +177,7 @@ export function useConversations() {
 
       activeConversationId.value = null;
       conversationMessages.value = [];
-      await loadConversations(true);
+      await loadConversations();
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
     } finally {
@@ -177,6 +197,7 @@ export function useConversations() {
     selectConversation,
     createNewConversation,
     removeConversation,
+    renameConversation,
     cleanEmptyConversations,
   };
 }

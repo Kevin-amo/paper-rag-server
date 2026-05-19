@@ -278,9 +278,11 @@ public class DocumentController {
                                                      String sourceId,
                                                      String title,
                                                      String fallbackFileName) throws IOException {
+        // 生成jobId和sourceId
         UUID jobId = UUID.randomUUID();
         String resolvedSourceId = sourceId == null || sourceId.isBlank() ? UUID.randomUUID().toString() : sourceId.trim();
         String fileName = fallbackFileName == null || fallbackFileName.isBlank() ? file.getOriginalFilename() : fallbackFileName;
+        // 保存上传文件到本地
         DocumentUploadStorageService.StoredUpload upload = documentUploadStorageService.store(
                 ownerUserId,
                 resolvedSourceId,
@@ -288,6 +290,7 @@ public class DocumentController {
                 file,
                 fileName
         );
+        // 创建数据库任务记录
         DocumentIngestionJob job = documentIngestionJobService.createJob(
                 jobId,
                 ownerUserId,
@@ -296,6 +299,7 @@ public class DocumentController {
                 upload.filePath(),
                 title
         );
+        // 投递RabbitMQ消息（只传递任务索引，后续消费者根据jobId去数据库查任务）
         documentIngestionProducer.publish(new DocumentIngestionMessage(job.getId(), ownerUserId, resolvedSourceId));
         return documentIngestionJobService.findJob(ownerUserId, job.getId()).orElse(job);
     }
