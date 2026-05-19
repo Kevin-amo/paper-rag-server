@@ -50,7 +50,7 @@ class DocumentIngestionServiceImplTest {
                 paperDocumentPersistenceService,
                 documentIngestionJobService,
                 documentUploadStorageService,
-                new DocumentIngestionProperties("storage", true, 3, new DocumentIngestionProperties.Listener(2, 4))
+                new DocumentIngestionProperties("storage", true, 3, new DocumentIngestionProperties.Listener(2, 4), null)
         );
     }
 
@@ -102,6 +102,38 @@ class DocumentIngestionServiceImplTest {
         verify(documentIngestionJobService).markRunningStage(ownerUserId, jobId, "source-1", DocumentIngestionJobService.STATUS_EMBEDDING, 80);
         verify(documentIngestionJobService).markIndexed(ownerUserId, jobId, "source-1");
         verify(paperDocumentPersistenceService).markIndexed(ownerUserId, "source-1", 1);
+    }
+
+    @Test
+    void processJobShouldDeleteUploadFileAfterIndexedWhenKeepUploadFileIsFalse() throws Exception {
+        service = new DocumentIngestionServiceImpl(
+                documentParsingService,
+                documentSplittingService,
+                embeddingService,
+                vectorWriteService,
+                paperDocumentPersistenceService,
+                documentIngestionJobService,
+                documentUploadStorageService,
+                new DocumentIngestionProperties("storage", false, 3, new DocumentIngestionProperties.Listener(2, 4), null)
+        );
+        Fixture fixture = fixture();
+        UUID ownerUserId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        DocumentIngestionJob job = new DocumentIngestionJob();
+        job.setId(jobId);
+        job.setOwnerUserId(ownerUserId);
+        job.setSourceId("source-1");
+        job.setFileName("scan.png");
+        job.setFilePath("storage/scan.png");
+        byte[] content = "scan-bytes".getBytes();
+        when(documentUploadStorageService.read("storage/scan.png")).thenReturn(content);
+        when(documentParsingService.parse(eq("scan.png"), eq(content), any())).thenReturn(fixture.parsedDocument());
+        when(documentSplittingService.split(fixture.source(), "页面文本")).thenReturn(List.of(fixture.chunk()));
+        when(embeddingService.embed(List.of(fixture.chunk()))).thenReturn(List.of());
+
+        service.processJob(job);
+
+        verify(documentUploadStorageService).delete("storage/scan.png");
     }
 
     private Fixture fixture() {

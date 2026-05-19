@@ -80,8 +80,12 @@ app:
         - image/webp
   document-ingestion:
     storage-dir: ${DOCUMENT_INGESTION_STORAGE_DIR:storage/document-ingestion}
-    keep-upload-file: ${DOCUMENT_INGESTION_KEEP_UPLOAD_FILE:true}
+    keep-upload-file: ${DOCUMENT_INGESTION_KEEP_UPLOAD_FILE:false}
     max-retry-count: ${DOCUMENT_INGESTION_MAX_RETRY_COUNT:3}
+    cleanup:
+      enabled: ${DOCUMENT_INGESTION_CLEANUP_ENABLED:true}
+      retention: ${DOCUMENT_INGESTION_CLEANUP_RETENTION:24h}
+      cron: "${DOCUMENT_INGESTION_CLEANUP_CRON:0 0 * * * *}"
     listener:
       concurrency: ${DOCUMENT_INGESTION_LISTENER_CONCURRENCY:2}
       max-concurrency: ${DOCUMENT_INGESTION_LISTENER_MAX_CONCURRENCY:4}

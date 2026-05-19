@@ -42,8 +42,12 @@ app:
     similarity-threshold: 0
   document-ingestion:
     storage-dir: storage/document-ingestion
-    keep-upload-file: true
+    keep-upload-file: false
     max-retry-count: 3
+    cleanup:
+      enabled: true
+      retention: 24h
+      cron: "0 0 * * * *"
     listener:
       concurrency: 2
       max-concurrency: 4

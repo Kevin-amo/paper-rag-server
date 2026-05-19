@@ -32,7 +32,7 @@ class DocumentIngestionConsumerTest {
                 jobService,
                 ingestionService,
                 producer,
-                new DocumentIngestionProperties("storage", true, 2, new DocumentIngestionProperties.Listener(2, 4))
+                new DocumentIngestionProperties("storage", true, 2, new DocumentIngestionProperties.Listener(2, 4), null)
         );
     }
 

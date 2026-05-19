@@ -21,7 +21,7 @@ class LocalDocumentUploadStorageServiceTest {
     @Test
     void storeShouldSanitizeFileNameAndPersistUnderOwnerAndSource() throws Exception {
         DocumentIngestionProperties properties = new DocumentIngestionProperties(
-                tempDir.toString(), true, 3, new DocumentIngestionProperties.Listener(2, 4)
+                tempDir.toString(), true, 3, new DocumentIngestionProperties.Listener(2, 4), null
         );
         LocalDocumentUploadStorageService service = new LocalDocumentUploadStorageService(properties);
         UUID ownerUserId = UUID.randomUUID();
