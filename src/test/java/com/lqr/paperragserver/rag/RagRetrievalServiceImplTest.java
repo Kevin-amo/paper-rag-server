@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.rag;
 
+import com.lqr.paperragserver.ai.service.RerankService;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
@@ -19,6 +20,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,13 +32,16 @@ class RagRetrievalServiceImplTest {
 
     private final VectorStore vectorStore = mock(VectorStore.class);
     private final PaperDocumentPersistenceService paperDocumentPersistenceService = mock(PaperDocumentPersistenceService.class);
+    private final RerankService rerankService = mock(RerankService.class);
     private final RagProperties ragProperties = new RagProperties(800, 120, 5, 0);
     private final UUID ownerUserId = UUID.randomUUID();
     private RagRetrievalServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new RagRetrievalServiceImpl(vectorStore, ragProperties, paperDocumentPersistenceService);
+        when(rerankService.rerank(anyString(), anyList(), anyInt()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        service = new RagRetrievalServiceImpl(vectorStore, ragProperties, paperDocumentPersistenceService, rerankService);
     }
 
     @Test
@@ -98,6 +106,41 @@ class RagRetrievalServiceImplTest {
         assertThat(results.get(0).rankScore()).isGreaterThan(results.get(1).rankScore());
         assertThat(results.get(1).chunk().chunkId()).isEqualTo("chunk-a");
         assertThat(results.get(1).rankScore()).isGreaterThan(0d);
+    }
+
+    @Test
+    void retrieveShouldUseRerankResultBeforeFinalTopK() {
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+
+        DocumentChunk lexicalFirst = new DocumentChunk(
+                "chunk-a",
+                "source-1",
+                0,
+                "A content",
+                Map.of("title", "Paper A")
+        );
+        DocumentChunk lexicalSecond = new DocumentChunk(
+                "chunk-b",
+                "source-1",
+                1,
+                "B content",
+                Map.of("title", "Paper B")
+        );
+        when(paperDocumentPersistenceService.searchChunks(ownerUserId, "精排测试", 6))
+                .thenReturn(List.of(lexicalFirst, lexicalSecond));
+        when(rerankService.rerank(eq("精排测试"), anyList(), eq(2)))
+                .thenReturn(List.of(
+                        new RetrievedChunk(lexicalSecond, 0.98),
+                        new RetrievedChunk(lexicalFirst, 0.12)
+                ));
+
+        List<RetrievedChunk> results = service.retrieve(ownerUserId, "精排测试", 2);
+
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).chunk().chunkId()).isEqualTo("chunk-b");
+        assertThat(results.get(0).rankScore()).isEqualTo(0.98);
+        assertThat(results.get(1).chunk().chunkId()).isEqualTo("chunk-a");
+        verify(rerankService).rerank(eq("精排测试"), anyList(), eq(2));
     }
 
     private PaperDocumentPersistenceService.DocumentDetail indexedDocument(String sourceId) {

@@ -34,6 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        // 尝试从请求头或资源访问参数中解析访问令牌
         String token = resolveToken(request);
         if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {

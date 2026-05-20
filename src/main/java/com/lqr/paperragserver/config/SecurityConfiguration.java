@@ -47,12 +47,14 @@ public class SecurityConfiguration {
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.ASYNC).permitAll()
+                        // 放行登录注册接口
                         .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/register", "/auth/register/email-code").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/documents/**", "/rag/**", "/conversations/**").hasRole("USER")
                         .requestMatchers("/auth/**").authenticated()
                         .anyRequest().authenticated())
+                // 在 UsernamePasswordAuthenticationFilter 之前插入jwt过滤器
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

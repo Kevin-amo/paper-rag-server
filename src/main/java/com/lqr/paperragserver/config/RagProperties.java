@@ -1,6 +1,9 @@
 package com.lqr.paperragserver.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
+
+import java.time.Duration;
 
 /**
  * RAG 业务配置
@@ -15,12 +18,19 @@ public record RagProperties(
         /* 问答检索时默认召回的片段数量。 */
         int defaultTopK,
         /* 向量检索相似度阈值，0 表示接受全部结果。 */
-        double similarityThreshold
+        double similarityThreshold,
+        /* 精排序配置。 */
+        RerankProperties rerank
 ) {
+
+    public RagProperties(int chunkSize, int chunkOverlap, int defaultTopK, double similarityThreshold) {
+        this(chunkSize, chunkOverlap, defaultTopK, similarityThreshold, null);
+    }
 
     /**
      * 提供默认配置，防止配置文件缺失时服务无法启动。
      */
+    @ConstructorBinding
     public RagProperties {
         if (chunkSize <= 0) {
             chunkSize = 800;
@@ -36,6 +46,37 @@ public record RagProperties(
         }
         if (similarityThreshold < 0) {
             similarityThreshold = 0;
+        }
+        if (rerank == null) {
+            rerank = new RerankProperties(true, "gte-rerank-v2", 5, 3, Duration.ofSeconds(10), "https://dashscope.aliyuncs.com");
+        }
+    }
+
+    public record RerankProperties(
+            boolean enabled,
+            String model,
+            int topN,
+            int candidateMultiplier,
+            Duration timeout,
+            String baseUrl
+    ) {
+
+        public RerankProperties {
+            if (model == null || model.isBlank()) {
+                model = "qwen3-rerank";
+            }
+            if (topN <= 0) {
+                topN = 5;
+            }
+            if (candidateMultiplier <= 0) {
+                candidateMultiplier = 3;
+            }
+            if (timeout == null || timeout.isNegative() || timeout.isZero()) {
+                timeout = Duration.ofSeconds(10);
+            }
+            if (baseUrl == null || baseUrl.isBlank()) {
+                baseUrl = "https://dashscope.aliyuncs.com";
+            }
         }
     }
 }
