@@ -1,6 +1,7 @@
 package com.lqr.paperragserver.auth.security;
 
 import com.lqr.paperragserver.auth.entity.SysUser;
+import com.lqr.paperragserver.auth.service.TokenRevocationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
@@ -17,16 +18,23 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * JWT 认证过滤器测试，验证访问令牌解析后能写入 Spring Security 上下文。
+ * JWT 认证过滤器测试，验证访问令牌解析、撤销拦截和安全上下文写入。
  */
 class JwtAuthenticationFilterTest {
 
     private final JwtDecoder jwtDecoder = mock(JwtDecoder.class);
     private final DatabaseUserDetailsService userDetailsService = mock(DatabaseUserDetailsService.class);
-    private final JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtDecoder, userDetailsService);
+    private final TokenRevocationService tokenRevocationService = mock(TokenRevocationService.class);
+    private final JwtAuthenticationFilter filter = new JwtAuthenticationFilter(
+            jwtDecoder,
+            userDetailsService,
+            tokenRevocationService
+    );
 
     @AfterEach
     void clearSecurityContext() {
@@ -53,6 +61,21 @@ class JwtAuthenticationFilterTest {
         assertThat(authentication).isNotNull();
         assertThat(authentication.getName()).isEqualTo("alice");
         assertThat(authentication.getAuthorities()).extracting("authority").containsExactly("ROLE_USER");
+    }
+
+    @Test
+    void shouldRejectRevokedBearerToken() throws Exception {
+        when(tokenRevocationService.isRevoked("revoked-token")).thenReturn(true);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer revoked-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(jwtDecoder, never()).decode("revoked-token");
+        verify(userDetailsService, never()).loadUserByUsername("alice");
     }
 
     @Test

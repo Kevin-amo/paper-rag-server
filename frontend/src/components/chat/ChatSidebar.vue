@@ -280,7 +280,6 @@ function conversationTitle(conversation: Conversation) {
       </button>
       <div class="user-meta">
         <strong>{{ props.currentUserName }}</strong>
-        <button type="button" class="avatar-action" @click="emit('openAvatarUpload')">更换头像</button>
       </div>
       <el-button circle text :icon="SwitchButton" title="退出登录" @click="emit('logout')" />
     </footer>

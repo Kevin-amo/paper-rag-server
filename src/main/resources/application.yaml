@@ -94,6 +94,17 @@ app:
       issuer: ${JWT_ISSUER:paper-rag-server}
       secret: ${JWT_SECRET:paper-rag-server-local-development-secret-change-before-production}
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:2h}
+    register-email-code:
+      code-ttl: ${REGISTER_EMAIL_CODE_TTL:5m}
+      email-cooldown: ${REGISTER_EMAIL_CODE_EMAIL_COOLDOWN:60s}
+      email-daily-limit: ${REGISTER_EMAIL_CODE_EMAIL_DAILY_LIMIT:10}
+      ip-minute-limit: ${REGISTER_EMAIL_CODE_IP_MINUTE_LIMIT:20}
+      ip-daily-limit: ${REGISTER_EMAIL_CODE_IP_DAILY_LIMIT:200}
+    login-attempt:
+      enabled: ${LOGIN_ATTEMPT_ENABLED:true}
+      max-failures: ${LOGIN_ATTEMPT_MAX_FAILURES:5}
+      window: ${LOGIN_ATTEMPT_WINDOW:10m}
+      lock-duration: ${LOGIN_ATTEMPT_LOCK_DURATION:10m}
     bootstrap-admin:
       enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
       username: ${BOOTSTRAP_ADMIN_USERNAME:admin}

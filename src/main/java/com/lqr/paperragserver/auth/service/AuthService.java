@@ -7,11 +7,13 @@ import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
  */
 public interface AuthService {
 
-    LoginResult login(String username, String password);
+    LoginResult login(String username, String password, String clientIp);
 
-    void createRegisterEmailCode(String email);
+    void createRegisterEmailCode(String email, String clientIp);
 
     LoginResult registerWithEmailCode(String username, String password, String email, String emailCode);
+
+    void logout(String token);
 
     CurrentUser currentUser(SecurityUserPrincipal principal);
 

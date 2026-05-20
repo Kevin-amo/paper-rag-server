@@ -3,11 +3,13 @@ package com.lqr.paperragserver.web;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.auth.service.AuthService;
 import com.lqr.paperragserver.auth.service.UserAvatarService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,13 +31,13 @@ public class AuthController {
     private final UserAvatarService userAvatarService;
 
     @PostMapping("/login")
-    public AuthService.LoginResult login(@Valid @RequestBody LoginRequest request) {
-        return authService.login(request.username(), request.password());
+    public AuthService.LoginResult login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        return authService.login(request.username(), request.password(), clientIp(httpRequest));
     }
 
     @PostMapping("/register/email-code")
-    public void createRegisterEmailCode(@Valid @RequestBody RegisterEmailCodeRequest request) {
-        authService.createRegisterEmailCode(request.email());
+    public void createRegisterEmailCode(@Valid @RequestBody RegisterEmailCodeRequest request, HttpServletRequest httpRequest) {
+        authService.createRegisterEmailCode(request.email(), clientIp(httpRequest));
     }
 
     @PostMapping("/register")
@@ -55,8 +57,29 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public void logout() {
-        // JWT 第一版为无状态退出，前端清理本地 token 即可。
+    public void logout(HttpServletRequest request) {
+        authService.logout(resolveBearerToken(request));
+    }
+
+    private String resolveBearerToken(HttpServletRequest request) {
+        String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
+            return null;
+        }
+        String token = authorization.substring("Bearer ".length()).trim();
+        return token.isBlank() ? null : token;
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",", 2)[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 
     /**

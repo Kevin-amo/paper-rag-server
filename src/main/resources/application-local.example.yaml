@@ -40,6 +40,18 @@ app:
     chunk-overlap: 120
     default-top-k: 5
     similarity-threshold: 0
+  security:
+    register-email-code:
+      code-ttl: 5m
+      email-cooldown: 60s
+      email-daily-limit: 10
+      ip-minute-limit: 20
+      ip-daily-limit: 200
+    login-attempt:
+      enabled: true
+      max-failures: 5
+      window: 15m
+      lock-duration: 15m
   document-ingestion:
     storage-dir: storage/document-ingestion
     keep-upload-file: false

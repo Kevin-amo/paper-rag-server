@@ -10,7 +10,10 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "app.security")
 public record SecurityProperties(
         Jwt jwt,
-        BootstrapAdmin bootstrapAdmin
+        BootstrapAdmin bootstrapAdmin,
+        RegisterEmailCode registerEmailCode,
+        LoginAttempt loginAttempt,
+        UserDetailsCache userDetailsCache
 ) {
     public SecurityProperties {
         if (jwt == null) {
@@ -18,6 +21,15 @@ public record SecurityProperties(
         }
         if (bootstrapAdmin == null) {
             bootstrapAdmin = new BootstrapAdmin(false, null, null, null);
+        }
+        if (registerEmailCode == null) {
+            registerEmailCode = new RegisterEmailCode(null, null, 0, 0, 0);
+        }
+        if (loginAttempt == null) {
+            loginAttempt = new LoginAttempt(true, 0, null, null);
+        }
+        if (userDetailsCache == null) {
+            userDetailsCache = new UserDetailsCache(true, null);
         }
     }
 
@@ -59,6 +71,71 @@ public record SecurityProperties(
             }
             if (displayName == null || displayName.isBlank()) {
                 displayName = "系统管理员";
+            }
+        }
+    }
+
+    /**
+     * 注册邮箱验证码与发送频控配置。
+     */
+    public record RegisterEmailCode(
+            Duration codeTtl,
+            Duration emailCooldown,
+            int emailDailyLimit,
+            int ipMinuteLimit,
+            int ipDailyLimit
+    ) {
+        public RegisterEmailCode {
+            if (codeTtl == null || codeTtl.isNegative() || codeTtl.isZero()) {
+                codeTtl = Duration.ofMinutes(5);
+            }
+            if (emailCooldown == null || emailCooldown.isNegative() || emailCooldown.isZero()) {
+                emailCooldown = Duration.ofSeconds(60);
+            }
+            if (emailDailyLimit <= 0) {
+                emailDailyLimit = 10;
+            }
+            if (ipMinuteLimit <= 0) {
+                ipMinuteLimit = 20;
+            }
+            if (ipDailyLimit <= 0) {
+                ipDailyLimit = 200;
+            }
+        }
+    }
+
+    /**
+     * 登录失败尝试锁定配置。
+     */
+    public record LoginAttempt(
+            boolean enabled,
+            int maxFailures,
+            Duration window,
+            Duration lockDuration
+    ) {
+        public LoginAttempt {
+            if (maxFailures <= 0) {
+                maxFailures = 5;
+            }
+            if (window == null || window.isNegative() || window.isZero()) {
+                window = Duration.ofMinutes(10);
+            }
+            if (lockDuration == null || lockDuration.isNegative() || lockDuration.isZero()) {
+                lockDuration = Duration.ofMinutes(10);
+            }
+        }
+    }
+
+    /**
+     * 用户详情缓存配置。
+     */
+    public record UserDetailsCache(
+            boolean enabled,
+            Duration ttl
+    ) {
+        public UserDetailsCache {
+            if (ttl == null || ttl.isNegative() || ttl.isZero()) {
+                ttl = Duration.ofMinutes(10);
             }
         }
     }

@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
@@ -48,6 +49,10 @@ public class JwtTokenService {
         } catch (JwtException ex) {
             return false;
         }
+    }
+
+    public Jwt decode(String token) {
+        return jwtDecoder.decode(token);
     }
 
     public long accessTokenExpiresInSeconds() {

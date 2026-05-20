@@ -10,7 +10,7 @@ public interface VerificationCodeService {
      *
      * @param email 邮箱地址
      */
-    void createRegisterEmailCode(String email);
+    void createRegisterEmailCode(String email, String clientIp);
 
     /**
      * 校验邮箱注册验证码
