@@ -1,9 +1,10 @@
 package com.lqr.paperragserver.rag.impl;
 
+import com.lqr.paperragserver.ai.service.RerankService;
+import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
-import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import org.springframework.ai.document.Document;
@@ -27,6 +28,7 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
     private final VectorStore vectorStore;
     private final RagProperties ragProperties;
     private final PaperDocumentPersistenceService paperDocumentPersistenceService;
+    private final RerankService rerankService;
 
     /**
      * 创建向量检索服务并保存运行配置。
@@ -36,10 +38,12 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
      */
     public RagRetrievalServiceImpl(VectorStore vectorStore,
                                    RagProperties ragProperties,
-                                   PaperDocumentPersistenceService paperDocumentPersistenceService) {
+                                   PaperDocumentPersistenceService paperDocumentPersistenceService,
+                                   RerankService rerankService) {
         this.vectorStore = vectorStore;
         this.ragProperties = ragProperties;
         this.paperDocumentPersistenceService = paperDocumentPersistenceService;
+        this.rerankService = rerankService;
     }
 
     /**
@@ -55,9 +59,10 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
             return List.of();
         }
         int resolvedTopK = topK > 0 ? topK : ragProperties.defaultTopK();
+        int candidateTopK = rerankCandidateTopK(resolvedTopK);
         SearchRequest.Builder builder = SearchRequest.builder()
                 .query(question)
-                .topK(resolvedTopK);
+                .topK(candidateTopK);
         double similarityThreshold = ragProperties.similarityThreshold();
         if (similarityThreshold > 0) {
             builder.similarityThreshold(similarityThreshold);
@@ -101,13 +106,21 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
             chunkById.putIfAbsent(chunkId, chunk.chunk());
             scoreById.merge(chunkId, chunk.rankScore(), Double::sum);
         }
-        return chunkById.entrySet().stream()
+        List<RetrievedChunk> fusionRankedCandidates = chunkById.entrySet().stream()
                 .map(entry -> new RetrievedChunk(entry.getValue(), scoreById.getOrDefault(entry.getKey(), 0.0)))
                 .sorted(Comparator.comparingDouble(RetrievedChunk::rankScore).reversed()
                         .thenComparing(retrieved -> retrieved.chunk().sourceId(), Comparator.nullsLast(String::compareTo))
                         .thenComparingInt(retrieved -> retrieved.chunk().chunkIndex()))
+                .limit(candidateTopK)
+                .toList();
+        return rerankService.rerank(question, fusionRankedCandidates, resolvedTopK).stream()
                 .limit(resolvedTopK)
                 .toList();
+    }
+
+    private int rerankCandidateTopK(int resolvedTopK) {
+        int multiplier = ragProperties.rerank().candidateMultiplier();
+        return Math.max(resolvedTopK * multiplier, resolvedTopK);
     }
 
     /**

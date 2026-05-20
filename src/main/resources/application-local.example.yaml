@@ -40,6 +40,13 @@ app:
     chunk-overlap: 120
     default-top-k: 5
     similarity-threshold: 0
+    rerank:
+      enabled: true
+      model: gte-rerank-v2
+      top-n: 5
+      candidate-multiplier: 3
+      timeout: 10s
+      base-url: https://dashscope.aliyuncs.com
   security:
     register-email-code:
       code-ttl: 5m

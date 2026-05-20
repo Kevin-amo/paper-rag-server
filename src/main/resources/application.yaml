@@ -1,4 +1,4 @@
-﻿spring:
+spring:
   application:
     name: paper-rag-server
   servlet:
@@ -78,6 +78,17 @@ app:
         - image/jpeg
         - image/png
         - image/webp
+  rag:
+    chunk-size: ${RAG_CHUNK_SIZE:800}
+    chunk-overlap: ${RAG_CHUNK_OVERLAP:120}
+    default-top-k: ${RAG_DEFAULT_TOP_K:3}
+    similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0}
+    rerank:
+      enabled: ${RAG_RERANK_ENABLED:true}
+      model: ${RAG_RERANK_MODEL:qwen3-rerank}
+      candidate-multiplier: ${RAG_RERANK_CANDIDATE_MULTIPLIER:3}
+      timeout: ${RAG_RERANK_TIMEOUT:10s}
+      base-url: ${RAG_RERANK_BASE_URL:https://dashscope.aliyuncs.com}
   document-ingestion:
     storage-dir: ${DOCUMENT_INGESTION_STORAGE_DIR:storage/document-ingestion}
     keep-upload-file: ${DOCUMENT_INGESTION_KEEP_UPLOAD_FILE:false}
