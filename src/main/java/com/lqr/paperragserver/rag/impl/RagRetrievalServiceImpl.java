@@ -7,6 +7,8 @@ import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
 import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
+import jdk.jfr.Registered;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -23,6 +25,7 @@ import java.util.UUID;
  * 基于向量库的检索实现。
  */
 @Service
+@RequiredArgsConstructor
 public class RagRetrievalServiceImpl implements RagRetrievalService {
 
     private final VectorStore vectorStore;
@@ -31,23 +34,7 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
     private final RerankService rerankService;
 
     /**
-     * 创建向量检索服务并保存运行配置。
-     *
-     * @param vectorStore 向量存储实例
-     * @param ragProperties 检索相关配置
-     */
-    public RagRetrievalServiceImpl(VectorStore vectorStore,
-                                   RagProperties ragProperties,
-                                   PaperDocumentPersistenceService paperDocumentPersistenceService,
-                                   RerankService rerankService) {
-        this.vectorStore = vectorStore;
-        this.ragProperties = ragProperties;
-        this.paperDocumentPersistenceService = paperDocumentPersistenceService;
-        this.rerankService = rerankService;
-    }
-
-    /**
-     * 根据问题从向量库召回最相关的文档分块。
+     * 根据问题从向量库召回最相关的文档分块。1
      *
      * @param question 用户问题
      * @param topK 召回数量

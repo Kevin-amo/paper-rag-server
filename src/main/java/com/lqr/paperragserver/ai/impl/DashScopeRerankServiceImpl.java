@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.lqr.paperragserver.ai.service.RerankService;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,7 @@ import java.util.Set;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DashScopeRerankServiceImpl implements RerankService {
 
     private static final String RERANK_PATH = "/api/v1/services/rerank/text-rerank/text-rerank";
@@ -41,16 +43,13 @@ public class DashScopeRerankServiceImpl implements RerankService {
         this(restClientBuilder, ragProperties, apiKey, true);
     }
 
-    DashScopeRerankServiceImpl(RestClient.Builder restClientBuilder,
-                               RagProperties ragProperties,
-                               String apiKey,
-                               boolean configureRequestTimeout) {
-        this.restClientBuilder = restClientBuilder;
-        this.ragProperties = ragProperties;
-        this.apiKey = apiKey;
-        this.configureRequestTimeout = configureRequestTimeout;
-    }
-
+    /**
+     * 基于 DashScope rerank API 的检索候选精排序实现。
+     * @param question 用户问题
+     * @param candidates 已完成权限过滤和候选融合的片段
+     * @param topN 期望返回数量
+     * @return 检索候选片段
+     */
     @Override
     public List<RetrievedChunk> rerank(String question, List<RetrievedChunk> candidates, int topN) {
         if (!available(question, candidates, topN)) {

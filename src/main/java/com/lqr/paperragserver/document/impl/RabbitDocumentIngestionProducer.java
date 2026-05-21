@@ -20,12 +20,14 @@ public class RabbitDocumentIngestionProducer implements DocumentIngestionProduce
 
     @Override
     public void publish(DocumentIngestionMessage message) {
+        // 投递RabbitMQ消息（只传递任务索引，后续消费者根据jobId去数据库查任务）
         try {
             rabbitTemplate.convertAndSend(
                     DocumentIngestionRabbitConfiguration.EXCHANGE,
                     DocumentIngestionRabbitConfiguration.ROUTING_KEY,
                     message
             );
+            // 标记任务已投递
             documentIngestionJobService.markQueued(message.ownerUserId(), message.jobId());
         } catch (RuntimeException ex) {
             documentIngestionJobService.markFailed(message.ownerUserId(), message.jobId(), message.sourceId(), ex.getMessage());

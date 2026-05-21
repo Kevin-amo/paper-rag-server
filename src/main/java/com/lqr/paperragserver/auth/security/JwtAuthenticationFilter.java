@@ -38,12 +38,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
         if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
+                // 判断 token 是否在黑名单（退出登录）
                 if (tokenRevocationService.isRevoked(token)) {
                     SecurityContextHolder.clearContext();
                     filterChain.doFilter(request, response);
                     return;
                 }
+                // 解码 JWT 获取 username
                 String username = jwtDecoder.decode(token).getSubject();
+                // 从数据库（先从Redis里找）加载用户和角色
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails,

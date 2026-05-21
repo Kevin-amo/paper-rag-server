@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.persistence.typehandler;
+package com.lqr.paperragserver.common.typehandler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.persistence.typehandler;
+package com.lqr.paperragserver.common.typehandler;
 
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
@@ -11,6 +11,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.UUID;
 
+/**
+ * 用于 PostgreSQL uuid 字段和 Java UUID 之间转换
+ */
 @MappedJdbcTypes(value = JdbcType.OTHER, includeNullJdbcType = true)
 @MappedTypes(UUID.class)
 public class UuidTypeHandler extends BaseTypeHandler<UUID> {

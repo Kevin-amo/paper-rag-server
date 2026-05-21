@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.lqr.paperragserver.persistence.typehandler.JsonbTypeHandler;
-import com.lqr.paperragserver.persistence.typehandler.UuidTypeHandler;
+import com.lqr.paperragserver.common.typehandler.JsonbTypeHandler;
+import com.lqr.paperragserver.common.typehandler.UuidTypeHandler;
 import lombok.Data;
 
 import java.time.OffsetDateTime;

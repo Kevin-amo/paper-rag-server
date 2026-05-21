@@ -42,7 +42,7 @@ public record RagProperties(
             chunkOverlap = Math.max(0, chunkSize / 5);
         }
         if (defaultTopK <= 0) {
-            defaultTopK = 5;
+            defaultTopK = 3;
         }
         if (similarityThreshold < 0) {
             similarityThreshold = 0;
