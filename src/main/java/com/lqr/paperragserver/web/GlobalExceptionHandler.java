@@ -1,5 +1,7 @@
 package com.lqr.paperragserver.web;
 
+import com.lqr.paperragserver.literature.LiteratureSearchException;
+import com.lqr.paperragserver.mcp.McpException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +33,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiErrorResponse> handleBadCredentials(BadCredentialsException ex, HttpServletRequest request) {
         return build(HttpStatus.UNAUTHORIZED, "BAD_CREDENTIALS", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(LiteratureSearchException.class)
+    public ResponseEntity<ApiErrorResponse> handleLiteratureSearchException(LiteratureSearchException ex, HttpServletRequest request) {
+        return build(ex.status(), ex.code(), ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(McpException.class)
+    public ResponseEntity<ApiErrorResponse> handleMcpException(McpException ex, HttpServletRequest request) {
+        return build(ex.status(), ex.code(), ex.getMessage(), request);
     }
 
     @ExceptionHandler(ResponseStatusException.class)

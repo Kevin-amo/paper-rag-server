@@ -10,6 +10,22 @@ import {
 import { getErrorMessage } from '../api/http';
 import type { Conversation, ConversationMessage } from '../types';
 
+function responseShape(value: unknown) {
+  if (value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value)) {
+    return 'array';
+  }
+  if (typeof value === 'string') {
+    return `string: ${value.slice(0, 80)}`;
+  }
+  if (typeof value === 'object') {
+    return `object keys: ${Object.keys(value).join(', ') || '(empty)'}`;
+  }
+  return typeof value;
+}
+
 function asArray<T>(value: T[] | { items?: T[] } | unknown, label: string): T[] {
   if (Array.isArray(value)) {
     return value;
@@ -19,7 +35,7 @@ function asArray<T>(value: T[] | { items?: T[] } | unknown, label: string): T[] 
     return value.items;
   }
 
-  throw new Error(`${label} 接口返回格式异常`);
+  throw new Error(`${label} 接口返回格式异常（${responseShape(value)}）`);
 }
 
 function isNotFound(error: unknown) {

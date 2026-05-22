@@ -23,6 +23,10 @@ export default defineConfig(({ mode }) => {
           target,
           changeOrigin: true,
         },
+        '/literature': {
+          target,
+          changeOrigin: true,
+        },
         '/auth': {
           target,
           changeOrigin: true,

@@ -147,10 +147,40 @@ export interface BatchDocumentIngestionResponse {
   failureCount: number;
 }
 
+export type ChatMode = 'rag' | 'literature';
+
 export interface AskQuestionPayload {
   conversationId?: string;
   question: string;
   topK?: number;
+}
+
+export interface LiteratureSearchPayload {
+  query: string;
+  limit?: number;
+  categories?: string[];
+  dateFrom?: string;
+  sortBy?: 'relevance' | 'date';
+}
+
+export interface LiteratureSearchResult {
+  title: string | null;
+  authors: string[];
+  abstractText: string | null;
+  year: number | null;
+  publishedDate: string | null;
+  updatedDate: string | null;
+  categories: string[];
+  primaryCategory: string | null;
+  doi: string | null;
+  url: string | null;
+  pdfUrl: string | null;
+  source: string;
+  externalId: string | null;
+}
+
+export interface LiteratureSearchResponse {
+  items: LiteratureSearchResult[];
 }
 
 export interface AnswerCitation {
