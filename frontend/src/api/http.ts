@@ -10,12 +10,17 @@ export const http = axios.create({
   timeout: 30000,
 });
 
+export const literatureHttp = axios.create({
+  baseURL: apiPrefix,
+  timeout: 120000,
+});
+
 export const uploadHttp = axios.create({
   baseURL: apiPrefix,
   timeout: 300000,
 });
 
-[http, uploadHttp].forEach((client) => {
+[http, literatureHttp, uploadHttp].forEach((client) => {
   client.interceptors.request.use((config) => {
     const token = getAccessToken();
     if (token) {

@@ -13,6 +13,8 @@ import { useAuth } from '../composables/useAuth';
 import { useDocuments } from '../composables/useDocuments';
 import { useConversations } from '../composables/useConversations';
 import { useRagChat } from '../composables/useRagChat';
+import { useLiteratureSearch } from '../composables/useLiteratureSearch';
+import type { ChatMode } from '../types';
 
 const router = useRouter();
 const auth = useAuth();
@@ -23,6 +25,7 @@ const uploadVisible = ref(false);
 const avatarUploadVisible = ref(false);
 const avatarUploading = ref(false);
 const avatarRefreshVersion = ref(0);
+const chatMode = ref<ChatMode>('rag');
 
 const ragState = useRagChat({
   activeConversationId: conversationsState.activeConversationId,
@@ -31,6 +34,7 @@ const ragState = useRagChat({
   loadConversations: () => conversationsState.loadConversations(),
   loadMessages: conversationsState.loadMessages,
 });
+const literatureState = useLiteratureSearch();
 
 const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '当前用户');
 const currentUserAvatarUrl = computed(() => buildAvatarDisplayUrl(auth.state.user?.avatarUrl ?? null));
@@ -81,6 +85,15 @@ async function openDocumentDetail(document: Parameters<typeof documentsState.ope
   await documentsState.openDetail(document);
 }
 
+async function handleChatSubmit(payload: { mode: ChatMode; question: string; topK?: number }) {
+  if (payload.mode === 'literature') {
+    await literatureState.search(payload.question);
+    return;
+  }
+
+  await ragState.ask({ question: payload.question, topK: payload.topK });
+}
+
 onMounted(async () => {
   try {
     await auth.hydrateCurrentUser();
@@ -112,13 +125,20 @@ onMounted(async () => {
     />
 
     <RagChatWorkspace
-      :loading="ragState.ragLoading.value"
+      :loading="chatMode === 'literature' ? literatureState.literatureLoading.value : ragState.ragLoading.value"
+      :mode="chatMode"
       :messages="visibleMessages"
       :active-conversation="activeConversation"
       :messages-loading="conversationsState.messagesLoading.value"
       :document-total="documentsState.pagination.total"
       :current-user-avatar-url="currentUserAvatarUrl"
-      @submit="ragState.ask"
+      :literature-loading="literatureState.literatureLoading.value"
+      :literature-items="literatureState.literatureItems.value"
+      :literature-error-message="literatureState.literatureErrorMessage.value"
+      :last-literature-query="literatureState.lastLiteratureQuery.value"
+      :has-searched-literature="literatureState.hasSearchedLiterature.value"
+      @update:mode="chatMode = $event"
+      @submit="handleChatSubmit"
       @open-documents="documentLibraryVisible = true"
       @open-upload="uploadVisible = true"
     />

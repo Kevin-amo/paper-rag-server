@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.config;
 
+import com.lqr.paperragserver.literature.LiteratureSearchProperties;
 import org.apache.tika.Tika;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -11,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
  * <p>这里集中注册跨模块复用的基础组件，业务服务只依赖接口或明确的基础 Bean。</p>
  */
 @Configuration
-@EnableConfigurationProperties({RagProperties.class, SecurityProperties.class, OssProperties.class, DocumentIngestionProperties.class})
+@EnableConfigurationProperties({RagProperties.class, SecurityProperties.class, OssProperties.class, DocumentIngestionProperties.class, LiteratureSearchProperties.class})
 public class ApplicationConfiguration {
 
     /**
