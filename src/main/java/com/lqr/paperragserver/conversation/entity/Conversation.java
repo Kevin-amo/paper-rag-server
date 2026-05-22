@@ -17,6 +17,7 @@ public class Conversation {
 
     private UUID ownerUserId;
     private String title;
+    private String type;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private OffsetDateTime deletedAt;

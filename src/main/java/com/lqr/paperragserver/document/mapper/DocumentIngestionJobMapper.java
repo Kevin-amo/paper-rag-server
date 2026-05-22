@@ -1,7 +1,7 @@
-package com.lqr.paperragserver.paper.mapper;
+package com.lqr.paperragserver.document.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 

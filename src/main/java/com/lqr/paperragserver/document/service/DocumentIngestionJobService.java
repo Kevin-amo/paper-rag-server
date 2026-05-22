@@ -1,6 +1,6 @@
-package com.lqr.paperragserver.paper.service;
+package com.lqr.paperragserver.document.service;
 
-import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
 
 import java.util.Optional;
 import java.util.UUID;

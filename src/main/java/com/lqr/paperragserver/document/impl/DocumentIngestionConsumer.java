@@ -5,8 +5,8 @@ import com.lqr.paperragserver.document.config.DocumentIngestionRabbitConfigurati
 import com.lqr.paperragserver.document.model.DocumentIngestionMessage;
 import com.lqr.paperragserver.document.service.DocumentIngestionProducer;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
-import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
-import com.lqr.paperragserver.paper.service.DocumentIngestionJobService;
+import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;

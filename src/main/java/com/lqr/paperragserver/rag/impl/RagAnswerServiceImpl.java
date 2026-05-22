@@ -95,7 +95,7 @@ public class RagAnswerServiceImpl implements RagAnswerService {
     }
 
     private AnswerContext prepareAnswerContext(UUID ownerUserId, UUID conversationId, String question, Integer topK) {
-        ConversationService.ConversationView conversation = conversationService.getOrCreateConversation(ownerUserId, conversationId, question);
+        ConversationService.ConversationView conversation = resolveConversation(ownerUserId, conversationId, question);
         conversationService.appendUserMessage(ownerUserId, conversation.id(), question);
         List<ConversationService.MessageView> history = conversationService.recentMessages(
                 ownerUserId,
@@ -109,6 +109,17 @@ public class RagAnswerServiceImpl implements RagAnswerService {
         PromptConstructionService.Prompt prompt = promptConstructionService.build(question, chunks, history);
         List<AnswerCitation> citations = buildCitations(chunks);
         return new AnswerContext(conversation.id(), prompt, citations);
+    }
+
+    private ConversationService.ConversationView resolveConversation(UUID ownerUserId, UUID conversationId, String question) {
+        if (conversationId == null) {
+            return conversationService.createConversation(ownerUserId, question, "RAG");
+        }
+        ConversationService.ConversationView conversation = conversationService.requireConversation(ownerUserId, conversationId);
+        if ("RAG".equals(conversation.type())) {
+            return conversation;
+        }
+        return conversationService.createConversation(ownerUserId, question, "RAG");
     }
 
     private String rewriteQuestionForRetrieval(String question, List<ConversationService.MessageView> history) {

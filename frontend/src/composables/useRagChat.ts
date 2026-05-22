@@ -6,6 +6,7 @@ import type { Conversation, ConversationMessage, RagStreamEvent } from '../types
 
 export interface RagChatBindings {
   activeConversationId: Ref<string | null>;
+  activeConversation: Ref<Conversation | null>;
   conversations: Ref<Conversation[]>;
   conversationMessages: Ref<ConversationMessage[]>;
   loadConversations: () => Promise<void>;
@@ -18,22 +19,27 @@ export function useRagChat(bindings: RagChatBindings) {
   async function ask(payload: { question: string; topK?: number }) {
     ragLoading.value = true;
     const now = Date.now();
+    const conversationId = bindings.activeConversation.value?.type === 'RAG'
+      ? bindings.activeConversationId.value ?? undefined
+      : undefined;
     const tempMessage: ConversationMessage = {
       id: `pending-${now}`,
-      conversationId: bindings.activeConversationId.value ?? 'pending',
+      conversationId: conversationId ?? 'pending',
       role: 'USER',
       messageOrder: bindings.conversationMessages.value.length + 1,
       content: payload.question,
       citations: [],
+      metadata: null,
       createdAt: new Date().toISOString(),
     };
     const assistantMessage: ConversationMessage = {
       id: `answer-${now}`,
-      conversationId: bindings.activeConversationId.value ?? 'pending',
+      conversationId: conversationId ?? 'pending',
       role: 'ASSISTANT',
       messageOrder: tempMessage.messageOrder + 1,
       content: '',
       citations: [],
+      metadata: null,
       createdAt: new Date().toISOString(),
       streaming: true,
     };
@@ -43,7 +49,7 @@ export function useRagChat(bindings: RagChatBindings) {
       let shouldRefreshConversations = false;
       await askQuestionStream(
         {
-          conversationId: bindings.activeConversationId.value ?? undefined,
+          conversationId,
           question: payload.question,
           topK: payload.topK,
         },

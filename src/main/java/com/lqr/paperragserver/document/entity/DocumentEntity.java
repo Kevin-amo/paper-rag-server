@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.paper.entity;
+package com.lqr.paperragserver.document.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @Data
 @TableName(value = "public.paper_document", autoResultMap = true)
-public class PaperDocument {
+public class DocumentEntity {
 
     @TableId(value = "id", type = IdType.INPUT)
     private UUID id;

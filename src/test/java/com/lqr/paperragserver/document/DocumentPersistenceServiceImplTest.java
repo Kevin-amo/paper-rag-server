@@ -1,16 +1,16 @@
-package com.lqr.paperragserver.paper;
+package com.lqr.paperragserver.document;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.common.model.DocumentChunk;
-import com.lqr.paperragserver.paper.entity.PaperDocumentChunk;
-import com.lqr.paperragserver.paper.entity.PaperDocument;
-import com.lqr.paperragserver.paper.impl.PaperDocumentPersistenceServiceImpl;
-import com.lqr.paperragserver.paper.mapper.PaperDocumentAssetMapper;
-import com.lqr.paperragserver.paper.mapper.PaperDocumentChunkMapper;
-import com.lqr.paperragserver.paper.mapper.PaperDocumentMapper;
-import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.document.entity.DocumentChunkEntity;
+import com.lqr.paperragserver.document.entity.DocumentEntity;
+import com.lqr.paperragserver.document.impl.DocumentPersistenceServiceImpl;
+import com.lqr.paperragserver.document.mapper.DocumentAssetMapper;
+import com.lqr.paperragserver.document.mapper.DocumentChunkMapper;
+import com.lqr.paperragserver.document.mapper.DocumentMapper;
+import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -26,29 +26,29 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class PaperDocumentPersistenceServiceImplTest {
+class DocumentPersistenceServiceImplTest {
 
-    private final PaperDocumentMapper documentMapper = mock(PaperDocumentMapper.class);
-    private final PaperDocumentChunkMapper chunkMapper = mock(PaperDocumentChunkMapper.class);
-    private final PaperDocumentAssetMapper assetMapper = mock(PaperDocumentAssetMapper.class);
+    private final DocumentMapper documentMapper = mock(DocumentMapper.class);
+    private final DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+    private final DocumentAssetMapper assetMapper = mock(DocumentAssetMapper.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final UUID ownerUserId = UUID.randomUUID();
-    private PaperDocumentPersistenceServiceImpl service;
+    private DocumentPersistenceServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new PaperDocumentPersistenceServiceImpl(documentMapper, chunkMapper, assetMapper, objectMapper);
+        service = new DocumentPersistenceServiceImpl(documentMapper, chunkMapper, assetMapper, objectMapper);
     }
 
     @Test
     void listDocumentsShouldExcludeDeletedByDefaultAndSearchKeyword() {
-        Page<PaperDocument> page = new Page<>(1, 20, 0);
+        Page<DocumentEntity> page = new Page<>(1, 20, 0);
         when(documentMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
 
-        PaperDocumentPersistenceService.PageResult<PaperDocumentPersistenceService.DocumentSummary> result =
+        DocumentPersistenceService.PageResult<DocumentPersistenceService.DocumentSummary> result =
                 service.listDocuments(ownerUserId, "paper", null, 0, 20);
 
-        ArgumentCaptor<Page<PaperDocument>> pageCaptor = ArgumentCaptor.forClass(Page.class);
+        ArgumentCaptor<Page<DocumentEntity>> pageCaptor = ArgumentCaptor.forClass(Page.class);
         verify(documentMapper).selectPage(pageCaptor.capture(), any(LambdaQueryWrapper.class));
 
         assertThat(result.total()).isZero();
@@ -58,21 +58,21 @@ class PaperDocumentPersistenceServiceImplTest {
 
     @Test
     void listDocumentsShouldRespectExplicitStatusAndPageOffset() {
-        PaperDocument entity = new PaperDocument();
+        DocumentEntity entity = new DocumentEntity();
         entity.setSourceId("source-1");
         entity.setTitle("Paper A");
         entity.setStatus("INDEXED");
         entity.setChunkCount(3);
         entity.setCreatedAt(OffsetDateTime.now());
         entity.setUpdatedAt(OffsetDateTime.now());
-        Page<PaperDocument> page = new Page<>(3, 10, 1);
+        Page<DocumentEntity> page = new Page<>(3, 10, 1);
         page.setRecords(List.of(entity));
         when(documentMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
 
-        PaperDocumentPersistenceService.PageResult<PaperDocumentPersistenceService.DocumentSummary> result =
+        DocumentPersistenceService.PageResult<DocumentPersistenceService.DocumentSummary> result =
                 service.listDocuments(ownerUserId, null, "indexed", 2, 10);
 
-        ArgumentCaptor<Page<PaperDocument>> pageCaptor = ArgumentCaptor.forClass(Page.class);
+        ArgumentCaptor<Page<DocumentEntity>> pageCaptor = ArgumentCaptor.forClass(Page.class);
         verify(documentMapper).selectPage(pageCaptor.capture(), any(LambdaQueryWrapper.class));
 
         assertThat(pageCaptor.getValue().getCurrent()).isEqualTo(3);
@@ -80,13 +80,13 @@ class PaperDocumentPersistenceServiceImplTest {
         assertThat(result.page()).isEqualTo(2);
         assertThat(result.size()).isEqualTo(10);
         assertThat(result.total()).isEqualTo(1);
-        assertThat(result.items()).singleElement().extracting(PaperDocumentPersistenceService.DocumentSummary::sourceId)
+        assertThat(result.items()).singleElement().extracting(DocumentPersistenceService.DocumentSummary::sourceId)
                 .isEqualTo("source-1");
     }
 
     @Test
     void updateMetadataShouldSerializeJsonFieldsAndMergeMetadata() {
-        PaperDocumentPersistenceService.DocumentMetadataUpdate update = new PaperDocumentPersistenceService.DocumentMetadataUpdate(
+        DocumentPersistenceService.DocumentMetadataUpdate update = new DocumentPersistenceService.DocumentMetadataUpdate(
                 "Paper A",
                 List.of("Alice", "Bob"),
                 "abstract",
@@ -133,7 +133,7 @@ class PaperDocumentPersistenceServiceImplTest {
 
         service.replaceChunks(ownerUserId, "source-1", List.of(chunk));
 
-        ArgumentCaptor<PaperDocumentChunk> entityCaptor = ArgumentCaptor.forClass(PaperDocumentChunk.class);
+        ArgumentCaptor<DocumentChunkEntity> entityCaptor = ArgumentCaptor.forClass(DocumentChunkEntity.class);
         verify(chunkMapper).insert(entityCaptor.capture());
 
         assertThat(entityCaptor.getValue().getSectionTitle())
@@ -154,7 +154,7 @@ class PaperDocumentPersistenceServiceImplTest {
 
         service.replaceChunks(ownerUserId, "source-1", List.of(chunk));
 
-        ArgumentCaptor<PaperDocumentChunk> entityCaptor = ArgumentCaptor.forClass(PaperDocumentChunk.class);
+        ArgumentCaptor<DocumentChunkEntity> entityCaptor = ArgumentCaptor.forClass(DocumentChunkEntity.class);
         verify(chunkMapper).insert(entityCaptor.capture());
 
         assertThat(entityCaptor.getValue().getId()).isNotNull();
@@ -180,7 +180,7 @@ class PaperDocumentPersistenceServiceImplTest {
 
         service.replaceAssets(ownerUserId, "source-1", List.of(asset));
 
-        ArgumentCaptor<com.lqr.paperragserver.paper.entity.PaperDocumentAsset> entityCaptor = ArgumentCaptor.forClass(com.lqr.paperragserver.paper.entity.PaperDocumentAsset.class);
+        ArgumentCaptor<com.lqr.paperragserver.document.entity.DocumentAssetEntity> entityCaptor = ArgumentCaptor.forClass(com.lqr.paperragserver.document.entity.DocumentAssetEntity.class);
         verify(assetMapper).insert(entityCaptor.capture());
 
         assertThat(entityCaptor.getValue().getId()).isNotNull();

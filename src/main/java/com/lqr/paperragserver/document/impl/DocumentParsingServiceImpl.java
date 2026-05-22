@@ -7,7 +7,7 @@ import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService.DocumentMultimodalExtractionResult;
 import com.lqr.paperragserver.document.service.DocumentParsingService;
-import com.lqr.paperragserver.paper.service.PaperMetadataService;
+import com.lqr.paperragserver.document.service.DocumentMetadataService;
 import lombok.RequiredArgsConstructor;
 import org.apache.tika.Tika;
 import org.apache.tika.metadata.Metadata;
@@ -55,7 +55,7 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
 
     private final Tika tika;
     private final DocumentMultimodalExtractionService documentMultimodalExtractionService;
-    private final PaperMetadataService paperMetadataService;
+    private final DocumentMetadataService documentMetadataService;
 
     /**
      * 规范化文件信息并生成统一的解析结果。
@@ -86,10 +86,10 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
                 : normalizedFileName;
 
         DocumentSource provisionalSource = new DocumentSource(sourceId, title, normalizedFileName, mergedMetadata);
-        DocumentSource enrichedSource = paperMetadataService.enrich(provisionalSource, metadata);
+        DocumentSource enrichedSource = documentMetadataService.enrich(provisionalSource, metadata);
         mergedMetadata = new LinkedHashMap<>(enrichedSource.metadata());
         ExtractionResult extractionResult = extractContent(enrichedSource, content, contentType, mergedMetadata);
-        enrichedSource = paperMetadataService.enrich(new DocumentSource(sourceId, enrichedSource.title(), normalizedFileName, mergedMetadata), Map.of());
+        enrichedSource = documentMetadataService.enrich(new DocumentSource(sourceId, enrichedSource.title(), normalizedFileName, mergedMetadata), Map.of());
         mergedMetadata = new LinkedHashMap<>(enrichedSource.metadata());
         mergedMetadata.put(MetadataKeys.EXTRACTION_MODE, extractionResult.mode().name());
         mergedMetadata.put(MetadataKeys.EXTRACTED_TEXT_LENGTH, extractionResult.text().length());

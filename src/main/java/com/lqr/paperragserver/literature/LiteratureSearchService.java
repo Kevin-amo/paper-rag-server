@@ -35,7 +35,7 @@ public class LiteratureSearchService {
         int limit = resolveLimit(request.limit());
         String sortBy = resolveSortBy(request.sortBy());
         List<String> categories = normalizeCategories(request.categories());
-        String query = request.query().trim();
+        String query = normalizeQuery(request.query());
         String dateFrom = normalizeText(request.dateFrom());
         LiteratureSearchCache.Key cacheKey = new LiteratureSearchCache.Key(query, limit, sortBy, categories, dateFrom);
 
@@ -71,7 +71,7 @@ public class LiteratureSearchService {
             String dateFrom,
             String sortBy
     ) {
-        return new LiteratureSearchRequest(query, request.limit(), categories, dateFrom, sortBy);
+        return new LiteratureSearchRequest(request.conversationId(), query, request.limit(), categories, dateFrom, sortBy);
     }
 
     private void cacheIfEnabled(LiteratureSearchCache.Key key, LiteratureSearchResponse response) {
@@ -126,5 +126,13 @@ public class LiteratureSearchService {
             return null;
         }
         return value.trim();
+    }
+
+    private String normalizeQuery(String query) {
+        String normalized = query.trim();
+        if ("rag".equalsIgnoreCase(normalized)) {
+            return "retrieval augmented generation";
+        }
+        return normalized;
     }
 }

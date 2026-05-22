@@ -9,6 +9,7 @@ export type UserRole = 'USER' | 'ADMIN';
 export type UserStatus = 'ACTIVE' | 'DISABLED';
 export type DocumentStatus = 'PENDING' | 'PROCESSING' | 'INDEXED' | 'READY' | 'FAILED' | string;
 export type MessageRole = 'USER' | 'ASSISTANT';
+export type ConversationType = 'RAG' | 'LITERATURE';
 
 export interface DocumentSource {
   sourceId: string;
@@ -156,6 +157,7 @@ export interface AskQuestionPayload {
 }
 
 export interface LiteratureSearchPayload {
+  conversationId?: string | null;
   query: string;
   limit?: number;
   categories?: string[];
@@ -179,7 +181,23 @@ export interface LiteratureSearchResult {
   externalId: string | null;
 }
 
+export interface LiteratureSearchMessageMetadata {
+  type: 'LITERATURE_SEARCH_RESULT';
+  query: string;
+  params: {
+    limit: number | null;
+    dateFrom: string | null;
+    sortBy: 'relevance' | 'date' | null;
+    categories: string[];
+  };
+  items: LiteratureSearchResult[];
+}
+
+export type ConversationMessageMetadata = Record<string, unknown> | LiteratureSearchMessageMetadata | null;
+
 export interface LiteratureSearchResponse {
+  conversationId: string | null;
+  summary: string | null;
   items: LiteratureSearchResult[];
 }
 
@@ -211,6 +229,7 @@ export interface Conversation {
   id: string;
   ownerUserId: string;
   title: string;
+  type: ConversationType;
   createdAt: string;
   updatedAt: string;
 }
@@ -222,6 +241,7 @@ export interface ConversationMessage {
   messageOrder: number;
   content: string;
   citations: AnswerCitation[];
+  metadata: ConversationMessageMetadata;
   createdAt: string;
   streaming?: boolean;
 }

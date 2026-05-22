@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.paper.entity;
+package com.lqr.paperragserver.document.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

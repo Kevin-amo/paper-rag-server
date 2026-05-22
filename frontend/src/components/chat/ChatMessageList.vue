@@ -8,13 +8,19 @@ export default {
 import { computed, nextTick, ref, watch } from 'vue';
 import EmptyState from '../common/EmptyState.vue';
 import CitationCards from './CitationCards.vue';
+import LiteratureSearchResults from './LiteratureSearchResults.vue';
 import { renderMarkdown } from '../../utils/markdown';
-import type { ConversationMessage } from '../../types';
+import type {
+  ChatMode,
+  ConversationMessage,
+  LiteratureSearchMessageMetadata,
+} from '../../types';
 
 const props = defineProps<{
   messages: ConversationMessage[];
   loading?: boolean;
   currentUserAvatarUrl?: string | null;
+  mode?: ChatMode;
 }>();
 
 const listRef = ref<HTMLElement | null>(null);
@@ -28,8 +34,45 @@ const scrollSignal = computed(() => {
   return `${props.messages.length}:${last?.id ?? ''}:${last?.content ?? ''}:${last?.streaming ?? false}`;
 });
 
-function assistantHtml(content: string) {
-  return renderMarkdown(content || '正在生成回答...');
+const chatMode = computed<ChatMode>(() => props.mode ?? 'rag');
+
+const emptyContent = computed(() => {
+  if (chatMode.value === 'literature') {
+    return {
+      title: '开始搜索外部论文',
+      description: '输入关键词即可检索 OpenAlex 文献，系统会把搜索记录保存为会话消息。',
+      examples: [
+        '找几篇关于 GraphRAG 的论文',
+        '只要 2025 年以后的论文',
+        '推荐几篇关于检索增强生成的综述',
+      ],
+    };
+  }
+
+  return {
+    title: '开始和你的论文知识库对话',
+    description: '你可以询问论文贡献、方法对比、实验结论、局限性，系统会基于已上传论文给出可追溯回答。',
+    examples: [
+      '请总结我上传论文中的核心研究问题和主要贡献',
+      '这些论文在方法设计上有哪些共同点和差异？',
+      '请基于引用说明相关工作的实验结论',
+    ],
+  };
+});
+
+function assistantHtml(content: string, streaming?: boolean) {
+  if (content && content.trim()) {
+    return renderMarkdown(content);
+  }
+  return renderMarkdown(streaming ? '正在生成...' : '');
+}
+
+function isLiteratureSearchMetadata(metadata: ConversationMessage['metadata']): metadata is LiteratureSearchMessageMetadata {
+  return !!metadata
+    && typeof metadata === 'object'
+    && 'type' in metadata
+    && metadata.type === 'LITERATURE_SEARCH_RESULT'
+    && Array.isArray((metadata as LiteratureSearchMessageMetadata).items);
 }
 
 watch(
@@ -50,18 +93,17 @@ watch(
   >
     <EmptyState
       v-if="!props.messages.length"
-      title="开始和你的论文知识库对话"
-      description="你可以询问论文贡献、方法对比、实验结论、局限性，系统会基于已上传论文给出可追溯回答。"
+      :title="emptyContent.title"
+      :description="emptyContent.description"
     >
       <div class="example-prompts">
-        <button type="button" @click="emit('askExample', '请总结我上传论文中的核心研究问题和主要贡献')">
-          总结核心贡献
-        </button>
-        <button type="button" @click="emit('askExample', '这些论文在方法设计上有哪些共同点和差异？')">
-          对比研究方法
-        </button>
-        <button type="button" @click="emit('askExample', '请基于引用说明相关工作的实验结论')">
-          查看实验结论
+        <button
+          v-for="example in emptyContent.examples"
+          :key="example"
+          type="button"
+          @click="emit('askExample', example)"
+        >
+          {{ example }}
         </button>
       </div>
     </EmptyState>
@@ -79,9 +121,23 @@ watch(
         </div>
         <div class="message-body">
           <div v-if="message.role === 'USER'" class="message-content">{{ message.content }}</div>
-          <div v-else class="message-content markdown-content" v-html="assistantHtml(message.content)" />
-          <span v-if="message.streaming" class="streaming-indicator">正在生成...</span>
-          <CitationCards v-if="message.role === 'ASSISTANT'" :citations="message.citations || []" />
+          <div
+            v-else-if="!isLiteratureSearchMetadata(message.metadata)"
+            class="message-content markdown-content"
+            v-html="assistantHtml(message.content, message.streaming)"
+          />
+          <span v-if="message.streaming" class="streaming-indicator">
+            {{ chatMode === 'literature' ? '正在检索文献...' : '正在生成...' }}
+          </span>
+          <CitationCards v-if="message.role === 'ASSISTANT' && message.citations?.length" :citations="message.citations || []" />
+          <LiteratureSearchResults
+            v-if="message.role === 'ASSISTANT' && isLiteratureSearchMetadata(message.metadata)"
+            inline
+            :items="message.metadata.items"
+            :last-query="message.metadata.query"
+            :has-searched="true"
+            :loading="false"
+          />
         </div>
       </article>
     </template>

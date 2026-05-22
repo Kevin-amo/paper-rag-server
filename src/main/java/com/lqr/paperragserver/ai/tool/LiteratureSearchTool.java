@@ -20,10 +20,10 @@ public class LiteratureSearchTool {
         this.literatureSearchService = literatureSearchService;
     }
 
-    @Tool(description = "Search academic papers by title, keyword, author or research topic.")
+    @Tool(description = "Search academic papers by title, keyword, author or research topic. Use this tool when the user asks to search, find, recommend, or retrieve papers/literature/articles, including Chinese requests like 搜文献、找论文、推荐文章.")
     public LiteratureSearchResponse searchLiterature(
-            @ToolParam(description = "Search query, such as paper title, keyword, author or research topic.") String query,
-            @ToolParam(description = "Maximum number of results. Default is 10, maximum is 50.", required = false) Integer limit,
+            @ToolParam(description = "Search query extracted from the user request, such as RAG, machine learning, paper title, keyword, author or research topic.") String query,
+            @ToolParam(description = "Maximum number of results. Default is 10, maximum is 50. If the user asks for one paper/article, use 1.", required = false) Integer limit,
             @ToolParam(description = "Sort mode. Allowed values: relevance or date.", required = false) String sortBy,
             @ToolParam(description = "Publication date lower bound. Format: YYYY-MM-DD.", required = false) String dateFrom,
             @ToolParam(description = "Optional research categories.", required = false) List<String> categories

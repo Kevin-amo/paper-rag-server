@@ -4,7 +4,7 @@ import com.lqr.paperragserver.ai.service.EmbeddingService;
 import com.lqr.paperragserver.document.impl.DocumentManagementServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentManagementService;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
-import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +16,7 @@ import static org.mockito.Mockito.verify;
 
 class DocumentManagementServiceTest {
 
-    private final PaperDocumentPersistenceService paperDocumentPersistenceService = mock(PaperDocumentPersistenceService.class);
+    private final DocumentPersistenceService documentPersistenceService = mock(DocumentPersistenceService.class);
     private final DocumentSplittingService documentSplittingService = mock(DocumentSplittingService.class);
     private final EmbeddingService embeddingService = mock(EmbeddingService.class);
     private final VectorWriteService vectorWriteService = mock(VectorWriteService.class);
@@ -25,7 +25,7 @@ class DocumentManagementServiceTest {
     @BeforeEach
     void setUp() {
         service = new DocumentManagementServiceImpl(
-                paperDocumentPersistenceService,
+                documentPersistenceService,
                 documentSplittingService,
                 embeddingService,
                 vectorWriteService
@@ -38,6 +38,6 @@ class DocumentManagementServiceTest {
 
         service.restore(ownerUserId, "source-1");
 
-        verify(paperDocumentPersistenceService).restore(ownerUserId, "source-1");
+        verify(documentPersistenceService).restore(ownerUserId, "source-1");
     }
 }

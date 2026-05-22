@@ -43,13 +43,15 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void shouldAuthenticateRequestWithValidBearerToken() throws Exception {
+        SecurityUserPrincipal principal = principal("alice", List.of(RoleCodes.USER));
         when(jwtDecoder.decode("valid-token")).thenReturn(Jwt.withTokenValue("valid-token")
                 .header("alg", "HS256")
                 .subject("alice")
+                .claim("userId", principal.getId().toString())
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build());
-        when(userDetailsService.loadUserByUsername("alice")).thenReturn(principal("alice", List.of(RoleCodes.USER)));
+        when(userDetailsService.loadUserByUsername("alice")).thenReturn(principal);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer valid-token");
@@ -81,6 +83,27 @@ class JwtAuthenticationFilterTest {
     @Test
     void shouldIgnoreMissingToken() throws Exception {
         filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), new MockFilterChain());
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    void shouldRejectTokenWhenUserIdClaimDoesNotMatchLoadedUser() throws Exception {
+        SecurityUserPrincipal principal = principal("alice", List.of(RoleCodes.USER));
+        when(jwtDecoder.decode("stale-token")).thenReturn(Jwt.withTokenValue("stale-token")
+                .header("alg", "HS256")
+                .subject("alice")
+                .claim("userId", UUID.randomUUID().toString())
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build());
+        when(userDetailsService.loadUserByUsername("alice")).thenReturn(principal);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer stale-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }

@@ -54,6 +54,22 @@ class LiteratureSearchServiceTest {
     }
 
     @Test
+    void searchShouldExpandAmbiguousRagAbbreviation() {
+        LiteratureSearchResult result = openAlexResult("Retrieval-Augmented Generation");
+        when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of(result));
+
+        LiteratureSearchResponse response = service.search(new LiteratureSearchRequest("RAG", 3, null, null, "relevance"));
+
+        assertThat(response.items()).containsExactly(result);
+        verify(openAlexLiteratureClient).search(
+                org.mockito.ArgumentMatchers.argThat(request -> "retrieval augmented generation".equals(request.query())),
+                org.mockito.ArgumentMatchers.eq(3),
+                org.mockito.ArgumentMatchers.eq("relevance"),
+                any()
+        );
+    }
+
+    @Test
     void searchShouldReturnEmptyWhenOpenAlexReturnsEmpty() {
         when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of());
 

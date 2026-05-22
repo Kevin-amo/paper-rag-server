@@ -1,12 +1,12 @@
-package com.lqr.paperragserver.paper.impl;
+package com.lqr.paperragserver.document.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.model.DocumentSource;
-import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
-import com.lqr.paperragserver.paper.mapper.DocumentIngestionJobMapper;
-import com.lqr.paperragserver.paper.service.DocumentIngestionJobService;
-import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.document.mapper.DocumentIngestionJobMapper;
+import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
+import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +26,7 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
     private static final int ERROR_MESSAGE_MAX_LENGTH = 4000;
 
     private final DocumentIngestionJobMapper jobMapper;
-    private final PaperDocumentPersistenceService paperDocumentPersistenceService;
+    private final DocumentPersistenceService documentPersistenceService;
 
     @Override
     @Transactional
@@ -48,12 +48,12 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
         metadata.put(MetadataKeys.SOURCE_ID, sourceId);
         metadata.put(MetadataKeys.FILE_NAME, fileName);
         metadata.put(MetadataKeys.TITLE, safeTitle);
-        paperDocumentPersistenceService.markParsing(
+        documentPersistenceService.markParsing(
                 ownerUserId,
                 new DocumentSource(sourceId, safeTitle, fileName, metadata),
                 ""
         );
-        paperDocumentPersistenceService.markStatus(ownerUserId, sourceId, STATUS_PENDING, 0);
+        documentPersistenceService.markStatus(ownerUserId, sourceId, STATUS_PENDING, 0);
         return job;
     }
 
@@ -62,7 +62,7 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
     public void markQueued(UUID ownerUserId, UUID jobId) {
         findJob(ownerUserId, jobId).ifPresent(job -> {
             jobMapper.markQueued(ownerUserId, jobId);
-            paperDocumentPersistenceService.markStatus(ownerUserId, job.getSourceId(), STATUS_QUEUED, 5);
+            documentPersistenceService.markStatus(ownerUserId, job.getSourceId(), STATUS_QUEUED, 5);
         });
     }
 
@@ -76,14 +76,14 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
     public void markRunningStage(UUID ownerUserId, UUID jobId, String sourceId, String status, int progress) {
         int safeProgress = clamp(progress, 0, 100);
         jobMapper.markRunningStage(ownerUserId, jobId, status, safeProgress);
-        paperDocumentPersistenceService.markStatus(ownerUserId, sourceId, status, safeProgress);
+        documentPersistenceService.markStatus(ownerUserId, sourceId, status, safeProgress);
     }
 
     @Override
     @Transactional
     public void markIndexed(UUID ownerUserId, UUID jobId, String sourceId) {
         jobMapper.markIndexed(ownerUserId, jobId);
-        paperDocumentPersistenceService.markStatus(ownerUserId, sourceId, STATUS_INDEXED, 100);
+        documentPersistenceService.markStatus(ownerUserId, sourceId, STATUS_INDEXED, 100);
     }
 
     @Override
@@ -91,7 +91,7 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
     public void markFailed(UUID ownerUserId, UUID jobId, String sourceId, String errorMessage) {
         String safeMessage = cut(errorMessage, ERROR_MESSAGE_MAX_LENGTH);
         jobMapper.markFailed(ownerUserId, jobId, safeMessage);
-        paperDocumentPersistenceService.markFailed(ownerUserId, sourceId, safeMessage);
+        documentPersistenceService.markFailed(ownerUserId, sourceId, safeMessage);
     }
 
     @Override

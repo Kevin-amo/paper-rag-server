@@ -35,7 +35,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         SecurityUserPrincipal cachedPrincipal = readCachedPrincipal(username);
-        if (cachedPrincipal != null) {
+        if (cachedPrincipal != null && isCacheBackedByDatabase(username, cachedPrincipal)) {
             return cachedPrincipal;
         }
         SecurityUserPrincipal principal = loadPrincipalFromDatabase(username);
@@ -66,6 +66,19 @@ public class DatabaseUserDetailsService implements UserDetailsService {
             return objectMapper.readValue(payload, CachedUserDetails.class).toPrincipal();
         } catch (RuntimeException | JsonProcessingException ex) {
             return null;
+        }
+    }
+
+    private boolean isCacheBackedByDatabase(String username, SecurityUserPrincipal cachedPrincipal) {
+        try {
+            SysUser user = userMapper.selectById(cachedPrincipal.getId());
+            boolean valid = user != null && username.equals(user.getUsername());
+            if (!valid) {
+                redisTemplate.delete(userDetailsKey(username));
+            }
+            return valid;
+        } catch (RuntimeException ex) {
+            return false;
         }
     }
 

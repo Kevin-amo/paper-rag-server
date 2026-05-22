@@ -24,4 +24,20 @@ public interface LlmService {
      * @return 模型生成的增量文本流
      */
     Flux<String> streamGenerate(PromptConstructionService.Prompt prompt);
+
+    /**
+     * 调用大模型生成回答，并允许模型按需调用已注册工具。
+     *
+     * @param prompt 需要发送给模型的提示词内容
+     * @return 模型生成的文本结果
+     */
+    String generateWithTools(PromptConstructionService.Prompt prompt);
+
+    /**
+     * 调用大模型流式生成回答，并允许模型按需调用已注册工具。
+     *
+     * @param prompt 需要发送给模型的提示词内容
+     * @return 模型生成的增量文本流
+     */
+    Flux<String> streamGenerateWithTools(PromptConstructionService.Prompt prompt);
 }
