@@ -61,8 +61,10 @@ class RagAnswerServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new RagAnswerServiceImpl(ragRetrievalService, promptConstructionService, llmService, ragProperties, conversationService);
-        when(conversationService.getOrCreateConversation(eq(ownerUserId), any(), anyString()))
-                .thenReturn(new ConversationService.ConversationView(conversationId, ownerUserId, "测试会话", null, null));
+        when(conversationService.createConversation(eq(ownerUserId), anyString(), eq("RAG")))
+                .thenReturn(new ConversationService.ConversationView(conversationId, ownerUserId, "测试会话", "RAG", null, null));
+        when(conversationService.requireConversation(eq(ownerUserId), eq(conversationId)))
+                .thenReturn(new ConversationService.ConversationView(conversationId, ownerUserId, "测试会话", "RAG", null, null));
         when(conversationService.recentMessages(eq(ownerUserId), eq(conversationId), anyInt()))
                 .thenReturn(List.of());
     }
@@ -148,9 +150,9 @@ class RagAnswerServiceImplTest {
     @Test
     void answerShouldRewriteFollowUpQuestionBeforeRetrieval() {
         List<ConversationService.MessageView> history = List.of(
-                new ConversationService.MessageView(UUID.randomUUID(), conversationId, "USER", 1, "这篇文章的作者是谁", List.of(), null),
-                new ConversationService.MessageView(UUID.randomUUID(), conversationId, "ASSISTANT", 2, "作者是 Yufan Gao 等。", List.of(), null),
-                new ConversationService.MessageView(UUID.randomUUID(), conversationId, "USER", 3, "回答上一个问题", List.of(), null)
+                new ConversationService.MessageView(UUID.randomUUID(), conversationId, "USER", 1, "这篇文章的作者是谁", List.of(), null, null),
+                new ConversationService.MessageView(UUID.randomUUID(), conversationId, "ASSISTANT", 2, "作者是 Yufan Gao 等。", List.of(), null, null),
+                new ConversationService.MessageView(UUID.randomUUID(), conversationId, "USER", 3, "回答上一个问题", List.of(), null, null)
         );
         when(conversationService.recentMessages(ownerUserId, conversationId, ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT))
                 .thenReturn(history);

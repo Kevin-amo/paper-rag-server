@@ -4,7 +4,7 @@ import com.lqr.paperragserver.common.model.ParsedDocument;
 import com.lqr.paperragserver.document.impl.DocumentParsingServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService.DocumentMultimodalExtractionResult;
-import com.lqr.paperragserver.paper.impl.PaperMetadataServiceImpl;
+import com.lqr.paperragserver.document.impl.DocumentMetadataServiceImpl;
 import org.apache.tika.Tika;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ class DocumentParsingServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new DocumentParsingServiceImpl(tika, documentMultimodalExtractionService, new PaperMetadataServiceImpl());
+        service = new DocumentParsingServiceImpl(tika, documentMultimodalExtractionService, new DocumentMetadataServiceImpl());
     }
 
     @Test

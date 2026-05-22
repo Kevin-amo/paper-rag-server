@@ -8,9 +8,9 @@ import com.lqr.paperragserver.document.service.DocumentIngestionProducer;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.service.DocumentManagementService;
 import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
-import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
-import com.lqr.paperragserver.paper.service.DocumentIngestionJobService;
-import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
+import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -35,7 +35,7 @@ class DocumentControllerTest {
 
     private final DocumentIngestionService documentIngestionService = mock(DocumentIngestionService.class);
     private final DocumentManagementService documentManagementService = mock(DocumentManagementService.class);
-    private final PaperDocumentPersistenceService paperDocumentPersistenceService = mock(PaperDocumentPersistenceService.class);
+    private final DocumentPersistenceService documentPersistenceService = mock(DocumentPersistenceService.class);
     private final DocumentIngestionJobService documentIngestionJobService = mock(DocumentIngestionJobService.class);
     private final DocumentUploadStorageService documentUploadStorageService = mock(DocumentUploadStorageService.class);
     private final DocumentIngestionProducer documentIngestionProducer = mock(DocumentIngestionProducer.class);
@@ -48,7 +48,7 @@ class DocumentControllerTest {
         controller = new DocumentController(
                 documentIngestionService,
                 documentManagementService,
-                paperDocumentPersistenceService,
+                documentPersistenceService,
                 documentIngestionJobService,
                 documentUploadStorageService,
                 documentIngestionProducer,

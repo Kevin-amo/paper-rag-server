@@ -8,10 +8,12 @@ const props = defineProps<{
   errorMessage?: string;
   lastQuery?: string;
   hasSearched?: boolean;
+  summary?: string | null;
+  inline?: boolean;
 }>();
 
 function sourceLabel(source: string | null | undefined) {
-        if (source === 'openalex') {
+  if (source === 'openalex') {
     return 'OpenAlex';
   }
   return source || '来源未知';
@@ -30,51 +32,88 @@ function metaText(item: LiteratureSearchResult) {
   <section
     v-loading="props.loading"
     class="literature-results"
-    :class="{ 'is-empty': !props.items.length }"
+    :class="{ 'is-empty': !props.items.length, inline: props.inline }"
   >
-    <EmptyState
-      v-if="!props.hasSearched && !props.loading"
-      title="搜索外部论文"
-      description="输入关键词即可检索论文元数据。"
-    />
-
-    <div v-else-if="props.errorMessage" class="literature-state error-state">
-      <strong>文献搜索失败</strong>
-      <span>{{ props.errorMessage }}</span>
-    </div>
-
-    <div v-else-if="props.hasSearched && !props.loading && !props.items.length" class="literature-state">
-      <strong>未找到相关论文</strong>
-      <span v-if="props.lastQuery">关键词：{{ props.lastQuery }}</span>
-    </div>
-
-    <div v-else class="literature-panel">
-      <div class="literature-header">
-        <div>
-          <span class="mode-badge">文献搜索结果</span>
-          <h2>{{ props.lastQuery || 'Papers' }}</h2>
-        </div>
-        <span class="result-count">{{ props.items.length }} 篇</span>
+    <template v-if="props.inline">
+      <div v-if="props.errorMessage" class="literature-state error-state inline-state">
+        <strong>文献搜索失败</strong>
+        <span>{{ props.errorMessage }}</span>
       </div>
 
-      <article v-for="(item, index) in props.items" :key="`${item.externalId || item.title || index}`" class="paper-card">
-        <div class="paper-index">{{ index + 1 }}</div>
-        <div class="paper-body">
-          <h3>{{ item.title || '未命名论文' }}</h3>
-          <p class="paper-meta">{{ metaText(item) }}</p>
-          <p v-if="item.abstractText" class="paper-abstract">{{ item.abstractText }}</p>
-          <div class="paper-tags">
-            <span>{{ sourceLabel(item.source) }}</span>
-            <span v-if="item.externalId">{{ item.externalId }}</span>
-            <span v-for="category in item.categories" :key="category">{{ category }}</span>
+      <div v-else-if="!props.items.length" class="literature-state inline-state">
+        <strong>未找到相关论文</strong>
+        <span v-if="props.summary">{{ props.summary }}</span>
+        <span v-else-if="props.lastQuery">关键词：{{ props.lastQuery }}</span>
+      </div>
+
+      <div v-else class="literature-inline-panel">
+        <article v-for="(item, index) in props.items" :key="`${item.externalId || item.title || index}`" class="paper-card inline-paper-card">
+          <div class="paper-index">{{ index + 1 }}</div>
+          <div class="paper-body">
+            <h3>
+              <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer">
+                {{ item.title || '未命名论文' }}
+              </a>
+              <span v-else>{{ item.title || '未命名论文' }}</span>
+            </h3>
+            <p class="paper-meta">{{ metaText(item) }}</p>
+            <p v-if="item.abstractText" class="paper-abstract">{{ item.abstractText }}</p>
+            <div class="paper-tags">
+              <span>{{ sourceLabel(item.source) }}</span>
+              <span v-if="item.externalId">{{ item.externalId }}</span>
+              <span v-for="category in item.categories" :key="category">{{ category }}</span>
+            </div>
+            <div class="paper-links">
+              <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer">Abs</a>
+              <a v-if="item.pdfUrl" :href="item.pdfUrl" target="_blank" rel="noopener noreferrer">PDF</a>
+            </div>
           </div>
-          <div class="paper-links">
-            <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer">Abs</a>
-            <a v-if="item.pdfUrl" :href="item.pdfUrl" target="_blank" rel="noopener noreferrer">PDF</a>
+        </article>
+      </div>
+    </template>
+
+    <template v-else>
+      <EmptyState
+        v-if="!props.hasSearched && !props.loading"
+        title="搜索外部论文"
+        description="输入关键词即可检索论文元数据。"
+      />
+
+      <div v-else-if="props.errorMessage" class="literature-state error-state">
+        <strong>文献搜索失败</strong>
+        <span>{{ props.errorMessage }}</span>
+      </div>
+
+      <div v-else-if="props.hasSearched && !props.loading && !props.items.length" class="literature-state">
+        <strong>未找到相关论文</strong>
+        <span v-if="props.lastQuery">关键词：{{ props.lastQuery }}</span>
+      </div>
+
+      <div v-else class="literature-panel">
+        <article v-for="(item, index) in props.items" :key="`${item.externalId || item.title || index}`" class="paper-card">
+          <div class="paper-index">{{ index + 1 }}</div>
+          <div class="paper-body">
+            <h3>
+              <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer">
+                {{ item.title || '未命名论文' }}
+              </a>
+              <span v-else>{{ item.title || '未命名论文' }}</span>
+            </h3>
+            <p class="paper-meta">{{ metaText(item) }}</p>
+            <p v-if="item.abstractText" class="paper-abstract">{{ item.abstractText }}</p>
+            <div class="paper-tags">
+              <span>{{ sourceLabel(item.source) }}</span>
+              <span v-if="item.externalId">{{ item.externalId }}</span>
+              <span v-for="category in item.categories" :key="category">{{ category }}</span>
+            </div>
+            <div class="paper-links">
+              <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer">Abs</a>
+              <a v-if="item.pdfUrl" :href="item.pdfUrl" target="_blank" rel="noopener noreferrer">PDF</a>
+            </div>
           </div>
-        </div>
-      </article>
-    </div>
+        </article>
+      </div>
+    </template>
   </section>
 </template>
 
@@ -87,6 +126,11 @@ function metaText(item: LiteratureSearchResult) {
   flex-direction: column;
   padding: clamp(24px, 4vw, 44px) 0 150px;
   background: linear-gradient(180deg, #fbfcff 0%, #ffffff 46%);
+}
+
+.literature-results.inline {
+  padding: 0;
+  background: transparent;
 }
 
 .literature-results.is-empty {
@@ -103,45 +147,19 @@ function metaText(item: LiteratureSearchResult) {
   box-shadow: none;
 }
 
-.literature-panel {
-  width: min(960px, calc(100% - 48px));
-  margin: 0 auto;
+.literature-results.is-empty :deep(.empty-state p) {
+  max-width: 560px;
+}
+
+.literature-results.is-empty :deep(.empty-icon) {
+  background: #f3f4f6;
+}
+
+.literature-inline-panel {
+  width: 100%;
   display: grid;
-  gap: 16px;
-}
-
-.literature-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 20px;
-  border: 1px solid #dbeafe;
-  border-radius: 24px;
-  background: #f8fbff;
-}
-
-.mode-badge {
-  display: inline-flex;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: #e0f2fe;
-  color: #0369a1;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.literature-header h2 {
-  margin: 10px 0 0;
-  color: var(--app-text);
-  font-size: 20px;
-}
-
-.result-count {
-  color: var(--app-text-muted);
-  font-size: 13px;
-  font-weight: 800;
-  white-space: nowrap;
+  gap: 12px;
+  margin-top: 14px;
 }
 
 .paper-card {
@@ -153,6 +171,12 @@ function metaText(item: LiteratureSearchResult) {
   border-radius: 24px;
   background: #ffffff;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
+}
+
+.inline-paper-card {
+  padding: 14px;
+  border-radius: 18px;
+  box-shadow: none;
 }
 
 .paper-index {
@@ -178,6 +202,20 @@ function metaText(item: LiteratureSearchResult) {
   color: var(--app-text);
   font-size: 17px;
   line-height: 1.5;
+}
+
+.paper-body h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.paper-body h3 a:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.inline-paper-card .paper-body h3 {
+  font-size: 15px;
 }
 
 .paper-meta {
@@ -230,6 +268,13 @@ function metaText(item: LiteratureSearchResult) {
   background: #ffffff;
   color: var(--app-text-muted);
   text-align: center;
+}
+
+.inline-state {
+  width: 100%;
+  margin: 0;
+  padding: 18px;
+  border-radius: 18px;
 }
 
 .literature-state strong,

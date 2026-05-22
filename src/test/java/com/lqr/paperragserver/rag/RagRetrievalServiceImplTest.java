@@ -4,7 +4,7 @@ import com.lqr.paperragserver.ai.service.RerankService;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
-import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.rag.impl.RagRetrievalServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
 class RagRetrievalServiceImplTest {
 
     private final VectorStore vectorStore = mock(VectorStore.class);
-    private final PaperDocumentPersistenceService paperDocumentPersistenceService = mock(PaperDocumentPersistenceService.class);
+    private final DocumentPersistenceService documentPersistenceService = mock(DocumentPersistenceService.class);
     private final RerankService rerankService = mock(RerankService.class);
     private final RagProperties ragProperties = new RagProperties(800, 120, 5, 0);
     private final UUID ownerUserId = UUID.randomUUID();
@@ -41,7 +41,7 @@ class RagRetrievalServiceImplTest {
     void setUp() {
         when(rerankService.rerank(anyString(), anyList(), anyInt()))
                 .thenAnswer(invocation -> invocation.getArgument(1));
-        service = new RagRetrievalServiceImpl(vectorStore, ragProperties, paperDocumentPersistenceService, rerankService);
+        service = new RagRetrievalServiceImpl(vectorStore, ragProperties, documentPersistenceService, rerankService);
     }
 
     @Test
@@ -55,7 +55,7 @@ class RagRetrievalServiceImplTest {
                 "学生姓名：李勤燃 张俊豪 王家豪",
                 Map.of("sectionTitle", "前置内容", "title", "课程设计")
         );
-        when(paperDocumentPersistenceService.searchChunks(ownerUserId, "这篇文章的学生姓名是谁", 9))
+        when(documentPersistenceService.searchChunks(ownerUserId, "这篇文章的学生姓名是谁", 9))
                 .thenReturn(List.of(lexicalHit));
 
         List<RetrievedChunk> results = service.retrieve(ownerUserId, "这篇文章的学生姓名是谁", 3);
@@ -64,7 +64,7 @@ class RagRetrievalServiceImplTest {
         assertThat(results.get(0).chunk().chunkId()).isEqualTo("chunk-0");
         assertThat(results.get(0).rankScore()).isGreaterThan(0d);
         assertThat(results.get(0).chunk().content()).contains("学生姓名");
-        verify(paperDocumentPersistenceService).searchChunks(ownerUserId, "这篇文章的学生姓名是谁", 9);
+        verify(documentPersistenceService).searchChunks(ownerUserId, "这篇文章的学生姓名是谁", 9);
         verify(vectorStore).similaritySearch(any(SearchRequest.class));
     }
 
@@ -79,7 +79,7 @@ class RagRetrievalServiceImplTest {
                         "title", "Paper B"
                 ))
         ));
-        when(paperDocumentPersistenceService.findDocument(ownerUserId, "source-1"))
+        when(documentPersistenceService.findDocument(ownerUserId, "source-1"))
                 .thenReturn(Optional.of(indexedDocument("source-1")));
 
         DocumentChunk lexicalFirst = new DocumentChunk(
@@ -96,7 +96,7 @@ class RagRetrievalServiceImplTest {
                 "B content",
                 Map.of("title", "Paper B")
         );
-        when(paperDocumentPersistenceService.searchChunks(ownerUserId, "排序测试", 9))
+        when(documentPersistenceService.searchChunks(ownerUserId, "排序测试", 9))
                 .thenReturn(List.of(lexicalFirst, lexicalSecond));
 
         List<RetrievedChunk> results = service.retrieve(ownerUserId, "排序测试", 3);
@@ -126,7 +126,7 @@ class RagRetrievalServiceImplTest {
                 "B content",
                 Map.of("title", "Paper B")
         );
-        when(paperDocumentPersistenceService.searchChunks(ownerUserId, "精排测试", 6))
+        when(documentPersistenceService.searchChunks(ownerUserId, "精排测试", 6))
                 .thenReturn(List.of(lexicalFirst, lexicalSecond));
         when(rerankService.rerank(eq("精排测试"), anyList(), eq(2)))
                 .thenReturn(List.of(
@@ -143,9 +143,9 @@ class RagRetrievalServiceImplTest {
         verify(rerankService).rerank(eq("精排测试"), anyList(), eq(2));
     }
 
-    private PaperDocumentPersistenceService.DocumentDetail indexedDocument(String sourceId) {
+    private DocumentPersistenceService.DocumentDetail indexedDocument(String sourceId) {
         OffsetDateTime now = OffsetDateTime.now();
-        return new PaperDocumentPersistenceService.DocumentDetail(
+        return new DocumentPersistenceService.DocumentDetail(
                 sourceId,
                 ownerUserId,
                 "Paper",

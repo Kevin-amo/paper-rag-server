@@ -2,7 +2,6 @@
 import { ref } from 'vue';
 import ChatMessageList from './ChatMessageList.vue';
 import ChatComposer from './ChatComposer.vue';
-import LiteratureSearchResults from './LiteratureSearchResults.vue';
 import type { ChatMode, ConversationMessage, LiteratureSearchResult } from '../../types';
 
 const props = defineProps<{
@@ -37,19 +36,11 @@ function handleExample(question: string) {
 <template>
   <main class="rag-workspace">
     <ChatMessageList
-      v-if="props.mode === 'rag'"
       :messages="props.messages"
       :loading="props.messagesLoading"
       :current-user-avatar-url="props.currentUserAvatarUrl"
+      :mode="props.mode"
       @ask-example="handleExample"
-    />
-    <LiteratureSearchResults
-      v-else
-      :items="props.literatureItems"
-      :loading="props.literatureLoading"
-      :error-message="props.literatureErrorMessage"
-      :last-query="props.lastLiteratureQuery"
-      :has-searched="props.hasSearchedLiterature"
     />
     <ChatComposer
       ref="composerRef"

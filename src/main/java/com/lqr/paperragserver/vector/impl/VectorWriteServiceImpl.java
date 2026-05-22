@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.ai.service.EmbeddingService;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
-import com.lqr.paperragserver.paper.mapper.PaperDocumentChunkMapper;
+import com.lqr.paperragserver.document.mapper.DocumentChunkMapper;
 import com.lqr.paperragserver.vector.mapper.VectorStoreMapper;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +26,7 @@ import java.util.UUID;
 public class VectorWriteServiceImpl implements VectorWriteService {
 
     private final VectorStoreMapper vectorStoreMapper;
-    private final PaperDocumentChunkMapper chunkMapper;
+    private final DocumentChunkMapper chunkMapper;
     private final ObjectMapper objectMapper;
     @Value("${spring.ai.vectorstore.pgvector.dimensions:1536}")
     private int embeddingDimensions;

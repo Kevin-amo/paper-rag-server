@@ -48,7 +48,16 @@ public class OpenAlexLiteratureClient {
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .body(JsonNode.class);
-            return normalize(raw);
+            List<LiteratureSearchResult> results = normalize(raw);
+            if (SORT_DATE.equals(sortBy)) {
+                return results.stream()
+                        .sorted(Comparator.comparing(
+                                LiteratureSearchResult::publishedDate,
+                                Comparator.nullsLast(String::compareTo)
+                        ))
+                        .toList();
+            }
+            return results;
         } catch (ResourceAccessException ex) {
             if (isTimeout(ex)) {
                 throw new LiteratureSearchException(HttpStatus.GATEWAY_TIMEOUT, "OPENALEX_TIMEOUT", "OpenAlex 调用超时", ex);
@@ -215,13 +224,10 @@ public class OpenAlexLiteratureClient {
     }
 
     private String openAlexSort(String sortBy) {
-        if (SORT_DATE.equals(sortBy)) {
-            return "publication_date:desc";
-        }
-        return SORT_RELEVANCE.equals(sortBy) ? "relevance_score:desc" : "relevance_score:desc";
+        return SORT_RELEVANCE.equals(sortBy) || SORT_DATE.equals(sortBy) ? "relevance_score:desc" : "relevance_score:desc";
     }
 
-    private URI openAlexUri(
+    URI openAlexUri(
             LiteratureSearchRequest request,
             int limit,
             String sortBy,
@@ -237,7 +243,7 @@ public class OpenAlexLiteratureClient {
         if (request.dateFrom() != null && !request.dateFrom().isBlank()) {
             builder.queryParam("filter", "from_publication_date:" + request.dateFrom().trim());
         }
-        return builder.build(true).toUri();
+        return builder.build().encode().toUri();
     }
 
     private RestClient client(Duration timeout) {

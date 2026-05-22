@@ -1,14 +1,14 @@
-package com.lqr.paperragserver.paper.mapper;
+package com.lqr.paperragserver.document.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.lqr.paperragserver.paper.entity.PaperDocument;
+import com.lqr.paperragserver.document.entity.DocumentEntity;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.UUID;
 
-public interface PaperDocumentMapper extends BaseMapper<PaperDocument> {
+public interface DocumentMapper extends BaseMapper<DocumentEntity> {
 
     /**
      * 新增或覆盖文档解析中的基础信息。

@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.paper.service;
+package com.lqr.paperragserver.document.service;
 
 import com.lqr.paperragserver.common.model.DocumentAsset;
 import com.lqr.paperragserver.common.model.DocumentChunk;
@@ -13,7 +13,7 @@ import java.util.UUID;
 /**
  * 文档元数据持久化服务。
  */
-public interface PaperDocumentPersistenceService {
+public interface DocumentPersistenceService {
 
     /**
      * 分页查询文档摘要。

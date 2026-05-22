@@ -1,8 +1,8 @@
-package com.lqr.paperragserver.paper.impl;
+package com.lqr.paperragserver.document.impl;
 
 import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.model.DocumentSource;
-import com.lqr.paperragserver.paper.service.PaperMetadataService;
+import com.lqr.paperragserver.document.service.DocumentMetadataService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -15,7 +15,7 @@ import java.util.Map;
  * 默认论文元数据归一化服务。
  */
 @Service
-public class PaperMetadataServiceImpl implements PaperMetadataService {
+public class DocumentMetadataServiceImpl implements DocumentMetadataService {
 
     private static final List<String> AUTHOR_KEYS = List.of("authors", "author", "作者");
     private static final List<String> ABSTRACT_KEYS = List.of("abstractText", "abstract", "summary", "摘要");
@@ -30,7 +30,7 @@ public class PaperMetadataServiceImpl implements PaperMetadataService {
      * 将外部传入的论文元数据归一化后合并到文档来源 metadata。
      */
     @Override
-    public DocumentSource enrich(DocumentSource source, Map<String, Object> paperMetadata) {
+    public DocumentSource enrich(DocumentSource source, Map<String, Object> documentMetadata) {
         if (source == null) {
             throw new IllegalArgumentException("文档来源信息不能为空");
         }
@@ -38,8 +38,8 @@ public class PaperMetadataServiceImpl implements PaperMetadataService {
         if (source.metadata() != null) {
             merged.putAll(source.metadata());
         }
-        if (paperMetadata != null) {
-            merged.putAll(paperMetadata);
+        if (documentMetadata != null) {
+            merged.putAll(documentMetadata);
         }
 
         putIfPresent(merged, MetadataKeys.AUTHORS, normalizeList(firstValue(merged, AUTHOR_KEYS)));

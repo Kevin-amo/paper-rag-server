@@ -81,6 +81,7 @@ class ConversationControllerTest {
                 2,
                 "答案",
                 List.of(new AnswerCitation("source-1", "chunk-1", 0, "标题", "摘录", 0.9)),
+                null,
                 OffsetDateTime.now()
         );
         when(conversationService.listMessages(ownerUserId, conversationId)).thenReturn(List.of(message));
@@ -102,7 +103,7 @@ class ConversationControllerTest {
 
     private ConversationService.ConversationView conversationView(String title) {
         OffsetDateTime now = OffsetDateTime.now();
-        return new ConversationService.ConversationView(UUID.randomUUID(), ownerUserId, title, now, now);
+        return new ConversationService.ConversationView(UUID.randomUUID(), ownerUserId, title, "RAG", now, now);
     }
 
     private SecurityUserPrincipal principal(UUID userId) {

@@ -17,6 +17,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -25,7 +27,11 @@ public class ConversationServiceImpl implements ConversationService {
 
     private static final int MAX_TITLE_LENGTH = 60;
     private static final int MAX_HISTORY_LIMIT = 40;
+    private static final String CONVERSATION_TYPE_RAG = "RAG";
+    private static final String CONVERSATION_TYPE_LITERATURE = "LITERATURE";
     private static final TypeReference<List<AnswerCitation>> CITATION_LIST_TYPE = new TypeReference<>() {
+    };
+    private static final TypeReference<Map<String, Object>> METADATA_MAP_TYPE = new TypeReference<>() {
     };
 
     private final ConversationMapper conversationMapper;
@@ -34,11 +40,17 @@ public class ConversationServiceImpl implements ConversationService {
 
     @Override
     public ConversationView createConversation(UUID ownerUserId, String title) {
+        return createConversation(ownerUserId, title, CONVERSATION_TYPE_RAG);
+    }
+
+    @Override
+    public ConversationView createConversation(UUID ownerUserId, String title, String type) {
         Conversation entity = new Conversation();
         OffsetDateTime now = OffsetDateTime.now();
         entity.setId(UUID.randomUUID());
         entity.setOwnerUserId(ownerUserId);
         entity.setTitle(normalizeTitle(title));
+        entity.setType(normalizeType(type, CONVERSATION_TYPE_RAG));
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
         conversationMapper.insert(entity);
@@ -69,12 +81,17 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    @Transactional
     public ConversationView getOrCreateConversation(UUID ownerUserId, UUID conversationId, String firstQuestion) {
+        return getOrCreateConversation(ownerUserId, conversationId, firstQuestion, CONVERSATION_TYPE_RAG);
+    }
+
+    @Override
+    @Transactional
+    public ConversationView getOrCreateConversation(UUID ownerUserId, UUID conversationId, String firstQuestion, String type) {
         if (conversationId != null) {
             return requireConversation(ownerUserId, conversationId);
         }
-        return createConversation(ownerUserId, firstQuestion);
+        return createConversation(ownerUserId, firstQuestion, type);
     }
 
     @Override
@@ -112,7 +129,7 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     @Transactional
     public MessageView appendUserMessage(UUID ownerUserId, UUID conversationId, String content) {
-        MessageView message = appendMessage(ownerUserId, conversationId, "USER", content, null);
+        MessageView message = appendMessage(ownerUserId, conversationId, "USER", content, null, null);
         conversationMapper.touch(conversationId, ownerUserId);
         return message;
     }
@@ -120,7 +137,13 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     @Transactional
     public MessageView appendAssistantMessage(UUID ownerUserId, UUID conversationId, String content, List<AnswerCitation> citations) {
-        MessageView message = appendMessage(ownerUserId, conversationId, "ASSISTANT", content, citations);
+        return appendAssistantMessage(ownerUserId, conversationId, content, citations, null);
+    }
+
+    @Override
+    @Transactional
+    public MessageView appendAssistantMessage(UUID ownerUserId, UUID conversationId, String content, List<AnswerCitation> citations, Object metadata) {
+        MessageView message = appendMessage(ownerUserId, conversationId, "ASSISTANT", content, citations, metadata);
         conversationMapper.touch(conversationId, ownerUserId);
         return message;
     }
@@ -131,7 +154,7 @@ public class ConversationServiceImpl implements ConversationService {
         conversationMapper.softDelete(conversationId, ownerUserId);
     }
 
-    private MessageView appendMessage(UUID ownerUserId, UUID conversationId, String role, String content, List<AnswerCitation> citations) {
+    private MessageView appendMessage(UUID ownerUserId, UUID conversationId, String role, String content, List<AnswerCitation> citations, Object metadata) {
         requireConversation(ownerUserId, conversationId);
         String normalizedContent = requireContent(content);
         ConversationMessage entity = new ConversationMessage();
@@ -142,6 +165,7 @@ public class ConversationServiceImpl implements ConversationService {
         entity.setMessageOrder(messageMapper.nextMessageOrder(conversationId, ownerUserId));
         entity.setContent(normalizedContent);
         entity.setCitations(citations == null || citations.isEmpty() ? null : citations);
+        entity.setMetadata(metadata);
         entity.setCreatedAt(OffsetDateTime.now());
         messageMapper.insert(entity);
         return toMessageView(entity);
@@ -160,7 +184,14 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     private ConversationView toConversationView(Conversation entity) {
-        return new ConversationView(entity.getId(), entity.getOwnerUserId(), entity.getTitle(), entity.getCreatedAt(), entity.getUpdatedAt());
+        return new ConversationView(
+                entity.getId(),
+                entity.getOwnerUserId(),
+                entity.getTitle(),
+                normalizeType(entity.getType(), CONVERSATION_TYPE_RAG),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
     }
 
     private MessageView toMessageView(ConversationMessage entity) {
@@ -171,6 +202,7 @@ public class ConversationServiceImpl implements ConversationService {
                 entity.getMessageOrder(),
                 entity.getContent(),
                 parseCitations(entity.getCitations()),
+                parseMetadata(entity.getMetadata()),
                 entity.getCreatedAt()
         );
     }
@@ -180,5 +212,23 @@ public class ConversationServiceImpl implements ConversationService {
             return List.of();
         }
         return objectMapper.convertValue(value, CITATION_LIST_TYPE);
+    }
+
+    private Map<String, Object> parseMetadata(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return objectMapper.convertValue(value, METADATA_MAP_TYPE);
+    }
+
+    private String normalizeType(String type, String fallback) {
+        if (type == null || type.isBlank()) {
+            return fallback;
+        }
+        String normalized = type.trim().toUpperCase(Locale.ROOT);
+        if (CONVERSATION_TYPE_LITERATURE.equals(normalized) || CONVERSATION_TYPE_RAG.equals(normalized)) {
+            return normalized;
+        }
+        return fallback;
     }
 }

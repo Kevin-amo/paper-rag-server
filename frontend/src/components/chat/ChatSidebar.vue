@@ -174,6 +174,10 @@ function closeOperationDialog() {
 function conversationTitle(conversation: Conversation) {
   return conversation.title?.trim() || '新的论文问答';
 }
+
+function conversationTypeLabel(conversation: Conversation) {
+  return conversation.type === 'LITERATURE' ? '文献搜索' : '论文分析';
+}
 </script>
 
 <template>
@@ -234,6 +238,9 @@ function conversationTitle(conversation: Conversation) {
           <button v-else type="button" class="conversation-select" @click="emit('selectConversation', conversation.id)">
             <span class="conversation-title-row">
               <span class="conversation-title">{{ conversationTitle(conversation) }}</span>
+              <span class="conversation-type-badge" :class="conversation.type === 'LITERATURE' ? 'literature' : 'rag'">
+                {{ conversationTypeLabel(conversation) }}
+              </span>
               <span v-if="isPinned(conversation.id)" class="conversation-pin-badge" aria-label="已置顶" title="已置顶">📌</span>
             </span>
           </button>
@@ -495,6 +502,30 @@ function conversationTitle(conversation: Conversation) {
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.conversation-type-badge {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.conversation-type-badge.literature {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.conversation-type-badge.rag {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
 }
 
 .conversation-pin-badge {

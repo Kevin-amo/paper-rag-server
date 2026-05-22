@@ -14,7 +14,7 @@ import { useDocuments } from '../composables/useDocuments';
 import { useConversations } from '../composables/useConversations';
 import { useRagChat } from '../composables/useRagChat';
 import { useLiteratureSearch } from '../composables/useLiteratureSearch';
-import type { ChatMode } from '../types';
+import type { ChatMode, ConversationMessage } from '../types';
 
 const router = useRouter();
 const auth = useAuth();
@@ -27,25 +27,29 @@ const avatarUploading = ref(false);
 const avatarRefreshVersion = ref(0);
 const chatMode = ref<ChatMode>('rag');
 
-const ragState = useRagChat({
-  activeConversationId: conversationsState.activeConversationId,
-  conversationMessages: conversationsState.conversationMessages,
-  conversations: conversationsState.conversations,
-  loadConversations: () => conversationsState.loadConversations(),
-  loadMessages: conversationsState.loadMessages,
-});
-const literatureState = useLiteratureSearch();
-
 const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '当前用户');
 const currentUserAvatarUrl = computed(() => buildAvatarDisplayUrl(auth.state.user?.avatarUrl ?? null));
 const activeConversation = computed(() => (
   conversationsState.conversations.value.find((item) => item.id === conversationsState.activeConversationId.value) ?? null
 ));
+
+const ragState = useRagChat({
+  activeConversationId: conversationsState.activeConversationId,
+  activeConversation,
+  conversationMessages: conversationsState.conversationMessages,
+  conversations: conversationsState.conversations,
+  loadConversations: () => conversationsState.loadConversations(),
+  loadMessages: conversationsState.loadMessages,
+});
+const literatureState = useLiteratureSearch({
+  activeConversationId: conversationsState.activeConversationId,
+  conversationMessages: conversationsState.conversationMessages,
+  loadConversations: () => conversationsState.loadConversations(),
+  loadMessages: conversationsState.loadMessages,
+});
+
 const visibleMessages = computed(() => conversationsState.conversationMessages.value
-  .filter((message) => {
-    const content = message.content.trim();
-    return message.streaming || (content && content !== '-') || message.citations?.length;
-  })
+  .filter((message) => isRenderableMessage(message))
   .sort((a, b) => a.messageOrder - b.messageOrder));
 
 function buildAvatarDisplayUrl(avatarUrl: string | null) {
@@ -55,6 +59,22 @@ function buildAvatarDisplayUrl(avatarUrl: string | null) {
 
   const separator = avatarUrl.includes('?') ? '&' : '?';
   return `${avatarUrl}${separator}t=${avatarRefreshVersion.value}`;
+}
+
+function isLiteratureMessageMetadata(metadata: ConversationMessage['metadata']) {
+  return !!metadata
+    && typeof metadata === 'object'
+    && 'type' in metadata
+    && metadata.type === 'LITERATURE_SEARCH_RESULT'
+    && Array.isArray((metadata as { items?: unknown[] }).items);
+}
+
+function isRenderableMessage(message: ConversationMessage) {
+  const content = message.content.trim();
+  return message.streaming
+    || (!!content && content !== '-')
+    || (message.citations?.length ?? 0) > 0
+    || (message.role === 'ASSISTANT' && isLiteratureMessageMetadata(message.metadata));
 }
 
 async function handleLogout() {
@@ -86,12 +106,28 @@ async function openDocumentDetail(document: Parameters<typeof documentsState.ope
 }
 
 async function handleChatSubmit(payload: { mode: ChatMode; question: string; topK?: number }) {
+  chatMode.value = payload.mode;
   if (payload.mode === 'literature') {
     await literatureState.search(payload.question);
     return;
   }
 
   await ragState.ask({ question: payload.question, topK: payload.topK });
+}
+
+async function handleSelectConversation(conversationId: string) {
+  await conversationsState.selectConversation(conversationId);
+  const selectedConversation = conversationsState.conversations.value.find((conversation) => conversation.id === conversationId);
+  chatMode.value = selectedConversation?.type === 'LITERATURE' ? 'literature' : 'rag';
+}
+
+function handleCreateConversation() {
+  conversationsState.createNewConversation();
+  chatMode.value = 'rag';
+}
+
+function handleModeUpdate(mode: ChatMode) {
+  chatMode.value = mode;
 }
 
 onMounted(async () => {
@@ -114,8 +150,8 @@ onMounted(async () => {
       :current-user-name="currentUserName"
       :current-user-avatar-url="currentUserAvatarUrl"
       :is-admin="auth.isAdmin.value"
-      @create-conversation="conversationsState.createNewConversation"
-      @select-conversation="conversationsState.selectConversation"
+      @create-conversation="handleCreateConversation"
+      @select-conversation="handleSelectConversation"
       @delete-conversation="conversationsState.removeConversation"
       @rename-conversation="conversationsState.renameConversation"
       @open-documents="documentLibraryVisible = true"
@@ -133,11 +169,11 @@ onMounted(async () => {
       :document-total="documentsState.pagination.total"
       :current-user-avatar-url="currentUserAvatarUrl"
       :literature-loading="literatureState.literatureLoading.value"
-      :literature-items="literatureState.literatureItems.value"
-      :literature-error-message="literatureState.literatureErrorMessage.value"
-      :last-literature-query="literatureState.lastLiteratureQuery.value"
-      :has-searched-literature="literatureState.hasSearchedLiterature.value"
-      @update:mode="chatMode = $event"
+      :literature-items="[]"
+      :literature-error-message="''"
+      :last-literature-query="''"
+      :has-searched-literature="false"
+      @update:mode="handleModeUpdate"
       @submit="handleChatSubmit"
       @open-documents="documentLibraryVisible = true"
       @open-upload="uploadVisible = true"

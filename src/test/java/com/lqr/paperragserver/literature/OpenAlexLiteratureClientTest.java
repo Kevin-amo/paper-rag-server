@@ -5,6 +5,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
@@ -85,6 +87,44 @@ class OpenAlexLiteratureClientTest {
                 """);
 
         assertThat(client.restoreAbstract(invertedIndex)).isEqualTo("A useful RAG paper");
+    }
+
+    @Test
+    void openAlexUriShouldEncodeQueryWithSpacesAndChineseCharacters() {
+        var properties = new LiteratureSearchProperties.OpenAlex(
+                true,
+                "https://api.openalex.org/works",
+                Duration.ofSeconds(10),
+                null
+        );
+
+        var uri = client.openAlexUri(
+                new LiteratureSearchRequest("learning machine 中文", 10, null, null, "relevance"),
+                10,
+                "relevance",
+                properties
+        );
+
+        assertThat(uri.toString()).contains("search=learning%20machine%20%E4%B8%AD%E6%96%87");
+    }
+
+    @Test
+    void openAlexUriShouldKeepRelevanceSortWhenDateSortRequested() {
+        var properties = new LiteratureSearchProperties.OpenAlex(
+                true,
+                "https://api.openalex.org/works",
+                Duration.ofSeconds(10),
+                null
+        );
+
+        var uri = client.openAlexUri(
+                new LiteratureSearchRequest("RAG", 3, null, null, "date"),
+                3,
+                "date",
+                properties
+        );
+
+        assertThat(uri.toString()).contains("sort=relevance_score:desc");
     }
 
     @Test

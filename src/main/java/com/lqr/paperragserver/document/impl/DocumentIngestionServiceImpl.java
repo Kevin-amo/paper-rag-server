@@ -11,9 +11,9 @@ import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.service.DocumentParsingService;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
 import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
-import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
-import com.lqr.paperragserver.paper.service.DocumentIngestionJobService;
-import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
+import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,7 +35,7 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
     private final DocumentSplittingService documentSplittingService;
     private final EmbeddingService embeddingService;
     private final VectorWriteService vectorWriteService;
-    private final PaperDocumentPersistenceService paperDocumentPersistenceService;
+    private final DocumentPersistenceService documentPersistenceService;
     private final DocumentIngestionJobService documentIngestionJobService;
     private final DocumentUploadStorageService documentUploadStorageService;
     private final DocumentIngestionProperties documentIngestionProperties;
@@ -87,16 +87,16 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         DocumentSource source = parsedDocument.source();
         String text = parsedDocument.text();
         try {
-            paperDocumentPersistenceService.markParsing(ownerUserId, source, text);
-            paperDocumentPersistenceService.replaceAssets(ownerUserId, source.sourceId(), parsedDocument.assets());
+            documentPersistenceService.markParsing(ownerUserId, source, text);
+            documentPersistenceService.replaceAssets(ownerUserId, source.sourceId(), parsedDocument.assets());
             List<DocumentChunk> chunks = documentSplittingService.split(source, text);
             vectorWriteService.deleteBySourceId(ownerUserId, source.sourceId());
-            paperDocumentPersistenceService.replaceChunks(ownerUserId, source.sourceId(), chunks);
+            documentPersistenceService.replaceChunks(ownerUserId, source.sourceId(), chunks);
             vectorWriteService.upsert(ownerUserId, embeddingService.embed(chunks));
-            paperDocumentPersistenceService.markIndexed(ownerUserId, source.sourceId(), chunks.size());
+            documentPersistenceService.markIndexed(ownerUserId, source.sourceId(), chunks.size());
             return new DocumentIngestionResult(source, chunks.size());
         } catch (RuntimeException ex) {
-            paperDocumentPersistenceService.markFailed(ownerUserId, source.sourceId(), ex.getMessage());
+            documentPersistenceService.markFailed(ownerUserId, source.sourceId(), ex.getMessage());
             throw ex;
         }
     }
@@ -107,8 +107,8 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         documentIngestionJobService.markRunningStage(
                 job.getOwnerUserId(), job.getId(), source.sourceId(), DocumentIngestionJobService.STATUS_PARSING, 30
         );
-        paperDocumentPersistenceService.markParsing(job.getOwnerUserId(), source, text);
-        paperDocumentPersistenceService.replaceAssets(job.getOwnerUserId(), source.sourceId(), parsedDocument.assets());
+        documentPersistenceService.markParsing(job.getOwnerUserId(), source, text);
+        documentPersistenceService.replaceAssets(job.getOwnerUserId(), source.sourceId(), parsedDocument.assets());
 
         documentIngestionJobService.markRunningStage(
                 job.getOwnerUserId(), job.getId(), source.sourceId(), DocumentIngestionJobService.STATUS_CHUNKING, 45
@@ -119,7 +119,7 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
                 job.getOwnerUserId(), job.getId(), source.sourceId(), DocumentIngestionJobService.STATUS_INDEXING, 65
         );
         vectorWriteService.deleteBySourceId(job.getOwnerUserId(), source.sourceId());
-        paperDocumentPersistenceService.replaceChunks(job.getOwnerUserId(), source.sourceId(), chunks);
+        documentPersistenceService.replaceChunks(job.getOwnerUserId(), source.sourceId(), chunks);
 
         documentIngestionJobService.markRunningStage(
                 job.getOwnerUserId(), job.getId(), source.sourceId(), DocumentIngestionJobService.STATUS_EMBEDDING, 80
@@ -130,7 +130,7 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
                 job.getOwnerUserId(), job.getId(), source.sourceId(), DocumentIngestionJobService.STATUS_INDEXING, 90
         );
         vectorWriteService.upsert(job.getOwnerUserId(), vectors);
-        paperDocumentPersistenceService.markIndexed(job.getOwnerUserId(), source.sourceId(), chunks.size());
+        documentPersistenceService.markIndexed(job.getOwnerUserId(), source.sourceId(), chunks.size());
         documentIngestionJobService.markIndexed(job.getOwnerUserId(), job.getId(), source.sourceId());
         return new DocumentIngestionResult(source, chunks.size());
     }
@@ -143,6 +143,6 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
     @Override
     public void deleteBySourceId(UUID ownerUserId, String sourceId) {
         vectorWriteService.deleteBySourceId(ownerUserId, sourceId);
-        paperDocumentPersistenceService.markDeleted(ownerUserId, sourceId);
+        documentPersistenceService.markDeleted(ownerUserId, sourceId);
     }
 }

@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.paper.impl;
+package com.lqr.paperragserver.document.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -8,13 +8,13 @@ import com.lqr.paperragserver.common.model.DocumentAsset;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
-import com.lqr.paperragserver.paper.entity.PaperDocumentAsset;
-import com.lqr.paperragserver.paper.entity.PaperDocumentChunk;
-import com.lqr.paperragserver.paper.entity.PaperDocument;
-import com.lqr.paperragserver.paper.mapper.PaperDocumentAssetMapper;
-import com.lqr.paperragserver.paper.mapper.PaperDocumentChunkMapper;
-import com.lqr.paperragserver.paper.mapper.PaperDocumentMapper;
-import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.document.entity.DocumentAssetEntity;
+import com.lqr.paperragserver.document.entity.DocumentChunkEntity;
+import com.lqr.paperragserver.document.entity.DocumentEntity;
+import com.lqr.paperragserver.document.mapper.DocumentAssetMapper;
+import com.lqr.paperragserver.document.mapper.DocumentChunkMapper;
+import com.lqr.paperragserver.document.mapper.DocumentMapper;
+import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,14 +40,14 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersistenceService {
+public class DocumentPersistenceServiceImpl implements DocumentPersistenceService {
 
     private static final int SECTION_TITLE_MAX_LENGTH = 512;
     private static final Pattern SEARCH_TOKEN = Pattern.compile("[\\p{IsHan}A-Za-z0-9]+");
 
-    private final PaperDocumentMapper documentMapper;
-    private final PaperDocumentChunkMapper chunkMapper;
-    private final PaperDocumentAssetMapper assetMapper;
+    private final DocumentMapper documentMapper;
+    private final DocumentChunkMapper chunkMapper;
+    private final DocumentAssetMapper assetMapper;
     private final ObjectMapper objectMapper;
 
     /**
@@ -57,10 +57,10 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     public PageResult<DocumentSummary> listDocuments(UUID ownerUserId, String keyword, String status, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = clamp(size, 1, 100);
-        LambdaQueryWrapper<PaperDocument> wrapper = documentListWrapper(ownerUserId, keyword, status)
-                .orderByDesc(PaperDocument::getUpdatedAt)
-                .orderByDesc(PaperDocument::getCreatedAt);
-        Page<PaperDocument> result = documentMapper.selectPage(new Page<>(safePage + 1L, safeSize), wrapper);
+        LambdaQueryWrapper<DocumentEntity> wrapper = documentListWrapper(ownerUserId, keyword, status)
+                .orderByDesc(DocumentEntity::getUpdatedAt)
+                .orderByDesc(DocumentEntity::getCreatedAt);
+        Page<DocumentEntity> result = documentMapper.selectPage(new Page<>(safePage + 1L, safeSize), wrapper);
         List<DocumentSummary> items = result.getRecords().stream()
                 .map(this::toDocumentSummary)
                 .toList();
@@ -72,9 +72,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
      */
     @Override
     public Optional<DocumentDetail> findDocument(UUID ownerUserId, String sourceId) {
-        return Optional.ofNullable(documentMapper.selectOne(new LambdaQueryWrapper<PaperDocument>()
-                        .eq(PaperDocument::getOwnerUserId, ownerUserId)
-                        .eq(PaperDocument::getSourceId, sourceId)))
+        return Optional.ofNullable(documentMapper.selectOne(new LambdaQueryWrapper<DocumentEntity>()
+                        .eq(DocumentEntity::getOwnerUserId, ownerUserId)
+                        .eq(DocumentEntity::getSourceId, sourceId)))
                 .map(this::toDocumentDetail);
     }
 
@@ -85,11 +85,11 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     public PageResult<DocumentChunkView> listChunks(UUID ownerUserId, String sourceId, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = clamp(size, 1, 200);
-        Page<PaperDocumentChunk> result = chunkMapper.selectPage(new Page<>(safePage + 1L, safeSize),
-                new LambdaQueryWrapper<PaperDocumentChunk>()
-                        .eq(PaperDocumentChunk::getOwnerUserId, ownerUserId)
-                        .eq(PaperDocumentChunk::getSourceId, sourceId)
-                        .orderByAsc(PaperDocumentChunk::getChunkIndex));
+        Page<DocumentChunkEntity> result = chunkMapper.selectPage(new Page<>(safePage + 1L, safeSize),
+                new LambdaQueryWrapper<DocumentChunkEntity>()
+                        .eq(DocumentChunkEntity::getOwnerUserId, ownerUserId)
+                        .eq(DocumentChunkEntity::getSourceId, sourceId)
+                        .orderByAsc(DocumentChunkEntity::getChunkIndex));
         List<DocumentChunkView> items = result.getRecords().stream()
                 .map(this::toDocumentChunkView)
                 .toList();
@@ -191,9 +191,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     @Override
     @Transactional
     public void replaceAssets(UUID ownerUserId, String sourceId, List<DocumentAsset> assets) {
-        assetMapper.delete(new LambdaQueryWrapper<PaperDocumentAsset>()
-                .eq(PaperDocumentAsset::getOwnerUserId, ownerUserId)
-                .eq(PaperDocumentAsset::getSourceId, sourceId));
+        assetMapper.delete(new LambdaQueryWrapper<DocumentAssetEntity>()
+                .eq(DocumentAssetEntity::getOwnerUserId, ownerUserId)
+                .eq(DocumentAssetEntity::getSourceId, sourceId));
         if (assets == null || assets.isEmpty()) {
             return;
         }
@@ -207,26 +207,26 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
      */
     @Override
     public List<DocumentAssetView> listAssets(UUID ownerUserId, String sourceId, List<String> assetIds) {
-        LambdaQueryWrapper<PaperDocumentAsset> wrapper = new LambdaQueryWrapper<PaperDocumentAsset>()
-                .select(PaperDocumentAsset::getAssetId,
-                        PaperDocumentAsset::getSourceId,
-                        PaperDocumentAsset::getAssetIndex,
-                        PaperDocumentAsset::getAssetType,
-                        PaperDocumentAsset::getFileName,
-                        PaperDocumentAsset::getContentType,
-                        PaperDocumentAsset::getFileSize,
-                        PaperDocumentAsset::getContentHash,
-                        PaperDocumentAsset::getExtractedText,
-                        PaperDocumentAsset::getTextStart,
-                        PaperDocumentAsset::getTextEnd,
-                        PaperDocumentAsset::getMetadata,
-                        PaperDocumentAsset::getCreatedAt,
-                        PaperDocumentAsset::getUpdatedAt)
-                .eq(PaperDocumentAsset::getOwnerUserId, ownerUserId)
-                .eq(PaperDocumentAsset::getSourceId, sourceId)
-                .orderByAsc(PaperDocumentAsset::getAssetIndex);
+        LambdaQueryWrapper<DocumentAssetEntity> wrapper = new LambdaQueryWrapper<DocumentAssetEntity>()
+                .select(DocumentAssetEntity::getAssetId,
+                        DocumentAssetEntity::getSourceId,
+                        DocumentAssetEntity::getAssetIndex,
+                        DocumentAssetEntity::getAssetType,
+                        DocumentAssetEntity::getFileName,
+                        DocumentAssetEntity::getContentType,
+                        DocumentAssetEntity::getFileSize,
+                        DocumentAssetEntity::getContentHash,
+                        DocumentAssetEntity::getExtractedText,
+                        DocumentAssetEntity::getTextStart,
+                        DocumentAssetEntity::getTextEnd,
+                        DocumentAssetEntity::getMetadata,
+                        DocumentAssetEntity::getCreatedAt,
+                        DocumentAssetEntity::getUpdatedAt)
+                .eq(DocumentAssetEntity::getOwnerUserId, ownerUserId)
+                .eq(DocumentAssetEntity::getSourceId, sourceId)
+                .orderByAsc(DocumentAssetEntity::getAssetIndex);
         if (assetIds != null && !assetIds.isEmpty()) {
-            wrapper.in(PaperDocumentAsset::getAssetId, assetIds);
+            wrapper.in(DocumentAssetEntity::getAssetId, assetIds);
         }
         return assetMapper.selectList(wrapper).stream()
                 .map(this::toDocumentAssetView)
@@ -238,10 +238,10 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
      */
     @Override
     public Optional<DocumentAssetView> findAsset(UUID ownerUserId, String sourceId, String assetId) {
-        return Optional.ofNullable(assetMapper.selectOne(new LambdaQueryWrapper<PaperDocumentAsset>()
-                        .eq(PaperDocumentAsset::getOwnerUserId, ownerUserId)
-                        .eq(PaperDocumentAsset::getSourceId, sourceId)
-                        .eq(PaperDocumentAsset::getAssetId, assetId)))
+        return Optional.ofNullable(assetMapper.selectOne(new LambdaQueryWrapper<DocumentAssetEntity>()
+                        .eq(DocumentAssetEntity::getOwnerUserId, ownerUserId)
+                        .eq(DocumentAssetEntity::getSourceId, sourceId)
+                        .eq(DocumentAssetEntity::getAssetId, assetId)))
                 .map(this::toDocumentAssetView);
     }
 
@@ -251,9 +251,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     @Override
     @Transactional
     public void replaceChunks(UUID ownerUserId, String sourceId, List<DocumentChunk> chunks) {
-        chunkMapper.delete(new LambdaQueryWrapper<PaperDocumentChunk>()
-                .eq(PaperDocumentChunk::getOwnerUserId, ownerUserId)
-                .eq(PaperDocumentChunk::getSourceId, sourceId));
+        chunkMapper.delete(new LambdaQueryWrapper<DocumentChunkEntity>()
+                .eq(DocumentChunkEntity::getOwnerUserId, ownerUserId)
+                .eq(DocumentChunkEntity::getSourceId, sourceId));
         if (chunks == null || chunks.isEmpty()) {
             return;
         }
@@ -284,29 +284,29 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     @Override
     @Transactional
     public void markDeleted(UUID ownerUserId, String sourceId) {
-        assetMapper.delete(new LambdaQueryWrapper<PaperDocumentAsset>()
-                .eq(PaperDocumentAsset::getOwnerUserId, ownerUserId)
-                .eq(PaperDocumentAsset::getSourceId, sourceId));
-        chunkMapper.delete(new LambdaQueryWrapper<PaperDocumentChunk>()
-                .eq(PaperDocumentChunk::getOwnerUserId, ownerUserId)
-                .eq(PaperDocumentChunk::getSourceId, sourceId));
+        assetMapper.delete(new LambdaQueryWrapper<DocumentAssetEntity>()
+                .eq(DocumentAssetEntity::getOwnerUserId, ownerUserId)
+                .eq(DocumentAssetEntity::getSourceId, sourceId));
+        chunkMapper.delete(new LambdaQueryWrapper<DocumentChunkEntity>()
+                .eq(DocumentChunkEntity::getOwnerUserId, ownerUserId)
+                .eq(DocumentChunkEntity::getSourceId, sourceId));
         documentMapper.markDeleted(ownerUserId, sourceId);
     }
 
     /**
      * 构建文档列表查询条件。
      */
-    private LambdaQueryWrapper<PaperDocument> documentListWrapper(UUID ownerUserId, String keyword, String status) {
-        LambdaQueryWrapper<PaperDocument> wrapper = new LambdaQueryWrapper<PaperDocument>()
-                .eq(PaperDocument::getOwnerUserId, ownerUserId);
+    private LambdaQueryWrapper<DocumentEntity> documentListWrapper(UUID ownerUserId, String keyword, String status) {
+        LambdaQueryWrapper<DocumentEntity> wrapper = new LambdaQueryWrapper<DocumentEntity>()
+                .eq(DocumentEntity::getOwnerUserId, ownerUserId);
         if (status == null || status.isBlank()) {
-            wrapper.ne(PaperDocument::getStatus, "DELETED")
-                    .isNull(PaperDocument::getDeletedAt);
+            wrapper.ne(DocumentEntity::getStatus, "DELETED")
+                    .isNull(DocumentEntity::getDeletedAt);
         } else if (!"ALL".equalsIgnoreCase(status)) {
             String normalizedStatus = normalizeStatus(status);
-            wrapper.eq(PaperDocument::getStatus, normalizedStatus);
+            wrapper.eq(DocumentEntity::getStatus, normalizedStatus);
             if (!"DELETED".equalsIgnoreCase(normalizedStatus)) {
-                wrapper.isNull(PaperDocument::getDeletedAt);
+                wrapper.isNull(DocumentEntity::getDeletedAt);
             }
         }
         String normalizedKeyword = normalizeLikeKeyword(keyword);
@@ -322,7 +322,7 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     /**
      * 将文档实体转换为摘要视图。
      */
-    private DocumentSummary toDocumentSummary(PaperDocument entity) {
+    private DocumentSummary toDocumentSummary(DocumentEntity entity) {
         return new DocumentSummary(
                 entity.getSourceId(),
                 entity.getOwnerUserId(),
@@ -342,7 +342,7 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     /**
      * 将文档实体转换为详情视图。
      */
-    private DocumentDetail toDocumentDetail(PaperDocument entity) {
+    private DocumentDetail toDocumentDetail(DocumentEntity entity) {
         return new DocumentDetail(
                 entity.getSourceId(),
                 entity.getOwnerUserId(),
@@ -371,7 +371,7 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     /**
      * 将分块实体转换为分块视图。
      */
-    private DocumentChunkView toDocumentChunkView(PaperDocumentChunk entity) {
+    private DocumentChunkView toDocumentChunkView(DocumentChunkEntity entity) {
         return new DocumentChunkView(
                 entity.getChunkId(),
                 entity.getOwnerUserId(),
@@ -392,7 +392,7 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     /**
      * 将资产实体转换为资产视图。
      */
-    private DocumentAssetView toDocumentAssetView(PaperDocumentAsset entity) {
+    private DocumentAssetView toDocumentAssetView(DocumentAssetEntity entity) {
         return new DocumentAssetView(
                 entity.getAssetId(),
                 entity.getSourceId(),
@@ -416,9 +416,9 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     /**
      * 将文档分块领域对象转换为分块实体。
      */
-    private PaperDocumentChunk toChunkEntity(UUID ownerUserId, DocumentChunk chunk) {
+    private DocumentChunkEntity toChunkEntity(UUID ownerUserId, DocumentChunk chunk) {
         Map<String, Object> metadata = ownerMetadata(ownerUserId, chunk.metadata());
-        PaperDocumentChunk entity = new PaperDocumentChunk();
+        DocumentChunkEntity entity = new DocumentChunkEntity();
         entity.setId(UUID.randomUUID());
         entity.setOwnerUserId(ownerUserId);
         entity.setChunkId(chunk.chunkId());
@@ -437,8 +437,8 @@ public class PaperDocumentPersistenceServiceImpl implements PaperDocumentPersist
     /**
      * 将文档资产领域对象转换为资产实体。
      */
-    private PaperDocumentAsset toAssetEntity(UUID ownerUserId, DocumentAsset asset) {
-        PaperDocumentAsset entity = new PaperDocumentAsset();
+    private DocumentAssetEntity toAssetEntity(UUID ownerUserId, DocumentAsset asset) {
+        DocumentAssetEntity entity = new DocumentAssetEntity();
         entity.setId(UUID.randomUUID());
         entity.setOwnerUserId(ownerUserId);
         entity.setAssetId(asset.assetId());

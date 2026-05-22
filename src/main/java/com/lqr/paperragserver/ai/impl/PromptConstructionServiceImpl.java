@@ -37,7 +37,6 @@ public class PromptConstructionServiceImpl implements PromptConstructionService 
         String userMessage = "历史对话：\n" + historyText
                 + "\n\n当前问题：" + question
                 + "\n\n可用上下文：\n" + contextText
-                // + "\n\n请结合历史对话理解追问，只依据可用上下文给出简洁、可验证的回答，并在末尾列出引用片段编号。"
                 + "\n\n请结合历史对话理解追问，只依据可用上下文给出简洁、可验证的回答。";
         return new Prompt(systemMessage, userMessage);
     }

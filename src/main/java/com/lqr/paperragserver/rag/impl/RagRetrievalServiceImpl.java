@@ -5,7 +5,7 @@ import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
-import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import jdk.jfr.Registered;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
 
     private final VectorStore vectorStore;
     private final RagProperties ragProperties;
-    private final PaperDocumentPersistenceService paperDocumentPersistenceService;
+    private final DocumentPersistenceService documentPersistenceService;
     private final RerankService rerankService;
 
     /**
@@ -80,7 +80,7 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
             vectorChunks.add(new RetrievedChunk(chunk, vectorRankContribution(vectorScore, currentIndex, documents.size())));
         }
 
-        List<DocumentChunk> lexicalChunks = paperDocumentPersistenceService.searchChunks(ownerUserId, question, Math.max(resolvedTopK * 3, resolvedTopK));
+        List<DocumentChunk> lexicalChunks = documentPersistenceService.searchChunks(ownerUserId, question, Math.max(resolvedTopK * 3, resolvedTopK));
         Map<String, DocumentChunk> chunkById = new LinkedHashMap<>();
         Map<String, Double> scoreById = new LinkedHashMap<>();
         for (int lexicalIndex = 0; lexicalIndex < lexicalChunks.size(); lexicalIndex++) {
@@ -120,7 +120,7 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
         if (ownerUserId == null || sourceId == null || sourceId.isBlank()) {
             return false;
         }
-        return paperDocumentPersistenceService.findDocument(ownerUserId, sourceId)
+        return documentPersistenceService.findDocument(ownerUserId, sourceId)
                 .filter(document -> document.deletedAt() == null)
                 .map(document -> "INDEXED".equals(document.status()))
                 .orElse(false);

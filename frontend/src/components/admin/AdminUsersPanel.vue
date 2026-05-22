@@ -1,10 +1,16 @@
+<script lang="ts">
+export default {
+  name: 'AdminUsersPanel',
+};
+</script>
+
 <script setup lang="ts">
 import { computed, watch } from 'vue';
-import StatusTag from './common/StatusTag.vue';
-import RoleTag from './common/RoleTag.vue';
-import ConfirmDeleteButton from './common/ConfirmDeleteButton.vue';
-import { useAdminUsers } from '../composables/useAdminUsers';
-import type { AdminUser, UserRole, UserStatus } from '../types';
+import StatusTag from '../common/StatusTag.vue';
+import RoleTag from '../common/RoleTag.vue';
+import ConfirmDeleteButton from '../common/ConfirmDeleteButton.vue';
+import { useAdminUsers } from '../../composables/useAdminUsers';
+import type { AdminUser, UserRole, UserStatus } from '../../types';
 
 const props = defineProps<{
   modelValue: boolean;

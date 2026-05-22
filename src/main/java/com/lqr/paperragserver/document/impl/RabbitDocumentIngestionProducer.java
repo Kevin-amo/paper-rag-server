@@ -3,7 +3,7 @@ package com.lqr.paperragserver.document.impl;
 import com.lqr.paperragserver.document.config.DocumentIngestionRabbitConfiguration;
 import com.lqr.paperragserver.document.model.DocumentIngestionMessage;
 import com.lqr.paperragserver.document.service.DocumentIngestionProducer;
-import com.lqr.paperragserver.paper.service.DocumentIngestionJobService;
+import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;

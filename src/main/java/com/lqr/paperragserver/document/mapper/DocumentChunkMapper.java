@@ -1,7 +1,7 @@
-package com.lqr.paperragserver.paper.mapper;
+package com.lqr.paperragserver.document.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.lqr.paperragserver.paper.entity.PaperDocumentChunk;
+import com.lqr.paperragserver.document.entity.DocumentChunkEntity;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -9,7 +9,7 @@ import org.apache.ibatis.annotations.Update;
 import java.util.List;
 import java.util.UUID;
 
-public interface PaperDocumentChunkMapper extends BaseMapper<PaperDocumentChunk> {
+public interface DocumentChunkMapper extends BaseMapper<DocumentChunkEntity> {
 
     /**
      * 查询所有可参与关键词检索的有效文档分块。
@@ -25,7 +25,7 @@ public interface PaperDocumentChunkMapper extends BaseMapper<PaperDocumentChunk>
               and d.status = 'INDEXED'
             order by c.source_id asc, c.chunk_index asc
             """)
-    List<PaperDocumentChunk> selectSearchCandidates(@Param("ownerUserId") UUID ownerUserId);
+    List<DocumentChunkEntity> selectSearchCandidates(@Param("ownerUserId") UUID ownerUserId);
 
     /**
      * 回写文档分块关联的向量库记录 ID。

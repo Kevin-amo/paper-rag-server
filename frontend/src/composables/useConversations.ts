@@ -8,7 +8,12 @@ import {
   updateConversation,
 } from '../api/conversations';
 import { getErrorMessage } from '../api/http';
-import type { Conversation, ConversationMessage } from '../types';
+import type {
+  Conversation,
+  ConversationMessage,
+  ConversationMessageMetadata,
+  LiteratureSearchMessageMetadata,
+} from '../types';
 
 function responseShape(value: unknown) {
   if (value === null) {
@@ -40,6 +45,14 @@ function asArray<T>(value: T[] | { items?: T[] } | unknown, label: string): T[] 
 
 function isNotFound(error: unknown) {
   return axios.isAxiosError(error) && error.response?.status === 404;
+}
+
+function isLiteratureSearchMetadata(metadata: ConversationMessageMetadata): metadata is LiteratureSearchMessageMetadata {
+  return !!metadata
+    && typeof metadata === 'object'
+    && 'type' in metadata
+    && metadata.type === 'LITERATURE_SEARCH_RESULT'
+    && Array.isArray((metadata as LiteratureSearchMessageMetadata).items);
 }
 
 export function useConversations() {
@@ -146,7 +159,8 @@ export function useConversations() {
 
   function isDisposableMessage(message: ConversationMessage) {
     const content = message.content.trim();
-    return (!content || content === '-') && !message.citations?.length;
+    const hasLiteratureResult = isLiteratureSearchMetadata(message.metadata) && message.metadata.items.length > 0;
+    return (!content || content === '-') && !message.citations?.length && !hasLiteratureResult;
   }
 
   async function cleanEmptyConversations() {
