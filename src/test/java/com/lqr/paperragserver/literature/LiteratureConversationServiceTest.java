@@ -5,6 +5,12 @@ import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
 import com.lqr.paperragserver.ai.service.ToolCallingPromptConstructionService;
 import com.lqr.paperragserver.conversation.service.ConversationService;
+import com.lqr.paperragserver.literature.model.LiteratureSearchRequest;
+import com.lqr.paperragserver.literature.model.LiteratureSearchResponse;
+import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
+import com.lqr.paperragserver.literature.service.LiteratureConversationService;
+import com.lqr.paperragserver.literature.service.LiteratureSearchToolCallingService;
+import com.lqr.paperragserver.literature.support.LiteratureSearchIntentParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -39,7 +45,8 @@ class LiteratureConversationServiceTest {
                 literatureSearchToolCallingService,
                 promptConstructionService,
                 llmService,
-                new ObjectMapper()
+                new ObjectMapper(),
+                new LiteratureSearchIntentParser()
         );
         when(promptConstructionService.buildLiteratureSearchPlanPrompt(anyString())).thenReturn(planPrompt);
     }
@@ -124,6 +131,24 @@ class LiteratureConversationServiceTest {
         ArgumentCaptor<String> contextualInputCaptor = ArgumentCaptor.forClass(String.class);
         verify(promptConstructionService).buildLiteratureSearchPlanPrompt(contextualInputCaptor.capture());
         assertThat(contextualInputCaptor.getValue()).contains("找 Graph RAG 综述").contains("只看近两年的");
+        verify(literatureSearchToolCallingService).search(resolvedRequest);
+    }
+
+    @Test
+    void searchShouldFallbackToLocalDateIntentWhenPlanParsingFails() {
+        LiteratureSearchRequest request = new LiteratureSearchRequest(conversationId, "搜集一篇关于RAG的文献，要最新的", null, null, null, null);
+        LiteratureSearchRequest resolvedRequest = new LiteratureSearchRequest(conversationId, "RAG", 1, List.of(), null, "date");
+        LiteratureSearchResponse searched = new LiteratureSearchResponse(List.of(result("Recent RAG")));
+        when(conversationService.requireConversation(ownerUserId, conversationId))
+                .thenReturn(conversation("RAG papers", "LITERATURE"));
+        when(conversationService.recentMessages(ownerUserId, conversationId, ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT))
+                .thenReturn(List.of());
+        when(llmService.generate(planPrompt)).thenReturn("not json");
+        when(literatureSearchToolCallingService.search(resolvedRequest)).thenReturn(searched);
+
+        LiteratureSearchResponse response = service.search(ownerUserId, request);
+
+        assertThat(response.items()).containsExactlyElementsOf(searched.items());
         verify(literatureSearchToolCallingService).search(resolvedRequest);
     }
 

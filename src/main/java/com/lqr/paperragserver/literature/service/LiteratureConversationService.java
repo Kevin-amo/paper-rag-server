@@ -8,6 +8,7 @@ import com.lqr.paperragserver.conversation.service.ConversationService;
 import com.lqr.paperragserver.literature.model.LiteratureSearchRequest;
 import com.lqr.paperragserver.literature.model.LiteratureSearchResponse;
 import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
+import com.lqr.paperragserver.literature.support.LiteratureSearchIntentParser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +36,7 @@ public class LiteratureConversationService {
     private final ToolCallingPromptConstructionService promptConstructionService;
     private final LlmService llmService;
     private final ObjectMapper objectMapper;
+    private final LiteratureSearchIntentParser intentParser;
 
     public LiteratureSearchResponse search(UUID ownerUserId, LiteratureSearchRequest request) {
         ConversationService.ConversationView conversation = resolveConversation(ownerUserId, request.conversationId(), request.query());
@@ -67,37 +69,41 @@ public class LiteratureConversationService {
 
     private ResolvedSearchPlan resolveSearchPlan(List<ConversationService.MessageView> history, LiteratureSearchRequest request) {
         String contextualInput = buildContextualInput(history, request.query());
+        ResolvedSearchPlan fallback = fallbackPlan(request);
         try {
             String content = llmService.generate(promptConstructionService.buildLiteratureSearchPlanPrompt(contextualInput));
             ResolvedSearchPlan plan = objectMapper.readValue(jsonObject(content), PLAN_TYPE);
-            return mergePlan(plan, request);
+            return mergePlan(plan, request, fallback);
         } catch (RuntimeException ex) {
-            return fallbackPlan(request);
+            return fallback;
         } catch (Exception ex) {
-            return fallbackPlan(request);
+            return fallback;
         }
     }
 
-    private ResolvedSearchPlan mergePlan(ResolvedSearchPlan plan, LiteratureSearchRequest request) {
+    private ResolvedSearchPlan mergePlan(ResolvedSearchPlan plan, LiteratureSearchRequest request, ResolvedSearchPlan fallback) {
         if (plan == null) {
-            return fallbackPlan(request);
+            return fallback;
         }
         return new ResolvedSearchPlan(
-                firstNonBlank(plan.query(), request.query()),
-                request.limit() != null ? request.limit() : positiveOrNull(plan.limit()),
-                request.categories() == null || request.categories().isEmpty() ? normalizeCategories(plan.categories()) : normalizeCategories(request.categories()),
-                firstNonBlank(request.dateFrom(), plan.dateFrom()),
-                firstNonBlank(request.sortBy(), plan.sortBy())
+                firstNonBlank(plan.query(), fallback.query()),
+                request.limit() != null ? request.limit() : positiveOrNull(plan.limit()) != null ? plan.limit() : fallback.limit(),
+                request.categories() == null || request.categories().isEmpty() ?
+                        (plan.categories() == null || plan.categories().isEmpty() ? fallback.categories() : normalizeCategories(plan.categories())) :
+                        normalizeCategories(request.categories()),
+                firstNonBlank(request.dateFrom(), firstNonBlank(plan.dateFrom(), fallback.dateFrom())),
+                firstNonBlank(request.sortBy(), firstNonBlank(fallback.sortBy(), plan.sortBy()))
         );
     }
 
     private ResolvedSearchPlan fallbackPlan(LiteratureSearchRequest request) {
+        LiteratureSearchIntentParser.Intent intent = intentParser.parse(request.query());
         return new ResolvedSearchPlan(
-                request.query(),
-                request.limit(),
+                firstNonBlank(intent.query(), request.query()),
+                request.limit() != null ? request.limit() : intent.limit(),
                 normalizeCategories(request.categories()),
                 normalizeText(request.dateFrom()),
-                normalizeText(request.sortBy())
+                firstNonBlank(request.sortBy(), intent.sortBy())
         );
     }
 

@@ -16,8 +16,8 @@ public class ToolCallingPromptConstructionServiceImpl implements ToolCallingProm
         String userMessage = "用户输入：" + userInput
                 + "\n\n请先从用户输入中抽取文献搜索工具参数："
                 + "\n- query 只保留核心主题、方法名、作者名或标题关键词，例如 ‘给我搜一篇关于RAG的文章’ 的 query 是 ‘RAG’。"
-                + "\n- 用户说一篇、一个、1篇、推荐一篇时，limit 使用 1。"
-                + "\n- 用户说最新、最近、近年时，sortBy 使用 date。"
+                + "\n- 用户说一篇、一个、1篇、推荐一篇或 one 时，limit 使用 1；未指定数量时 limit 使用 5。"
+                + "\n- 用户说最新、最近、近年、latest、recent、newest 时，sortBy 使用 date。"
                 + "\n\n然后调用文献搜索工具。工具返回后，最终只返回如下 JSON 结构：{\"items\":[...]}。";
         return new PromptConstructionService.Prompt(systemMessage, userMessage);
     }
@@ -28,8 +28,8 @@ public class ToolCallingPromptConstructionServiceImpl implements ToolCallingProm
         String userMessage = "用户输入：" + userInput
                 + "\n\n请输出 JSON 对象，字段如下："
                 + "\n- query: string，核心检索词。必须去掉‘帮我找’、‘给我搜’、‘关于’、‘文献’、‘论文’、‘文章’等指令性词，只保留主题、方法名、作者名或标题关键词。"
-                + "\n- limit: number|null，用户说一篇、一个、1篇、推荐一篇时填 1；未指定数量填 null。"
-                + "\n- sortBy: \"relevance\"|\"date\"|null，用户说最新、最近、近年时填 date，否则填 null。"
+                + "\n- limit: number|null，用户说一篇、一个、1篇、推荐一篇或 one 时填 1；未指定数量填 5。"
+                + "\n- sortBy: \"relevance\"|\"date\"|null，用户说最新、最近、近年、latest、recent、newest 时填 date，否则填 null。"
                 + "\n- dateFrom: string|null，若用户明确给出起始日期，格式 YYYY-MM-DD；否则填 null。"
                 + "\n- categories: string[]，无法确定时返回空数组。"
                 + "\n\n示例："

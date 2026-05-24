@@ -6,11 +6,11 @@ import com.lqr.paperragserver.ai.service.ToolCallingPromptConstructionService;
 import com.lqr.paperragserver.ai.tool.LiteratureSearchTool;
 import com.lqr.paperragserver.literature.model.LiteratureSearchRequest;
 import com.lqr.paperragserver.literature.model.LiteratureSearchResponse;
+import com.lqr.paperragserver.literature.support.LiteratureSearchIntentParser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * 面向自然语言文献搜索的工具调用编排服务。
@@ -19,13 +19,11 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class LiteratureSearchToolCallingService {
 
-    private static final Pattern SINGLE_RESULT_PATTERN = Pattern.compile(".*(一篇|一个|1篇|1个|one).*", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ABOUT_PATTERN = Pattern.compile("关于\\s*([^，。,.！？?]+)");
-
     private final LlmService llmService;
     private final ToolCallingPromptConstructionService promptConstructionService;
     private final LiteratureSearchTool literatureSearchTool;
     private final ObjectMapper objectMapper;
+    private final LiteratureSearchIntentParser intentParser;
 
     public LiteratureSearchResponse search(LiteratureSearchRequest request) {
         SearchPlan plan = resolvePlan(request.query());
@@ -55,32 +53,15 @@ public class LiteratureSearchToolCallingService {
         return new SearchPlan(
                 firstNonBlank(plan.query(), fallback.query()),
                 positiveOrNull(plan.limit()) != null ? plan.limit() : fallback.limit(),
-                firstNonBlank(plan.sortBy(), fallback.sortBy()),
+                firstNonBlank(fallback.sortBy(), plan.sortBy()),
                 firstNonBlank(plan.dateFrom(), fallback.dateFrom()),
                 plan.categories() == null || plan.categories().isEmpty() ? fallback.categories() : plan.categories()
         );
     }
 
     private SearchPlan fallbackPlan(String userInput) {
-        String query = fallbackQuery(userInput);
-        Integer limit = SINGLE_RESULT_PATTERN.matcher(userInput == null ? "" : userInput).matches() ? 1 : null;
-        return new SearchPlan(query, limit, null, null, List.of());
-    }
-
-    private String fallbackQuery(String userInput) {
-        if (userInput == null || userInput.isBlank()) {
-            return userInput;
-        }
-        String text = userInput.trim();
-        var aboutMatcher = ABOUT_PATTERN.matcher(text);
-        if (aboutMatcher.find()) {
-            text = aboutMatcher.group(1).trim();
-        }
-        text = text.replaceFirst("^(请|帮我|给我|麻烦你)?(搜|搜索|找|查找|推荐|检索)(一篇|一个|1篇|几篇)?", "");
-        text = text.replaceFirst("^(一篇|一个|1篇)?关于", "");
-        text = text.replaceFirst("(的)?(论文|文献|文章|paper|article)$", "");
-        text = text.trim();
-        return text.isBlank() ? userInput.trim() : text;
+        LiteratureSearchIntentParser.Intent intent = intentParser.parse(userInput);
+        return new SearchPlan(intent.query(), intent.limit(), intent.sortBy(), null, List.of());
     }
 
     private String jsonObject(String content) {

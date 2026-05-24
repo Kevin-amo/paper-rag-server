@@ -1,5 +1,13 @@
 package com.lqr.paperragserver.literature;
 
+import com.lqr.paperragserver.literature.client.OpenAlexLiteratureClient;
+import com.lqr.paperragserver.literature.config.LiteratureSearchProperties;
+import com.lqr.paperragserver.literature.exception.LiteratureSearchException;
+import com.lqr.paperragserver.literature.model.LiteratureSearchRequest;
+import com.lqr.paperragserver.literature.model.LiteratureSearchResponse;
+import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
+import com.lqr.paperragserver.literature.service.LiteratureSearchService;
+import com.lqr.paperragserver.literature.support.LiteratureSearchCache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -70,6 +78,22 @@ class LiteratureSearchServiceTest {
     }
 
     @Test
+    void searchShouldUseFiveAsDefaultLimitWhenUserDoesNotSpecifyCount() {
+        LiteratureSearchResult result = openAlexResult("Graph RAG");
+        when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of(result));
+
+        LiteratureSearchResponse response = service.search(new LiteratureSearchRequest("Graph RAG", null, null, null, "relevance"));
+
+        assertThat(response.items()).containsExactly(result);
+        verify(openAlexLiteratureClient).search(
+                any(LiteratureSearchRequest.class),
+                org.mockito.ArgumentMatchers.eq(5),
+                org.mockito.ArgumentMatchers.eq("relevance"),
+                any()
+        );
+    }
+
+    @Test
     void searchShouldReturnEmptyWhenOpenAlexReturnsEmpty() {
         when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of());
 
@@ -132,6 +156,43 @@ class LiteratureSearchServiceTest {
         verifyNoInteractions(openAlexLiteratureClient);
     }
 
+    @Test
+    void dateSearchShouldFetchMoreCandidatesAndReturnOnlyUserLimit() {
+        LiteratureSearchResult newest = openAlexResult("Newest", "2025-01-01");
+        LiteratureSearchResult older = openAlexResult("Older", "2024-01-01");
+        when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of(newest, older));
+
+        LiteratureSearchResponse response = service.search(new LiteratureSearchRequest("Graph RAG", 1, null, null, "date"));
+
+        assertThat(response.items()).containsExactly(newest);
+        verify(openAlexLiteratureClient).search(
+                any(LiteratureSearchRequest.class),
+                org.mockito.ArgumentMatchers.eq(10),
+                org.mockito.ArgumentMatchers.eq("date"),
+                any()
+        );
+    }
+
+    @Test
+    void cacheShouldSeparateDateSortFromRelevanceSortByUserLimit() {
+        LiteratureSearchResult relevanceResult = openAlexResult("Relevant", "2023-01-01");
+        LiteratureSearchResult dateResult = openAlexResult("Recent", "2025-01-01");
+        when(openAlexLiteratureClient.search(any(), anyInt(), org.mockito.ArgumentMatchers.eq("relevance"), any()))
+                .thenReturn(List.of(relevanceResult));
+        when(openAlexLiteratureClient.search(any(), anyInt(), org.mockito.ArgumentMatchers.eq("date"), any()))
+                .thenReturn(List.of(dateResult));
+
+        LiteratureSearchResponse relevance = service.search(new LiteratureSearchRequest("Graph RAG", 1, null, null, "relevance"));
+        LiteratureSearchResponse date = service.search(new LiteratureSearchRequest("Graph RAG", 1, null, null, "date"));
+        LiteratureSearchResponse cachedDate = service.search(new LiteratureSearchRequest("Graph RAG", 1, null, null, "date"));
+
+        assertThat(relevance.items()).containsExactly(relevanceResult);
+        assertThat(date.items()).containsExactly(dateResult);
+        assertThat(cachedDate.items()).containsExactly(dateResult);
+        verify(openAlexLiteratureClient, times(1)).search(any(), org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq("relevance"), any());
+        verify(openAlexLiteratureClient, times(1)).search(any(), org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq("date"), any());
+    }
+
     private LiteratureSearchProperties searchProperties(boolean openAlexEnabled, boolean cacheEnabled) {
         return new LiteratureSearchProperties(
                 new LiteratureSearchProperties.OpenAlex(openAlexEnabled, "https://api.openalex.org/works", Duration.ofSeconds(10), null),
@@ -140,8 +201,12 @@ class LiteratureSearchServiceTest {
     }
 
     private LiteratureSearchResult openAlexResult(String title) {
+        return openAlexResult(title, "2024-01-01");
+    }
+
+    private LiteratureSearchResult openAlexResult(String title, String publishedDate) {
         return new LiteratureSearchResult(
-                title, List.of("Alice"), "Abstract", 2024, "2024-01-01", null,
+                title, List.of("Alice"), "Abstract", 2024, publishedDate, null,
                 List.of("Artificial Intelligence"), "Artificial Intelligence", "https://doi.org/10.1000/test", "https://example.org/paper",
                 "https://example.org/paper.pdf", "openalex", "https://openalex.org/W123"
         );

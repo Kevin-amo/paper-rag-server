@@ -1,11 +1,15 @@
-package com.lqr.paperragserver.literature;
+package com.lqr.paperragserver.literature.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lqr.paperragserver.literature.config.LiteratureSearchProperties;
+import com.lqr.paperragserver.literature.model.LiteratureSearchRequest;
+import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -109,7 +113,7 @@ class OpenAlexLiteratureClientTest {
     }
 
     @Test
-    void openAlexUriShouldKeepRelevanceSortWhenDateSortRequested() {
+    void openAlexUriShouldUsePublicationDateSortWhenDateSortRequested() {
         var properties = new LiteratureSearchProperties.OpenAlex(
                 true,
                 "https://api.openalex.org/works",
@@ -124,7 +128,45 @@ class OpenAlexLiteratureClientTest {
                 properties
         );
 
+        assertThat(uri.toString()).contains("sort=publication_date:desc");
+    }
+
+    @Test
+    void openAlexUriShouldUseRelevanceScoreSortWhenRelevanceSortRequested() {
+        var properties = new LiteratureSearchProperties.OpenAlex(
+                true,
+                "https://api.openalex.org/works",
+                Duration.ofSeconds(10),
+                null
+        );
+
+        var uri = client.openAlexUri(
+                new LiteratureSearchRequest("RAG", 3, null, null, "relevance"),
+                3,
+                "relevance",
+                properties
+        );
+
         assertThat(uri.toString()).contains("sort=relevance_score:desc");
+    }
+
+    @Test
+    void dateSortShouldOrderNormalizedResultsFromNewestToOldestWithMissingDateLast() throws Exception {
+        var raw = objectMapper.readTree("""
+                {
+                  "results": [
+                    {"id": "old", "title": "Old", "publication_date": "2023-01-01"},
+                    {"id": "missing", "title": "Missing"},
+                    {"id": "new", "title": "New", "publication_date": "2025-01-01"}
+                  ]
+                }
+                """);
+
+        List<LiteratureSearchResult> results = client.sortByDateDescending(client.normalize(raw));
+
+        assertThat(results)
+                .extracting(LiteratureSearchResult::title)
+                .containsExactly("New", "Old", "Missing");
     }
 
     @Test

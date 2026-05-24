@@ -2,10 +2,10 @@ package com.lqr.paperragserver.web;
 
 import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
-import com.lqr.paperragserver.literature.LiteratureConversationService;
-import com.lqr.paperragserver.literature.LiteratureSearchRequest;
-import com.lqr.paperragserver.literature.LiteratureSearchResponse;
-import com.lqr.paperragserver.literature.LiteratureSearchResult;
+import com.lqr.paperragserver.literature.model.LiteratureSearchRequest;
+import com.lqr.paperragserver.literature.model.LiteratureSearchResponse;
+import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
+import com.lqr.paperragserver.literature.service.LiteratureConversationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.PostMapping;

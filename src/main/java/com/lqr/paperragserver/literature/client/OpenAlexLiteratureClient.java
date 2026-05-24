@@ -54,12 +54,7 @@ public class OpenAlexLiteratureClient {
                     .body(JsonNode.class);
             List<LiteratureSearchResult> results = normalize(raw);
             if (SORT_DATE.equals(sortBy)) {
-                return results.stream()
-                        .sorted(Comparator.comparing(
-                                LiteratureSearchResult::publishedDate,
-                                Comparator.nullsLast(String::compareTo)
-                        ))
-                        .toList();
+                return sortByDateDescending(results);
             }
             return results;
         } catch (ResourceAccessException ex) {
@@ -95,6 +90,15 @@ public class OpenAlexLiteratureClient {
             }
         }
         return items;
+    }
+
+    List<LiteratureSearchResult> sortByDateDescending(List<LiteratureSearchResult> results) {
+        return results.stream()
+                .sorted(Comparator.comparing(
+                        LiteratureSearchResult::publishedDate,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
+                .toList();
     }
 
     String restoreAbstract(JsonNode invertedIndex) {
@@ -228,7 +232,7 @@ public class OpenAlexLiteratureClient {
     }
 
     private String openAlexSort(String sortBy) {
-        return SORT_RELEVANCE.equals(sortBy) || SORT_DATE.equals(sortBy) ? "relevance_score:desc" : "relevance_score:desc";
+        return SORT_DATE.equals(sortBy) ? "publication_date:desc" : "relevance_score:desc";
     }
 
     URI openAlexUri(

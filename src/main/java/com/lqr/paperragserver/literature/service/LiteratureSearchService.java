@@ -5,6 +5,7 @@ import com.lqr.paperragserver.literature.config.LiteratureSearchProperties;
 import com.lqr.paperragserver.literature.exception.LiteratureSearchException;
 import com.lqr.paperragserver.literature.model.LiteratureSearchRequest;
 import com.lqr.paperragserver.literature.model.LiteratureSearchResponse;
+import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
 import com.lqr.paperragserver.literature.support.LiteratureSearchCache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -49,12 +50,14 @@ public class LiteratureSearchService {
         }
 
         try {
-            LiteratureSearchResponse response = new LiteratureSearchResponse(openAlexLiteratureClient.search(
+            int fetchLimit = resolveFetchLimit(limit, sortBy);
+            List<LiteratureSearchResult> items = openAlexLiteratureClient.search(
                     normalizedRequest(request, query, categories, dateFrom, sortBy),
-                    limit,
+                    fetchLimit,
                     sortBy,
                     literatureProperties.openalex()
-            ));
+            );
+            LiteratureSearchResponse response = new LiteratureSearchResponse(trimToUserLimit(items, limit, sortBy));
             cacheIfEnabled(cacheKey, response);
             return response;
         } catch (RuntimeException ex) {
@@ -70,6 +73,24 @@ public class LiteratureSearchService {
             String sortBy
     ) {
         return new LiteratureSearchRequest(request.conversationId(), query, request.limit(), categories, dateFrom, sortBy);
+    }
+
+    private int resolveFetchLimit(int limit, String sortBy) {
+        if (!SORT_DATE.equals(sortBy)) {
+            return limit;
+        }
+        return Math.min(Math.max(limit * 10, 10), 50);
+    }
+
+    private List<LiteratureSearchResult> trimToUserLimit(
+            List<LiteratureSearchResult> items,
+            int limit,
+            String sortBy
+    ) {
+        if (!SORT_DATE.equals(sortBy) || items.size() <= limit) {
+            return items;
+        }
+        return items.stream().limit(limit).toList();
     }
 
     private void cacheIfEnabled(LiteratureSearchCache.Key key, LiteratureSearchResponse response) {
@@ -89,7 +110,7 @@ public class LiteratureSearchService {
 
     private int resolveLimit(Integer limit) {
         if (limit == null) {
-            return 10;
+            return 5;
         }
         if (limit > 50) {
             throw new LiteratureSearchException(HttpStatus.BAD_REQUEST, "LITERATURE_LIMIT_EXCEEDED", "limit 不能超过 50");
