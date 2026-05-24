@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.config;
 
-import com.lqr.paperragserver.literature.LiteratureSearchProperties;
+import com.lqr.paperragserver.literature.config.LiteratureSearchProperties;
 import org.apache.tika.Tika;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;

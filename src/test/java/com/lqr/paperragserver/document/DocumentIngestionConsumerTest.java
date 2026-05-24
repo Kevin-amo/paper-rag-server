@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.document;
 
 import com.lqr.paperragserver.config.DocumentIngestionProperties;
-import com.lqr.paperragserver.document.impl.DocumentIngestionConsumer;
+import com.lqr.paperragserver.document.service.impl.DocumentIngestionConsumer;
 import com.lqr.paperragserver.document.model.DocumentIngestionMessage;
 import com.lqr.paperragserver.document.service.DocumentIngestionProducer;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;

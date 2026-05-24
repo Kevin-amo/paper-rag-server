@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.web;
 
-import com.lqr.paperragserver.literature.LiteratureSearchException;
+import com.lqr.paperragserver.literature.exception.LiteratureSearchException;
 import com.lqr.paperragserver.mcp.McpException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;

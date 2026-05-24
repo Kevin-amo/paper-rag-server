@@ -1,9 +1,9 @@
 package com.lqr.paperragserver.ai.tool;
 
-import com.lqr.paperragserver.literature.LiteratureSearchException;
-import com.lqr.paperragserver.literature.LiteratureSearchRequest;
-import com.lqr.paperragserver.literature.LiteratureSearchResponse;
-import com.lqr.paperragserver.literature.LiteratureSearchService;
+import com.lqr.paperragserver.literature.exception.LiteratureSearchException;
+import com.lqr.paperragserver.literature.model.LiteratureSearchRequest;
+import com.lqr.paperragserver.literature.model.LiteratureSearchResponse;
+import com.lqr.paperragserver.literature.service.LiteratureSearchService;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.http.HttpStatus;

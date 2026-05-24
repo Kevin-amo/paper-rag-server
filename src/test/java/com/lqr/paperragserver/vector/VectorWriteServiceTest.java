@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.ai.service.EmbeddingService;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.document.mapper.DocumentChunkMapper;
-import com.lqr.paperragserver.vector.impl.VectorWriteServiceImpl;
+import com.lqr.paperragserver.vector.service.impl.VectorWriteServiceImpl;
 import com.lqr.paperragserver.vector.mapper.VectorStoreMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

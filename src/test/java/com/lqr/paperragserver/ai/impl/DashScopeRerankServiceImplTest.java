@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.ai.impl;
 
+import com.lqr.paperragserver.ai.service.impl.DashScopeRerankServiceImpl;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;

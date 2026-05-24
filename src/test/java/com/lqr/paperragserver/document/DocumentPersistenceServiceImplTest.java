@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.document.entity.DocumentChunkEntity;
 import com.lqr.paperragserver.document.entity.DocumentEntity;
-import com.lqr.paperragserver.document.impl.DocumentPersistenceServiceImpl;
+import com.lqr.paperragserver.document.service.impl.DocumentPersistenceServiceImpl;
 import com.lqr.paperragserver.document.mapper.DocumentAssetMapper;
 import com.lqr.paperragserver.document.mapper.DocumentChunkMapper;
 import com.lqr.paperragserver.document.mapper.DocumentMapper;
