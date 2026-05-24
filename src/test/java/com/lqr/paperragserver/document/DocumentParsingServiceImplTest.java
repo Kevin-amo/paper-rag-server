@@ -1,10 +1,10 @@
 package com.lqr.paperragserver.document;
 
 import com.lqr.paperragserver.common.model.ParsedDocument;
-import com.lqr.paperragserver.document.impl.DocumentParsingServiceImpl;
+import com.lqr.paperragserver.document.service.impl.DocumentParsingServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService.DocumentMultimodalExtractionResult;
-import com.lqr.paperragserver.document.impl.DocumentMetadataServiceImpl;
+import com.lqr.paperragserver.document.service.impl.DocumentMetadataServiceImpl;
 import org.apache.tika.Tika;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

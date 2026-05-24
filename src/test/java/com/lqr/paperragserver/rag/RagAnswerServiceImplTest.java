@@ -9,7 +9,7 @@ import com.lqr.paperragserver.common.model.RagStreamEvent;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.config.RagProperties;
 import com.lqr.paperragserver.conversation.service.ConversationService;
-import com.lqr.paperragserver.rag.impl.RagAnswerServiceImpl;
+import com.lqr.paperragserver.rag.service.impl.RagAnswerServiceImpl;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

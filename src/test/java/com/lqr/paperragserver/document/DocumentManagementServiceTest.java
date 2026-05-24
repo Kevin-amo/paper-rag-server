@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.document;
 
 import com.lqr.paperragserver.ai.service.EmbeddingService;
-import com.lqr.paperragserver.document.impl.DocumentManagementServiceImpl;
+import com.lqr.paperragserver.document.service.impl.DocumentManagementServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentManagementService;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
