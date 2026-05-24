@@ -7,16 +7,13 @@ export default {
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { Promotion, Setting, UploadFilled, Collection } from '@element-plus/icons-vue';
-import type { ChatMode } from '../../types';
 
 const props = defineProps<{
   loading?: boolean;
-  mode: ChatMode;
 }>();
 
 const emit = defineEmits<{
-  submit: [payload: { mode: ChatMode; question: string; topK?: number }];
-  'update:mode': [mode: ChatMode];
+  submit: [payload: { question: string; topK?: number }];
   openDocuments: [];
   openUpload: [];
 }>();
@@ -27,15 +24,7 @@ const advancedVisible = ref(false);
 const topKOptions = Array.from({ length: 10 }, (_, index) => index + 1);
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !props.loading);
-const placeholder = computed(() => (
-  props.mode === 'literature'
-    ? '搜索论文，例如 Graph RAG，按 Enter 发送，Shift + Enter 换行'
-    : '向论文知识库提问，按 Enter 发送，Shift + Enter 换行'
-));
-const modeOptions: Array<{ label: string; value: ChatMode }> = [
-  { label: '论文分析', value: 'rag' },
-  { label: '文献搜索', value: 'literature' },
-];
+const placeholder = computed(() => '告诉我你的研究目标，例如：帮我找 Graph RAG 最新论文并结合我的知识库总结趋势，按 Enter 发送，Shift + Enter 换行');
 
 function submitQuestion() {
   const content = question.value.trim();
@@ -44,9 +33,8 @@ function submitQuestion() {
   }
 
   emit('submit', {
-    mode: props.mode,
     question: content,
-    topK: props.mode === 'rag' ? topK.value || undefined : undefined,
+    topK: topK.value || undefined,
   });
   question.value = '';
 }
@@ -71,19 +59,6 @@ defineExpose({ fillQuestion });
 <template>
   <section class="chat-composer">
     <div class="composer-box">
-      <div class="mode-switch" role="radiogroup" aria-label="聊天模式">
-        <button
-          v-for="option in modeOptions"
-          :key="option.value"
-          type="button"
-          :class="{ active: props.mode === option.value }"
-          :aria-checked="props.mode === option.value"
-          role="radio"
-          @click="emit('update:mode', option.value)"
-        >
-          {{ option.label }}
-        </button>
-      </div>
       <el-input
         v-model="question"
         type="textarea"
@@ -94,7 +69,7 @@ defineExpose({ fillQuestion });
       />
       <div class="composer-actions">
         <div class="composer-left-actions">
-          <el-button v-if="props.mode === 'rag'" class="composer-pill" text :icon="Setting" @click="advancedVisible = true">
+          <el-button class="composer-pill" text :icon="Setting" @click="advancedVisible = true">
             高级设置 · Top K {{ topK }}
           </el-button>
           <el-button class="composer-pill hide-on-small" text :icon="Collection" @click="emit('openDocuments')">
@@ -166,35 +141,6 @@ defineExpose({ fillQuestion });
   border-radius: 28px;
   background: #ffffff;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
-}
-
-.mode-switch {
-  display: inline-flex;
-  width: fit-content;
-  padding: 3px;
-  border: 1px solid #dbeafe;
-  border-radius: 999px;
-  background: #f8fbff;
-}
-
-.mode-switch button {
-  height: 30px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: #64748b;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 900;
-  transition: all 0.16s ease;
-}
-
-.mode-switch button.active {
-  background: var(--app-primary);
-  color: #ffffff;
-  box-shadow: 0 6px 14px rgba(91, 124, 250, 0.2);
 }
 
 .composer-box :deep(.el-textarea__inner) {

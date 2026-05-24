@@ -2,26 +2,19 @@
 import { ref } from 'vue';
 import ChatMessageList from './ChatMessageList.vue';
 import ChatComposer from './ChatComposer.vue';
-import type { ChatMode, ConversationMessage, LiteratureSearchResult } from '../../types';
+import type { ConversationMessage } from '../../types';
 
 const props = defineProps<{
   loading: boolean;
-  mode: ChatMode;
   messages: ConversationMessage[];
   activeConversation?: unknown;
   messagesLoading?: boolean;
   documentTotal: number;
   currentUserAvatarUrl?: string | null;
-  literatureLoading?: boolean;
-  literatureItems: LiteratureSearchResult[];
-  literatureErrorMessage?: string;
-  lastLiteratureQuery?: string;
-  hasSearchedLiterature?: boolean;
 }>();
 
 const emit = defineEmits<{
-  submit: [payload: { mode: ChatMode; question: string; topK?: number }];
-  'update:mode': [mode: ChatMode];
+  submit: [payload: { question: string; topK?: number }];
   openDocuments: [];
   openUpload: [];
 }>();
@@ -39,14 +32,11 @@ function handleExample(question: string) {
       :messages="props.messages"
       :loading="props.messagesLoading"
       :current-user-avatar-url="props.currentUserAvatarUrl"
-      :mode="props.mode"
       @ask-example="handleExample"
     />
     <ChatComposer
       ref="composerRef"
-      :mode="props.mode"
       :loading="props.loading"
-      @update:mode="emit('update:mode', $event)"
       @submit="emit('submit', $event)"
       @open-documents="emit('openDocuments')"
       @open-upload="emit('openUpload')"

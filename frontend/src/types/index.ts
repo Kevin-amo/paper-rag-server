@@ -9,7 +9,7 @@ export type UserRole = 'USER' | 'ADMIN';
 export type UserStatus = 'ACTIVE' | 'DISABLED';
 export type DocumentStatus = 'PENDING' | 'PROCESSING' | 'INDEXED' | 'READY' | 'FAILED' | string;
 export type MessageRole = 'USER' | 'ASSISTANT';
-export type ConversationType = 'RAG' | 'LITERATURE';
+export type ConversationType = 'RAG' | 'LITERATURE' | 'AGENT';
 
 export interface DocumentSource {
   sourceId: string;
@@ -148,9 +148,15 @@ export interface BatchDocumentIngestionResponse {
   failureCount: number;
 }
 
-export type ChatMode = 'rag' | 'literature';
+export type ChatMode = 'agent';
 
 export interface AskQuestionPayload {
+  conversationId?: string;
+  question: string;
+  topK?: number;
+}
+
+export interface AgentAskPayload {
   conversationId?: string;
   question: string;
   topK?: number;
@@ -193,7 +199,24 @@ export interface LiteratureSearchMessageMetadata {
   items: LiteratureSearchResult[];
 }
 
-export type ConversationMessageMetadata = Record<string, unknown> | LiteratureSearchMessageMetadata | null;
+export interface AgentStepTrace {
+  index: number;
+  thoughtSummary: string;
+  action: string;
+  actionInput: Record<string, unknown>;
+  observationSummary: string;
+}
+
+export interface AgentResultMetadata {
+  type: 'AGENT_RESULT';
+  agent: string;
+  steps: AgentStepTrace[];
+  literature?: LiteratureSearchMessageMetadata;
+  localPaperChunks?: Array<Record<string, unknown>>;
+  stopReason?: string;
+}
+
+export type ConversationMessageMetadata = Record<string, unknown> | LiteratureSearchMessageMetadata | AgentResultMetadata | null;
 
 export interface LiteratureSearchResponse {
   conversationId: string | null;
@@ -222,6 +245,21 @@ export interface RagStreamEvent {
   delta: string | null;
   answer: string | null;
   citations: AnswerCitation[];
+  message: string | null;
+}
+
+export interface AgentStreamEvent {
+  type: 'start' | 'step' | 'thought' | 'tool_call' | 'tool_result' | 'delta' | 'done' | 'error';
+  conversationId: string | null;
+  step: number | null;
+  thought: string | null;
+  toolName: string | null;
+  toolInput: Record<string, unknown>;
+  observation: string | null;
+  delta: string | null;
+  answer: string | null;
+  citations: AnswerCitation[];
+  metadata: AgentResultMetadata | Record<string, unknown>;
   message: string | null;
 }
 

@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => {
           target,
           changeOrigin: true,
         },
-        '/literature': {
+        '/agent': {
           target,
           changeOrigin: true,
         },

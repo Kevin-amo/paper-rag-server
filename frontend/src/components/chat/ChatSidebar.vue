@@ -174,10 +174,6 @@ function closeOperationDialog() {
 function conversationTitle(conversation: Conversation) {
   return conversation.title?.trim() || '新的论文问答';
 }
-
-function conversationTypeLabel(conversation: Conversation) {
-  return conversation.type === 'LITERATURE' ? '文献搜索' : '论文分析';
-}
 </script>
 
 <template>
@@ -185,13 +181,13 @@ function conversationTypeLabel(conversation: Conversation) {
     <div class="brand-block">
       <div class="brand-mark">P</div>
       <div>
-        <strong>Paper RAG</strong>
+        <strong>Paper Agent</strong>
         <span>论文智能助手</span>
       </div>
     </div>
 
     <el-button class="new-chat-button" type="primary" size="large" :icon="Plus" @click="emit('createConversation')">
-      新建问答
+      论文智能助手
     </el-button>
 
     <nav class="sidebar-nav">
@@ -238,9 +234,6 @@ function conversationTypeLabel(conversation: Conversation) {
           <button v-else type="button" class="conversation-select" @click="emit('selectConversation', conversation.id)">
             <span class="conversation-title-row">
               <span class="conversation-title">{{ conversationTitle(conversation) }}</span>
-              <span class="conversation-type-badge" :class="conversation.type === 'LITERATURE' ? 'literature' : 'rag'">
-                {{ conversationTypeLabel(conversation) }}
-              </span>
               <span v-if="isPinned(conversation.id)" class="conversation-pin-badge" aria-label="已置顶" title="已置顶">📌</span>
             </span>
           </button>

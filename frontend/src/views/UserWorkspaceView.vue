@@ -12,9 +12,8 @@ import { getErrorMessage } from '../api/http';
 import { useAuth } from '../composables/useAuth';
 import { useDocuments } from '../composables/useDocuments';
 import { useConversations } from '../composables/useConversations';
-import { useRagChat } from '../composables/useRagChat';
-import { useLiteratureSearch } from '../composables/useLiteratureSearch';
-import type { ChatMode, ConversationMessage } from '../types';
+import { useAgentChat } from '../composables/useAgentChat';
+import type { ConversationMessage } from '../types';
 
 const router = useRouter();
 const auth = useAuth();
@@ -25,7 +24,6 @@ const uploadVisible = ref(false);
 const avatarUploadVisible = ref(false);
 const avatarUploading = ref(false);
 const avatarRefreshVersion = ref(0);
-const chatMode = ref<ChatMode>('rag');
 
 const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '当前用户');
 const currentUserAvatarUrl = computed(() => buildAvatarDisplayUrl(auth.state.user?.avatarUrl ?? null));
@@ -33,17 +31,11 @@ const activeConversation = computed(() => (
   conversationsState.conversations.value.find((item) => item.id === conversationsState.activeConversationId.value) ?? null
 ));
 
-const ragState = useRagChat({
+const agentState = useAgentChat({
   activeConversationId: conversationsState.activeConversationId,
   activeConversation,
   conversationMessages: conversationsState.conversationMessages,
   conversations: conversationsState.conversations,
-  loadConversations: () => conversationsState.loadConversations(),
-  loadMessages: conversationsState.loadMessages,
-});
-const literatureState = useLiteratureSearch({
-  activeConversationId: conversationsState.activeConversationId,
-  conversationMessages: conversationsState.conversationMessages,
   loadConversations: () => conversationsState.loadConversations(),
   loadMessages: conversationsState.loadMessages,
 });
@@ -62,11 +54,17 @@ function buildAvatarDisplayUrl(avatarUrl: string | null) {
 }
 
 function isLiteratureMessageMetadata(metadata: ConversationMessage['metadata']) {
-  return !!metadata
-    && typeof metadata === 'object'
-    && 'type' in metadata
-    && metadata.type === 'LITERATURE_SEARCH_RESULT'
-    && Array.isArray((metadata as { items?: unknown[] }).items);
+  if (!metadata || typeof metadata !== 'object' || !('type' in metadata)) {
+    return false;
+  }
+  if (metadata.type === 'LITERATURE_SEARCH_RESULT') {
+    return Array.isArray((metadata as { items?: unknown[] }).items);
+  }
+  if (metadata.type === 'AGENT_RESULT' && 'literature' in metadata) {
+    const literature = (metadata as { literature?: { items?: unknown[] } }).literature;
+    return Array.isArray(literature?.items);
+  }
+  return false;
 }
 
 function isRenderableMessage(message: ConversationMessage) {
@@ -105,29 +103,16 @@ async function openDocumentDetail(document: Parameters<typeof documentsState.ope
   await documentsState.openDetail(document);
 }
 
-async function handleChatSubmit(payload: { mode: ChatMode; question: string; topK?: number }) {
-  chatMode.value = payload.mode;
-  if (payload.mode === 'literature') {
-    await literatureState.search(payload.question);
-    return;
-  }
-
-  await ragState.ask({ question: payload.question, topK: payload.topK });
+async function handleChatSubmit(payload: { question: string; topK?: number }) {
+  await agentState.ask({ question: payload.question, topK: payload.topK });
 }
 
 async function handleSelectConversation(conversationId: string) {
   await conversationsState.selectConversation(conversationId);
-  const selectedConversation = conversationsState.conversations.value.find((conversation) => conversation.id === conversationId);
-  chatMode.value = selectedConversation?.type === 'LITERATURE' ? 'literature' : 'rag';
 }
 
 function handleCreateConversation() {
   conversationsState.createNewConversation();
-  chatMode.value = 'rag';
-}
-
-function handleModeUpdate(mode: ChatMode) {
-  chatMode.value = mode;
 }
 
 onMounted(async () => {
@@ -161,19 +146,12 @@ onMounted(async () => {
     />
 
     <RagChatWorkspace
-      :loading="chatMode === 'literature' ? literatureState.literatureLoading.value : ragState.ragLoading.value"
-      :mode="chatMode"
+      :loading="agentState.agentLoading.value"
       :messages="visibleMessages"
       :active-conversation="activeConversation"
       :messages-loading="conversationsState.messagesLoading.value"
       :document-total="documentsState.pagination.total"
       :current-user-avatar-url="currentUserAvatarUrl"
-      :literature-loading="literatureState.literatureLoading.value"
-      :literature-items="[]"
-      :literature-error-message="''"
-      :last-literature-query="''"
-      :has-searched-literature="false"
-      @update:mode="handleModeUpdate"
       @submit="handleChatSubmit"
       @open-documents="documentLibraryVisible = true"
       @open-upload="uploadVisible = true"
