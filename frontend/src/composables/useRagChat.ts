@@ -19,9 +19,7 @@ export function useRagChat(bindings: RagChatBindings) {
   async function ask(payload: { question: string; topK?: number }) {
     ragLoading.value = true;
     const now = Date.now();
-    const conversationId = bindings.activeConversation.value?.type === 'RAG'
-      ? bindings.activeConversationId.value ?? undefined
-      : undefined;
+    const conversationId = bindings.activeConversationId.value ?? undefined;
     const tempMessage: ConversationMessage = {
       id: `pending-${now}`,
       conversationId: conversationId ?? 'pending',

@@ -113,13 +113,9 @@ public class RagAnswerServiceImpl implements RagAnswerService {
 
     private ConversationService.ConversationView resolveConversation(UUID ownerUserId, UUID conversationId, String question) {
         if (conversationId == null) {
-            return conversationService.createConversation(ownerUserId, question, "RAG");
+            return conversationService.createConversation(ownerUserId, question);
         }
-        ConversationService.ConversationView conversation = conversationService.requireConversation(ownerUserId, conversationId);
-        if ("RAG".equals(conversation.type())) {
-            return conversation;
-        }
-        return conversationService.createConversation(ownerUserId, question, "RAG");
+        return conversationService.requireConversation(ownerUserId, conversationId);
     }
 
     private String rewriteQuestionForRetrieval(String question, List<ConversationService.MessageView> history) {

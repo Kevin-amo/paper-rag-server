@@ -25,7 +25,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class LiteratureConversationService {
 
-    private static final String CONVERSATION_TYPE_LITERATURE = "LITERATURE";
     private static final String LITERATURE_RESULT_TYPE = "LITERATURE_SEARCH_RESULT";
     private static final int DEFAULT_HISTORY_LIMIT = ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT;
     private static final TypeReference<ResolvedSearchPlan> PLAN_TYPE = new TypeReference<>() {
@@ -58,13 +57,9 @@ public class LiteratureConversationService {
 
     private ConversationService.ConversationView resolveConversation(UUID ownerUserId, UUID conversationId, String query) {
         if (conversationId == null) {
-            return conversationService.createConversation(ownerUserId, query, CONVERSATION_TYPE_LITERATURE);
+            return conversationService.createConversation(ownerUserId, query);
         }
-        ConversationService.ConversationView conversation = conversationService.requireConversation(ownerUserId, conversationId);
-        if (CONVERSATION_TYPE_LITERATURE.equalsIgnoreCase(conversation.type())) {
-            return conversation;
-        }
-        return conversationService.createConversation(ownerUserId, query, CONVERSATION_TYPE_LITERATURE);
+        return conversationService.requireConversation(ownerUserId, conversationId);
     }
 
     private ResolvedSearchPlan resolveSearchPlan(List<ConversationService.MessageView> history, LiteratureSearchRequest request) {

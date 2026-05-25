@@ -17,7 +17,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -27,8 +26,6 @@ public class ConversationServiceImpl implements ConversationService {
 
     private static final int MAX_TITLE_LENGTH = 60;
     private static final int MAX_HISTORY_LIMIT = 40;
-    private static final String CONVERSATION_TYPE_RAG = "RAG";
-    private static final String CONVERSATION_TYPE_LITERATURE = "LITERATURE";
     private static final TypeReference<List<AnswerCitation>> CITATION_LIST_TYPE = new TypeReference<>() {
     };
     private static final TypeReference<Map<String, Object>> METADATA_MAP_TYPE = new TypeReference<>() {
@@ -40,17 +37,11 @@ public class ConversationServiceImpl implements ConversationService {
 
     @Override
     public ConversationView createConversation(UUID ownerUserId, String title) {
-        return createConversation(ownerUserId, title, CONVERSATION_TYPE_RAG);
-    }
-
-    @Override
-    public ConversationView createConversation(UUID ownerUserId, String title, String type) {
         Conversation entity = new Conversation();
         OffsetDateTime now = OffsetDateTime.now();
         entity.setId(UUID.randomUUID());
         entity.setOwnerUserId(ownerUserId);
         entity.setTitle(normalizeTitle(title));
-        entity.setType(normalizeType(type, CONVERSATION_TYPE_RAG));
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
         conversationMapper.insert(entity);
@@ -81,17 +72,12 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    public ConversationView getOrCreateConversation(UUID ownerUserId, UUID conversationId, String firstQuestion) {
-        return getOrCreateConversation(ownerUserId, conversationId, firstQuestion, CONVERSATION_TYPE_RAG);
-    }
-
-    @Override
     @Transactional
-    public ConversationView getOrCreateConversation(UUID ownerUserId, UUID conversationId, String firstQuestion, String type) {
+    public ConversationView getOrCreateConversation(UUID ownerUserId, UUID conversationId, String firstQuestion) {
         if (conversationId != null) {
             return requireConversation(ownerUserId, conversationId);
         }
-        return createConversation(ownerUserId, firstQuestion, type);
+        return createConversation(ownerUserId, firstQuestion);
     }
 
     @Override
@@ -188,7 +174,6 @@ public class ConversationServiceImpl implements ConversationService {
                 entity.getId(),
                 entity.getOwnerUserId(),
                 entity.getTitle(),
-                normalizeType(entity.getType(), CONVERSATION_TYPE_RAG),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -221,14 +206,4 @@ public class ConversationServiceImpl implements ConversationService {
         return objectMapper.convertValue(value, METADATA_MAP_TYPE);
     }
 
-    private String normalizeType(String type, String fallback) {
-        if (type == null || type.isBlank()) {
-            return fallback;
-        }
-        String normalized = type.trim().toUpperCase(Locale.ROOT);
-        if (CONVERSATION_TYPE_LITERATURE.equals(normalized) || CONVERSATION_TYPE_RAG.equals(normalized)) {
-            return normalized;
-        }
-        return fallback;
-    }
 }

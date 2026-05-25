@@ -10,22 +10,23 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
 public class AgentService {
 
-    private static final String CONVERSATION_TYPE_RAG_COMPATIBLE = "RAG";
-
     private final ConversationService conversationService;
     private final AgentLoop agentLoop;
+    private final AgentPlanner planner;
 
     public Flux<AgentStreamEvent> streamAnswer(UUID ownerUserId, AgentAskRequest request) {
         return Flux.<AgentStreamEvent>create(sink -> {
-            UUID conversationId = request.conversationId();
+            UUID activeConversationId = request.conversationId();
             try {
-                ConversationService.ConversationView conversation = resolveConversation(ownerUserId, conversationId, request.question());
+                ConversationService.ConversationView conversation = resolveConversation(ownerUserId, activeConversationId, request.question());
                 UUID resolvedConversationId = conversation.id();
+                activeConversationId = resolvedConversationId;
                 sink.next(AgentStreamEvent.start(resolvedConversationId));
                 conversationService.appendUserMessage(ownerUserId, resolvedConversationId, request.question());
                 List<ConversationService.MessageView> history = conversationService.recentMessages(
@@ -42,18 +43,18 @@ public class AgentService {
                         history,
                         sink::next
                 );
+                String answer = streamFinalAnswer(resolvedConversationId, request.question(), history, result, sink::next);
                 conversationService.appendAssistantMessage(
                         ownerUserId,
                         resolvedConversationId,
-                        result.answer(),
+                        answer,
                         result.citations(),
                         result.metadata()
                 );
-                emitAnswerDeltas(resolvedConversationId, result.answer(), sink::next);
-                sink.next(AgentStreamEvent.done(resolvedConversationId, result.answer(), result.citations(), result.metadata()));
+                sink.next(AgentStreamEvent.done(resolvedConversationId, answer, result.citations(), result.metadata()));
                 sink.complete();
             } catch (RuntimeException ex) {
-                sink.next(AgentStreamEvent.error(conversationId, ex.getMessage()));
+                sink.next(AgentStreamEvent.error(activeConversationId, userSafeMessage(ex)));
                 sink.complete();
             }
         }).subscribeOn(Schedulers.boundedElastic());
@@ -61,19 +62,63 @@ public class AgentService {
 
     private ConversationService.ConversationView resolveConversation(UUID ownerUserId, UUID conversationId, String question) {
         if (conversationId == null) {
-            return conversationService.createConversation(ownerUserId, question, CONVERSATION_TYPE_RAG_COMPATIBLE);
+            return conversationService.createConversation(ownerUserId, question);
         }
         return conversationService.requireConversation(ownerUserId, conversationId);
     }
 
-    private void emitAnswerDeltas(UUID conversationId, String answer, java.util.function.Consumer<AgentStreamEvent> sink) {
-        if (answer == null || answer.isBlank()) {
+    private String streamFinalAnswer(UUID conversationId,
+                                     String question,
+                                     List<ConversationService.MessageView> history,
+                                     AgentLoop.AgentLoopResult result,
+                                     Consumer<AgentStreamEvent> sink) {
+        StringBuilder answerBuffer = new StringBuilder();
+        RuntimeException streamFailure = null;
+        try {
+            planner.finalAnswerStream(question, history, result.steps(), result.observations())
+                    .doOnNext(delta -> emitAnswerDelta(conversationId, delta, answerBuffer, sink))
+                    .blockLast();
+        } catch (RuntimeException ex) {
+            streamFailure = ex;
+        }
+
+        if (streamFailure != null && answerBuffer.length() > 0) {
+            throw streamFailure;
+        }
+        if (answerBuffer.length() == 0) {
+            emitAnswerDelta(conversationId, fallbackFinalAnswer(question, history, result), answerBuffer, sink);
+        }
+        return answerBuffer.toString();
+    }
+
+    private void emitAnswerDelta(UUID conversationId,
+                                 String delta,
+                                 StringBuilder answerBuffer,
+                                 Consumer<AgentStreamEvent> sink) {
+        if (delta == null || delta.isEmpty()) {
             return;
         }
-        int chunkSize = 24;
-        for (int start = 0; start < answer.length(); start += chunkSize) {
-            int end = Math.min(answer.length(), start + chunkSize);
-            sink.accept(AgentStreamEvent.delta(conversationId, answer.substring(start, end)));
+        answerBuffer.append(delta);
+        sink.accept(AgentStreamEvent.delta(conversationId, delta));
+    }
+
+    private String fallbackFinalAnswer(String question,
+                                       List<ConversationService.MessageView> history,
+                                       AgentLoop.AgentLoopResult result) {
+        String answer = planner.finalAnswer(question, history, result.steps(), result.observations());
+        if ((answer == null || answer.isBlank()) && result.draftAnswer() != null && !result.draftAnswer().isBlank()) {
+            answer = result.draftAnswer();
         }
+        if (answer == null || answer.isBlank()) {
+            return "智能体未返回回答内容";
+        }
+        return answer;
+    }
+
+    private String userSafeMessage(RuntimeException ex) {
+        if (ex == null || ex.getMessage() == null || ex.getMessage().isBlank()) {
+            return "智能体执行失败";
+        }
+        return ex.getMessage().trim();
     }
 }

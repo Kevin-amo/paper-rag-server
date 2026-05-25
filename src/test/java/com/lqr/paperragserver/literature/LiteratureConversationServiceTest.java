@@ -56,8 +56,8 @@ class LiteratureConversationServiceTest {
         LiteratureSearchRequest request = new LiteratureSearchRequest("Graph RAG", null, null, null, null);
         LiteratureSearchResult result = result("Graph RAG");
         LiteratureSearchRequest resolvedRequest = new LiteratureSearchRequest(conversationId, "Graph RAG", 2, List.of(), null, "relevance");
-        when(conversationService.createConversation(ownerUserId, "Graph RAG", "LITERATURE"))
-                .thenReturn(conversation("Graph RAG", "LITERATURE"));
+        when(conversationService.createConversation(ownerUserId, "Graph RAG"))
+                .thenReturn(conversation("Graph RAG"));
         when(conversationService.recentMessages(ownerUserId, conversationId, ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT))
                 .thenReturn(List.of());
         when(llmService.generate(planPrompt))
@@ -94,7 +94,7 @@ class LiteratureConversationServiceTest {
         LiteratureSearchRequest request = new LiteratureSearchRequest(conversationId, "RAG evaluation", 5, List.of("cs.AI"), "2024-01-01", "date");
         LiteratureSearchResponse searched = new LiteratureSearchResponse(List.of(result("RAG evaluation")));
         when(conversationService.requireConversation(ownerUserId, conversationId))
-                .thenReturn(conversation("RAG evaluation", "LITERATURE"));
+                .thenReturn(conversation("RAG evaluation"));
         when(conversationService.recentMessages(ownerUserId, conversationId, ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT))
                 .thenReturn(List.of());
         when(llmService.generate(planPrompt)).thenReturn("{}");
@@ -105,7 +105,7 @@ class LiteratureConversationServiceTest {
         assertThat(response.conversationId()).isEqualTo(conversationId);
         assertThat(response.items()).isEqualTo(searched.items());
         verify(conversationService).requireConversation(ownerUserId, conversationId);
-        verify(conversationService, never()).createConversation(ownerUserId, request.query(), "LITERATURE");
+        verify(conversationService, never()).createConversation(ownerUserId, request.query());
         verify(literatureSearchToolCallingService).search(request);
     }
 
@@ -113,7 +113,7 @@ class LiteratureConversationServiceTest {
     void searchShouldResolveFollowUpQueryFromConversationHistoryBeforeLiteratureSearch() {
         LiteratureSearchRequest request = new LiteratureSearchRequest(conversationId, "只看近两年的", null, null, null, null);
         when(conversationService.requireConversation(ownerUserId, conversationId))
-                .thenReturn(conversation("RAG papers", "LITERATURE"));
+                .thenReturn(conversation("RAG papers"));
         when(conversationService.recentMessages(ownerUserId, conversationId, ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT))
                 .thenReturn(List.of(
                         new ConversationService.MessageView(UUID.randomUUID(), conversationId, "USER", 1, "找 Graph RAG 综述", List.of(), null, null),
@@ -140,7 +140,7 @@ class LiteratureConversationServiceTest {
         LiteratureSearchRequest resolvedRequest = new LiteratureSearchRequest(conversationId, "RAG", 1, List.of(), null, "date");
         LiteratureSearchResponse searched = new LiteratureSearchResponse(List.of(result("Recent RAG")));
         when(conversationService.requireConversation(ownerUserId, conversationId))
-                .thenReturn(conversation("RAG papers", "LITERATURE"));
+                .thenReturn(conversation("RAG papers"));
         when(conversationService.recentMessages(ownerUserId, conversationId, ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT))
                 .thenReturn(List.of());
         when(llmService.generate(planPrompt)).thenReturn("not json");
@@ -152,8 +152,8 @@ class LiteratureConversationServiceTest {
         verify(literatureSearchToolCallingService).search(resolvedRequest);
     }
 
-    private ConversationService.ConversationView conversation(String title, String type) {
-        return new ConversationService.ConversationView(conversationId, ownerUserId, title, type, null, null);
+    private ConversationService.ConversationView conversation(String title) {
+        return new ConversationService.ConversationView(conversationId, ownerUserId, title, null, null);
     }
 
     private LiteratureSearchResult result(String title) {

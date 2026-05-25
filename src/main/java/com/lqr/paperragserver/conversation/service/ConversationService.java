@@ -13,15 +13,11 @@ public interface ConversationService {
 
     ConversationView createConversation(UUID ownerUserId, String title);
 
-    ConversationView createConversation(UUID ownerUserId, String title, String type);
-
     ConversationView renameConversation(UUID ownerUserId, UUID conversationId, String title);
 
     ConversationView requireConversation(UUID ownerUserId, UUID conversationId);
 
     ConversationView getOrCreateConversation(UUID ownerUserId, UUID conversationId, String firstQuestion);
-
-    ConversationView getOrCreateConversation(UUID ownerUserId, UUID conversationId, String firstQuestion, String type);
 
     List<ConversationView> listConversations(UUID ownerUserId);
 
@@ -41,7 +37,6 @@ public interface ConversationService {
             UUID id,
             UUID ownerUserId,
             String title,
-            String type,
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
     ) {

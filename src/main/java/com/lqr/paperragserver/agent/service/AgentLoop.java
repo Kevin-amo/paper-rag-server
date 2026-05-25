@@ -42,41 +42,91 @@ public class AgentLoop {
         for (int index = 1; index <= MAX_STEPS; index++) {
             sink.accept(AgentStreamEvent.step(conversationId, index));
             AgentDecision decision = planner.decide(question, history, steps, observations, topK);
-            sink.accept(AgentStreamEvent.thought(conversationId, index, decision.thoughtSummary()));
+            String thoughtSummary = deterministicThoughtSummary(decision.action());
+            sink.accept(AgentStreamEvent.thought(conversationId, index, thoughtSummary));
 
             if (decision.finish()) {
-                String answer = firstNonBlank(decision.answer(), planner.finalAnswer(question, history, steps, observations));
-                Map<String, Object> metadata = AgentStepTrace.metadata(steps, extraMetadata);
-                return new AgentLoopResult(answer, citations, metadata);
+                return result(decision.answer(), citations, metadata(steps, extraMetadata), steps, observations);
             }
 
             AgentTool tool = toolRegistry.find(decision.action().value()).orElse(null);
             if (tool == null || decision.action() == AgentActionType.FINISH) {
-                String answer = planner.finalAnswer(question, history, steps, observations);
-                Map<String, Object> metadata = AgentStepTrace.metadata(steps, extraMetadata);
-                return new AgentLoopResult(answer, citations, metadata);
+                return result(decision.answer(), citations, metadata(steps, extraMetadata), steps, observations);
+            }
+            if (hasRepeatedAction(steps, tool.name(), decision.actionInput()) && !observations.isEmpty()) {
+                Map<String, Object> metadata = metadata(steps, extraMetadata);
+                metadata.put("stopReason", "REPEATED_ACTION");
+                return result(null, citations, metadata, steps, observations);
             }
 
             sink.accept(AgentStreamEvent.toolCall(conversationId, index, tool.name(), decision.actionInput()));
-            AgentToolResult result = tool.execute(ownerUserId, decision.actionInput());
+            AgentToolResult result = executeTool(ownerUserId, tool, decision.actionInput());
             citations.addAll(result.citations());
             observations.add(result.evidenceText());
             mergeMetadata(extraMetadata, result.metadata());
             AgentStepTrace trace = new AgentStepTrace(
                     index,
-                    decision.thoughtSummary(),
+                    thoughtSummary,
                     tool.name(),
                     decision.actionInput(),
                     result.observationSummary()
             );
             steps.add(trace);
             sink.accept(AgentStreamEvent.toolResult(conversationId, index, tool.name(), result.observationSummary()));
+            if (isToolUnavailable(result.metadata())) {
+                Map<String, Object> metadata = metadata(steps, extraMetadata);
+                metadata.put("stopReason", "TOOL_UNAVAILABLE");
+                return result(null, citations, metadata, steps, observations);
+            }
         }
 
-        String answer = planner.finalAnswer(question, history, steps, observations);
-        Map<String, Object> metadata = AgentStepTrace.metadata(steps, extraMetadata);
+        Map<String, Object> metadata = metadata(steps, extraMetadata);
         metadata.put("stopReason", "MAX_STEPS_REACHED");
-        return new AgentLoopResult(answer, citations, metadata);
+        return result(null, citations, metadata, steps, observations);
+    }
+
+    private Map<String, Object> metadata(List<AgentStepTrace> steps, Map<String, Object> extraMetadata) {
+        return new LinkedHashMap<>(AgentStepTrace.metadata(steps, extraMetadata));
+    }
+
+    private AgentLoopResult result(String draftAnswer,
+                                   List<AnswerCitation> citations,
+                                   Map<String, Object> metadata,
+                                   List<AgentStepTrace> steps,
+                                   List<String> observations) {
+        return new AgentLoopResult(draftAnswer, citations, metadata, steps, observations);
+    }
+
+    private AgentToolResult executeTool(UUID ownerUserId, AgentTool tool, Map<String, Object> actionInput) {
+        try {
+            return tool.execute(ownerUserId, actionInput);
+        } catch (RuntimeException ex) {
+            String message = userSafeMessage(ex);
+            return new AgentToolResult(
+                    tool.name() + " 执行失败：" + message,
+                    tool.name() + " 工具暂不可用，未能获取新的检索结果。原因：" + message,
+                    List.of(),
+                    Map.of("toolUnavailable", true, "toolErrorMessage", message)
+            );
+        }
+    }
+
+    private boolean isToolUnavailable(Map<String, Object> metadata) {
+        return metadata != null && Boolean.TRUE.equals(metadata.get("toolUnavailable"));
+    }
+
+    private String userSafeMessage(RuntimeException ex) {
+        if (ex == null || ex.getMessage() == null || ex.getMessage().isBlank()) {
+            return "服务暂不可用，请稍后重试";
+        }
+        return ex.getMessage().trim();
+    }
+
+    private boolean hasRepeatedAction(List<AgentStepTrace> steps, String action, Map<String, Object> actionInput) {
+        if (steps == null || steps.isEmpty()) {
+            return false;
+        }
+        return steps.stream().anyMatch(step -> action.equals(step.action()) && step.actionInput().equals(actionInput));
     }
 
     private void mergeMetadata(Map<String, Object> target, Map<String, Object> source) {
@@ -86,18 +136,26 @@ public class AgentLoop {
         target.putAll(source);
     }
 
-    private String firstNonBlank(String first, String second) {
-        return first == null || first.isBlank() ? second : first.trim();
+    private String deterministicThoughtSummary(AgentActionType action) {
+        return switch (action) {
+            case LITERATURE_SEARCH -> "用户需要搜索外部文献，我将调用外部文献搜索。";
+            case LOCAL_PAPER_RETRIEVAL -> "用户需要分析已上传文档，我将检索本地论文知识库。";
+            case FINISH -> "已有工具结果足够回答，我将整理最终回复。";
+        };
     }
 
     public record AgentLoopResult(
-            String answer,
+            String draftAnswer,
             List<AnswerCitation> citations,
-            Map<String, Object> metadata
+            Map<String, Object> metadata,
+            List<AgentStepTrace> steps,
+            List<String> observations
     ) {
         public AgentLoopResult {
-            citations = citations == null ? List.of() : citations;
-            metadata = metadata == null ? Map.of() : metadata;
+            citations = citations == null ? List.of() : List.copyOf(citations);
+            metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
+            steps = steps == null ? List.of() : List.copyOf(steps);
+            observations = observations == null ? List.of() : List.copyOf(observations);
         }
     }
 }
