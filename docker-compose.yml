@@ -1,57 +1,237 @@
+# 生产部署前建议在同目录 .env 中设置：
+# POSTGRES_PASSWORD=请改成强密码
+# REDIS_PASSWORD=请改成强密码
+# RABBITMQ_PASSWORD=请改成强密码
+# JWT_SECRET=至少 32 位随机字符串
+# DASHSCOPE_API_KEY=你的 DashScope API Key
+
+name: paper-rag
+
+x-backend-environment: &backend-environment
+  SERVER_PORT: 8080
+  DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-paper_rag}
+  DB_USERNAME: ${POSTGRES_USER:-paper_rag}
+  DB_PASSWORD: ${POSTGRES_PASSWORD:?请设置 POSTGRES_PASSWORD}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}
+  REDIS_DATABASE: ${REDIS_DATABASE:-0}
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: 5672
+  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-paper_rag}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?请设置 RABBITMQ_PASSWORD}
+  DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?请设置 DASHSCOPE_API_KEY}
+  JWT_ISSUER: ${JWT_ISSUER:-paper-rag-server}
+  JWT_SECRET: ${JWT_SECRET:?请设置 JWT_SECRET}
+  JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-2h}
+  BOOTSTRAP_ADMIN_ENABLED: ${BOOTSTRAP_ADMIN_ENABLED:-false}
+  BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+  BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+  BOOTSTRAP_ADMIN_DISPLAY_NAME: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:-系统管理员}
+  DOCUMENT_INGESTION_STORAGE_DIR: /app/storage/document-ingestion
+  DOCUMENT_INGESTION_KEEP_UPLOAD_FILE: ${DOCUMENT_INGESTION_KEEP_UPLOAD_FILE:-false}
+  DOCUMENT_INGESTION_MAX_RETRY_COUNT: ${DOCUMENT_INGESTION_MAX_RETRY_COUNT:-3}
+  DOCUMENT_INGESTION_LISTENER_CONCURRENCY: ${DOCUMENT_INGESTION_LISTENER_CONCURRENCY:-2}
+  DOCUMENT_INGESTION_LISTENER_MAX_CONCURRENCY: ${DOCUMENT_INGESTION_LISTENER_MAX_CONCURRENCY:-4}
+  LITERATURE_OPENALEX_ENABLED: ${LITERATURE_OPENALEX_ENABLED:-true}
+  LITERATURE_OPENALEX_MAILTO: ${LITERATURE_OPENALEX_MAILTO:-}
+  ALIYUN_OSS_ENDPOINT: ${ALIYUN_OSS_ENDPOINT:-}
+  ALIYUN_OSS_BUCKET: ${ALIYUN_OSS_BUCKET:-}
+  ALIYUN_OSS_ACCESS_KEY_ID: ${ALIYUN_OSS_ACCESS_KEY_ID:-}
+  ALIYUN_OSS_ACCESS_KEY_SECRET: ${ALIYUN_OSS_ACCESS_KEY_SECRET:-}
+  ALIYUN_OSS_PUBLIC_BASE_URL: ${ALIYUN_OSS_PUBLIC_BASE_URL:-}
+  RAG_RERANK_ENABLED: ${RAG_RERANK_ENABLED:-true}
+
 services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_PREFIX: ${VITE_API_PREFIX:-}
+      dockerfile_inline: |
+        # syntax=docker/dockerfile:1.7
+        FROM node:24-alpine AS build
+        WORKDIR /app
+        COPY package*.json ./
+        RUN npm ci
+        COPY . .
+        ARG VITE_API_PREFIX=
+        ENV VITE_API_PREFIX=${VITE_API_PREFIX}
+        RUN npm run build
+
+        FROM nginx:1.29-alpine
+        COPY --from=build /app/dist /usr/share/nginx/html
+        RUN cat > /etc/nginx/conf.d/default.conf <<'EOF'
+        server {
+            listen 80;
+            server_name _;
+            client_max_body_size 50m;
+
+            root /usr/share/nginx/html;
+            index index.html;
+
+            location / {
+                try_files $uri $uri/ /index.html;
+            }
+
+            location /api/ {
+                rewrite ^/api/(.*)$ /$1 break;
+                proxy_pass http://backend:8080;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_buffering off;
+                proxy_read_timeout 300s;
+                proxy_send_timeout 300s;
+            }
+
+            location ~ ^/(auth|admin|documents|conversations|agent)(/|$) {
+                proxy_pass http://backend:8080;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_buffering off;
+                proxy_read_timeout 300s;
+                proxy_send_timeout 300s;
+            }
+        }
+        EOF
+    container_name: paper-rag-frontend
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - paper-rag-net
+
+  backend:
+    build:
+      context: .
+      dockerfile_inline: |
+        # syntax=docker/dockerfile:1.7
+        FROM maven:3.9.11-eclipse-temurin-21 AS build
+        WORKDIR /workspace
+        COPY pom.xml ./
+        RUN --mount=type=cache,target=/root/.m2 mvn -q -DskipTests dependency:go-offline
+        COPY src ./src
+        RUN --mount=type=cache,target=/root/.m2 mvn -q -DskipTests package
+
+        FROM eclipse-temurin:21-jre-alpine
+        WORKDIR /app
+        RUN apk add --no-cache curl \
+            && addgroup -S app \
+            && adduser -S app -G app \
+            && mkdir -p /app/storage/document-ingestion \
+            && chown -R app:app /app
+        COPY --from=build /workspace/target/*.jar /app/app.jar
+        USER app
+        EXPOSE 8080
+        ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/app.jar"]
+    container_name: paper-rag-backend
+    restart: unless-stopped
+    environment:
+      <<: *backend-environment
+    volumes:
+      - document-storage:/app/storage/document-ingestion
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    networks:
+      - paper-rag-net
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: paper-rag-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: mydatabase
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: root
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-paper_rag}
+      POSTGRES_USER: ${POSTGRES_USER:-paper_rag}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请设置 POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./src/main/resources/sql:/docker-entrypoint-initdb.d:ro
+    expose:
+      - "5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U root -d mydatabase"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
+    networks:
+      - paper-rag-net
 
   redis:
     image: redis:7.4-alpine
     container_name: paper-rag-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}
+    command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
     volumes:
       - redis-data:/data
-    command: ["redis-server", "--appendonly", "yes"]
+    expose:
+      - "6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+    networks:
+      - paper-rag-net
 
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:3.13-management-alpine
     container_name: paper-rag-rabbitmq
     restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: admin
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-paper_rag}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?请设置 RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+    expose:
+      - "5672"
+      - "15672"
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
+    networks:
+      - paper-rag-net
+
+networks:
+  paper-rag-net:
+    driver: bridge
 
 volumes:
   postgres-data:
   redis-data:
   rabbitmq-data:
+  document-storage:
