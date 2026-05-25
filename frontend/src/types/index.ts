@@ -147,27 +147,10 @@ export interface BatchDocumentIngestionResponse {
   failureCount: number;
 }
 
-export type ChatMode = 'agent';
-
-export interface AskQuestionPayload {
-  conversationId?: string;
-  question: string;
-  topK?: number;
-}
-
 export interface AgentAskPayload {
   conversationId?: string;
   question: string;
   topK?: number;
-}
-
-export interface LiteratureSearchPayload {
-  conversationId?: string | null;
-  query: string;
-  limit?: number;
-  categories?: string[];
-  dateFrom?: string;
-  sortBy?: 'relevance' | 'date';
 }
 
 export interface LiteratureSearchResult {
@@ -217,12 +200,6 @@ export interface AgentResultMetadata {
 
 export type ConversationMessageMetadata = Record<string, unknown> | LiteratureSearchMessageMetadata | AgentResultMetadata | null;
 
-export interface LiteratureSearchResponse {
-  conversationId: string | null;
-  summary: string | null;
-  items: LiteratureSearchResult[];
-}
-
 export interface AnswerCitation {
   sourceId: string;
   chunkId: string;
@@ -230,21 +207,6 @@ export interface AnswerCitation {
   title: string;
   excerpt: string;
   rankScore: number;
-}
-
-export interface RagAnswer {
-  answer: string;
-  citations: AnswerCitation[];
-  conversationId: string;
-}
-
-export interface RagStreamEvent {
-  type: 'start' | 'delta' | 'done' | 'error';
-  conversationId: string | null;
-  delta: string | null;
-  answer: string | null;
-  citations: AnswerCitation[];
-  message: string | null;
 }
 
 export interface AgentStreamEvent {

@@ -75,10 +75,10 @@ public class AgentPlanner {
                 + "\n\n规则："
                 + "\n1. 用户问已上传论文、知识库、文档内容、总结、引用、方法对比时，优先 action=local_paper_retrieval。"
                 + "\n2. 用户问找论文、搜文献、推荐文章、最新研究、外部资料时，优先 action=literature_search。"
-                + "\n3. 用户问综述、研究现状、趋势、对比分析时，可先搜索外部文献，再检索本地论文。"
+                + "\n3. 用户问综述、研究现状、趋势、对比分析时，先判断资料范围：若目标指向已上传论文、本地知识库、当前文档或本文内容，只能 action=local_paper_retrieval；只有用户明确要求找新论文、搜外部文献、补充外部资料或最新研究时，才可 action=literature_search。"
                 + "\n4. local_paper_retrieval 的 topK 只表示本地 RAG 检索时最多返回的片段数量配置，不代表本地库数量、论文数量或已检索结果。"
                 + "\n5. literature_search 不使用 topK；外部文献数量只由用户明确说的“几篇/limit”决定，未明确时默认 limit=5。"
-                + "\n6. 如果已有观察足够回答，输出 finish=true。"
+                + "\n6. 已有观察后，当前观察可用于回答时必须输出 finish=true；不要连续选择上一步相同 action。"
                 + "\n7. thoughtSummary 只能是可展示的简短思考摘要，不要输出完整隐私思维链。"
                 + "\n8. 只输出 JSON，不要 Markdown，不要解释。";
         String user = "用户目标：\n" + question

@@ -15,10 +15,6 @@ export default defineConfig(({ mode }) => {
           target,
           changeOrigin: true,
         },
-        '/rag': {
-          target,
-          changeOrigin: true,
-        },
         '/conversations': {
           target,
           changeOrigin: true,

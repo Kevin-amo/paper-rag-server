@@ -8,6 +8,7 @@ import com.lqr.paperragserver.agent.model.AgentToolResult;
 import com.lqr.paperragserver.agent.tool.AgentTool;
 import com.lqr.paperragserver.agent.tool.AgentToolRegistry;
 import com.lqr.paperragserver.common.model.AnswerCitation;
+import com.lqr.paperragserver.config.RagProperties;
 import com.lqr.paperragserver.conversation.service.ConversationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class AgentLoop {
 
     private final AgentPlanner planner;
     private final AgentToolRegistry toolRegistry;
+    private final RagProperties ragProperties;
 
     public AgentLoopResult run(UUID ownerUserId,
                                UUID conversationId,
@@ -43,22 +45,22 @@ public class AgentLoop {
             sink.accept(AgentStreamEvent.step(conversationId, index));
             AgentDecision decision = planner.decide(question, history, steps, observations, topK);
             String thoughtSummary = deterministicThoughtSummary(decision.action());
-            sink.accept(AgentStreamEvent.thought(conversationId, index, thoughtSummary));
 
             if (decision.finish()) {
-                return result(decision.answer(), citations, metadata(steps, extraMetadata), steps, observations);
+                return result(decision.answer(), citations, topK, metadata(steps, extraMetadata), steps, observations);
             }
 
             AgentTool tool = toolRegistry.find(decision.action().value()).orElse(null);
             if (tool == null || decision.action() == AgentActionType.FINISH) {
-                return result(decision.answer(), citations, metadata(steps, extraMetadata), steps, observations);
+                return result(decision.answer(), citations, topK, metadata(steps, extraMetadata), steps, observations);
             }
             if (hasRepeatedAction(steps, tool.name(), decision.actionInput()) && !observations.isEmpty()) {
                 Map<String, Object> metadata = metadata(steps, extraMetadata);
                 metadata.put("stopReason", "REPEATED_ACTION");
-                return result(null, citations, metadata, steps, observations);
+                return result(null, citations, topK, metadata, steps, observations);
             }
 
+            sink.accept(AgentStreamEvent.thought(conversationId, index, thoughtSummary));
             sink.accept(AgentStreamEvent.toolCall(conversationId, index, tool.name(), decision.actionInput()));
             AgentToolResult result = executeTool(ownerUserId, tool, decision.actionInput());
             citations.addAll(result.citations());
@@ -76,13 +78,13 @@ public class AgentLoop {
             if (isToolUnavailable(result.metadata())) {
                 Map<String, Object> metadata = metadata(steps, extraMetadata);
                 metadata.put("stopReason", "TOOL_UNAVAILABLE");
-                return result(null, citations, metadata, steps, observations);
+                return result(null, citations, topK, metadata, steps, observations);
             }
         }
 
         Map<String, Object> metadata = metadata(steps, extraMetadata);
         metadata.put("stopReason", "MAX_STEPS_REACHED");
-        return result(null, citations, metadata, steps, observations);
+        return result(null, citations, topK, metadata, steps, observations);
     }
 
     private Map<String, Object> metadata(List<AgentStepTrace> steps, Map<String, Object> extraMetadata) {
@@ -91,10 +93,55 @@ public class AgentLoop {
 
     private AgentLoopResult result(String draftAnswer,
                                    List<AnswerCitation> citations,
+                                   Integer topK,
                                    Map<String, Object> metadata,
                                    List<AgentStepTrace> steps,
                                    List<String> observations) {
-        return new AgentLoopResult(draftAnswer, citations, metadata, steps, observations);
+        return new AgentLoopResult(draftAnswer, normalizeCitations(citations, topK), metadata, steps, observations);
+    }
+
+    private List<AnswerCitation> normalizeCitations(List<AnswerCitation> citations, Integer topK) {
+        if (citations == null || citations.isEmpty()) {
+            return List.of();
+        }
+        Map<String, AnswerCitation> citationByKey = new LinkedHashMap<>();
+        for (AnswerCitation citation : citations) {
+            if (citation == null) {
+                continue;
+            }
+            String key = citationKey(citation);
+            AnswerCitation existing = citationByKey.get(key);
+            if (existing == null || citation.rankScore() > existing.rankScore()) {
+                citationByKey.put(key, citation);
+            }
+        }
+        int limit = citationLimit(topK);
+        return citationByKey.values().stream()
+                .sorted((left, right) -> Double.compare(right.rankScore(), left.rankScore()))
+                .limit(limit)
+                .toList();
+    }
+
+    private int citationLimit(Integer topK) {
+        if (topK != null && topK > 0) {
+            return topK;
+        }
+        return Math.max(1, ragProperties.defaultTopK());
+    }
+
+    private String citationKey(AnswerCitation citation) {
+        if (hasText(citation.chunkId())) {
+            return "chunk:" + citation.chunkId();
+        }
+        return "source-chunk:" + nullToEmpty(citation.sourceId()) + ':' + citation.chunkIndex();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private AgentToolResult executeTool(UUID ownerUserId, AgentTool tool, Map<String, Object> actionInput) {
@@ -125,6 +172,10 @@ public class AgentLoop {
     private boolean hasRepeatedAction(List<AgentStepTrace> steps, String action, Map<String, Object> actionInput) {
         if (steps == null || steps.isEmpty()) {
             return false;
+        }
+        AgentStepTrace lastStep = steps.get(steps.size() - 1);
+        if (action.equals(lastStep.action())) {
+            return true;
         }
         return steps.stream().anyMatch(step -> action.equals(step.action()) && step.actionInput().equals(actionInput));
     }

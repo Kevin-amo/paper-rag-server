@@ -51,7 +51,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/register", "/auth/register/email-code").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/documents/**", "/rag/**", "/conversations/**", "/literature/**").hasRole("USER")
+                        .requestMatchers("/documents/**", "/conversations/**", "/agent/**").hasRole("USER")
                         .requestMatchers("/auth/**").authenticated()
                         .anyRequest().authenticated())
                 // 在 UsernamePasswordAuthenticationFilter 之前插入jwt过滤器

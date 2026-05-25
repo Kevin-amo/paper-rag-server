@@ -464,4 +464,4 @@ create index if not exists idx_document_ingestion_job_status
 --   curl -F "file=@sample.pdf" -F "sourceId=sample-paper" -F "title=Sample Paper" http://localhost:8080/documents
 --
 -- 问答验证：
---   curl -H "Content-Type: application/json" -d '{"question":"这篇论文的核心观点是什么？","topK":3}' http://localhost:8080/rag/ask
+--   前端主链路通过 /agent/ask/stream 发起 agent 流式问答。
