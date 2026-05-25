@@ -10,12 +10,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 /**
  * JWT 认证过滤器，从请求头或资源访问参数中解析访问令牌并写入安全上下文。
@@ -44,10 +46,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     filterChain.doFilter(request, response);
                     return;
                 }
-                // 解码 JWT 获取 username
-                String username = jwtDecoder.decode(token).getSubject();
-                // 从数据库（先从Redis里找）加载用户和角色
+                Jwt jwt = jwtDecoder.decode(token);
+                String username = jwt.getSubject();
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                if (!isTokenBoundToUser(jwt, userDetails)) {
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,
@@ -60,6 +66,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isTokenBoundToUser(Jwt jwt, UserDetails userDetails) {
+        if (!(userDetails instanceof SecurityUserPrincipal principal)) {
+            return false;
+        }
+        try {
+            String userId = jwt.getClaimAsString("userId");
+            return userId != null && principal.getId().equals(UUID.fromString(userId));
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     private String resolveToken(HttpServletRequest request) {

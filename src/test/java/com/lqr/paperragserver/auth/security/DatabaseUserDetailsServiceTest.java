@@ -64,7 +64,10 @@ class DatabaseUserDetailsServiceTest {
     }
 
     @Test
-    void loadUserByUsernameShouldReturnCachedPrincipalWithoutDatabaseQuery() {
+    void loadUserByUsernameShouldReturnCachedPrincipalWhenCacheIsBackedByDatabase() {
+        UUID userId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        SysUser user = user("alice");
+        user.setId(userId);
         when(valueOperations.get("auth:user-details:alice")).thenReturn("""
                 {
                   "id":"00000000-0000-0000-0000-000000000001",
@@ -77,6 +80,7 @@ class DatabaseUserDetailsServiceTest {
                   "roles":["USER"]
                 }
                 """);
+        when(userMapper.selectById(userId)).thenReturn(user);
 
         SecurityUserPrincipal principal = (SecurityUserPrincipal) service.loadUserByUsername("alice");
 
@@ -84,8 +88,37 @@ class DatabaseUserDetailsServiceTest {
         assertThat(principal.getDisplayName()).isEqualTo("Alice");
         assertThat(principal.getAvatarObjectKey()).isEqualTo("avatars/alice.png");
         assertThat(principal.getAuthorities()).extracting("authority").containsExactly("ROLE_USER");
+        verify(userMapper).selectById(userId);
         verify(userMapper, never()).selectOne(any());
         verify(roleMapper, never()).selectRoleCodesByUserId(any());
+    }
+
+    @Test
+    void loadUserByUsernameShouldDiscardStaleCachedPrincipalAndReloadDatabase() {
+        UUID staleUserId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        SysUser user = user("alice");
+        when(valueOperations.get("auth:user-details:alice")).thenReturn("""
+                {
+                  "id":"00000000-0000-0000-0000-000000000001",
+                  "username":"alice",
+                  "passwordHash":"{noop}password",
+                  "displayName":"Old Alice",
+                  "email":"old-alice@example.com",
+                  "avatarObjectKey":null,
+                  "status":"ACTIVE",
+                  "roles":["USER"]
+                }
+                """);
+        when(userMapper.selectById(staleUserId)).thenReturn(null);
+        when(userMapper.selectOne(any())).thenReturn(user);
+        when(roleMapper.selectRoleCodesByUserId(user.getId())).thenReturn(List.of(RoleCodes.USER));
+
+        SecurityUserPrincipal principal = (SecurityUserPrincipal) service.loadUserByUsername("alice");
+
+        assertThat(principal.getId()).isEqualTo(user.getId());
+        assertThat(principal.getDisplayName()).isEqualTo("Alice");
+        verify(redisTemplate).delete("auth:user-details:alice");
+        verify(valueOperations).set(eq("auth:user-details:alice"), any(String.class), eq(Duration.ofMinutes(10)));
     }
 
     @Test

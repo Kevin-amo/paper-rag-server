@@ -12,7 +12,8 @@ import { getErrorMessage } from '../api/http';
 import { useAuth } from '../composables/useAuth';
 import { useDocuments } from '../composables/useDocuments';
 import { useConversations } from '../composables/useConversations';
-import { useRagChat } from '../composables/useRagChat';
+import { useAgentChat } from '../composables/useAgentChat';
+import type { ConversationMessage } from '../types';
 
 const router = useRouter();
 const auth = useAuth();
@@ -24,24 +25,23 @@ const avatarUploadVisible = ref(false);
 const avatarUploading = ref(false);
 const avatarRefreshVersion = ref(0);
 
-const ragState = useRagChat({
+const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '当前用户');
+const currentUserAvatarUrl = computed(() => buildAvatarDisplayUrl(auth.state.user?.avatarUrl ?? null));
+const activeConversation = computed(() => (
+  conversationsState.conversations.value.find((item) => item.id === conversationsState.activeConversationId.value) ?? null
+));
+
+const agentState = useAgentChat({
   activeConversationId: conversationsState.activeConversationId,
+  activeConversation,
   conversationMessages: conversationsState.conversationMessages,
   conversations: conversationsState.conversations,
   loadConversations: () => conversationsState.loadConversations(),
   loadMessages: conversationsState.loadMessages,
 });
 
-const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '当前用户');
-const currentUserAvatarUrl = computed(() => buildAvatarDisplayUrl(auth.state.user?.avatarUrl ?? null));
-const activeConversation = computed(() => (
-  conversationsState.conversations.value.find((item) => item.id === conversationsState.activeConversationId.value) ?? null
-));
 const visibleMessages = computed(() => conversationsState.conversationMessages.value
-  .filter((message) => {
-    const content = message.content.trim();
-    return message.streaming || (content && content !== '-') || message.citations?.length;
-  })
+  .filter((message) => isRenderableMessage(message))
   .sort((a, b) => a.messageOrder - b.messageOrder));
 
 function buildAvatarDisplayUrl(avatarUrl: string | null) {
@@ -51,6 +51,28 @@ function buildAvatarDisplayUrl(avatarUrl: string | null) {
 
   const separator = avatarUrl.includes('?') ? '&' : '?';
   return `${avatarUrl}${separator}t=${avatarRefreshVersion.value}`;
+}
+
+function isLiteratureMessageMetadata(metadata: ConversationMessage['metadata']) {
+  if (!metadata || typeof metadata !== 'object' || !('type' in metadata)) {
+    return false;
+  }
+  if (metadata.type === 'LITERATURE_SEARCH_RESULT') {
+    return Array.isArray((metadata as { items?: unknown[] }).items);
+  }
+  if (metadata.type === 'AGENT_RESULT' && 'literature' in metadata) {
+    const literature = (metadata as { literature?: { items?: unknown[] } }).literature;
+    return Array.isArray(literature?.items);
+  }
+  return false;
+}
+
+function isRenderableMessage(message: ConversationMessage) {
+  const content = message.content.trim();
+  return message.streaming
+    || (!!content && content !== '-')
+    || (message.citations?.length ?? 0) > 0
+    || (message.role === 'ASSISTANT' && isLiteratureMessageMetadata(message.metadata));
 }
 
 async function handleLogout() {
@@ -81,6 +103,18 @@ async function openDocumentDetail(document: Parameters<typeof documentsState.ope
   await documentsState.openDetail(document);
 }
 
+async function handleChatSubmit(payload: { question: string; topK?: number }) {
+  await agentState.ask({ question: payload.question, topK: payload.topK });
+}
+
+async function handleSelectConversation(conversationId: string) {
+  await conversationsState.selectConversation(conversationId);
+}
+
+function handleCreateConversation() {
+  conversationsState.createNewConversation();
+}
+
 onMounted(async () => {
   try {
     await auth.hydrateCurrentUser();
@@ -101,8 +135,8 @@ onMounted(async () => {
       :current-user-name="currentUserName"
       :current-user-avatar-url="currentUserAvatarUrl"
       :is-admin="auth.isAdmin.value"
-      @create-conversation="conversationsState.createNewConversation"
-      @select-conversation="conversationsState.selectConversation"
+      @create-conversation="handleCreateConversation"
+      @select-conversation="handleSelectConversation"
       @delete-conversation="conversationsState.removeConversation"
       @rename-conversation="conversationsState.renameConversation"
       @open-documents="documentLibraryVisible = true"
@@ -112,13 +146,13 @@ onMounted(async () => {
     />
 
     <RagChatWorkspace
-      :loading="ragState.ragLoading.value"
+      :loading="agentState.agentLoading.value"
       :messages="visibleMessages"
       :active-conversation="activeConversation"
       :messages-loading="conversationsState.messagesLoading.value"
       :document-total="documentsState.pagination.total"
       :current-user-avatar-url="currentUserAvatarUrl"
-      @submit="ragState.ask"
+      @submit="handleChatSubmit"
       @open-documents="documentLibraryVisible = true"
       @open-upload="uploadVisible = true"
     />

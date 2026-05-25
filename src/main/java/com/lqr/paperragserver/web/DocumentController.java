@@ -8,9 +8,9 @@ import com.lqr.paperragserver.document.service.DocumentIngestionProducer;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.service.DocumentManagementService;
 import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
-import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
-import com.lqr.paperragserver.paper.service.DocumentIngestionJobService;
-import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
+import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -49,7 +49,7 @@ public class DocumentController {
 
     private final DocumentIngestionService documentIngestionService;
     private final DocumentManagementService documentManagementService;
-    private final PaperDocumentPersistenceService paperDocumentPersistenceService;
+    private final DocumentPersistenceService documentPersistenceService;
     private final DocumentIngestionJobService documentIngestionJobService;
     private final DocumentUploadStorageService documentUploadStorageService;
     private final DocumentIngestionProducer documentIngestionProducer;
@@ -126,8 +126,8 @@ public class DocumentController {
                                                       @RequestParam(value = "status", required = false) String status,
                                                       @RequestParam(value = "page", defaultValue = "0") @Min(0) int page,
                                                       @RequestParam(value = "size", defaultValue = "20") @Min(1) @Max(100) int size) {
-        PaperDocumentPersistenceService.PageResult<PaperDocumentPersistenceService.DocumentSummary> result =
-                paperDocumentPersistenceService.listDocuments(principal.getId(), keyword, status, page, size);
+        DocumentPersistenceService.PageResult<DocumentPersistenceService.DocumentSummary> result =
+                documentPersistenceService.listDocuments(principal.getId(), keyword, status, page, size);
         return new PageResponse<>(
                 result.items().stream().map(DocumentSummaryResponse::from).toList(),
                 result.page(),
@@ -153,7 +153,7 @@ public class DocumentController {
     @GetMapping("/{sourceId}")
     public DocumentDetailResponse detail(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                          @PathVariable String sourceId) {
-        return paperDocumentPersistenceService.findDocument(principal.getId(), sourceId)
+        return documentPersistenceService.findDocument(principal.getId(), sourceId)
                 .map(DocumentDetailResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文档不存在"));
     }
@@ -171,8 +171,8 @@ public class DocumentController {
                                                       @PathVariable String sourceId,
                                                       @RequestParam(value = "page", defaultValue = "0") @Min(0) int page,
                                                       @RequestParam(value = "size", defaultValue = "50") @Min(1) @Max(200) int size) {
-        PaperDocumentPersistenceService.PageResult<PaperDocumentPersistenceService.DocumentChunkView> result =
-                paperDocumentPersistenceService.listChunks(principal.getId(), sourceId, page, size);
+        DocumentPersistenceService.PageResult<DocumentPersistenceService.DocumentChunkView> result =
+                documentPersistenceService.listChunks(principal.getId(), sourceId, page, size);
         return new PageResponse<>(
                 result.items().stream().map(DocumentChunkResponse::from).toList(),
                 result.page(),
@@ -192,7 +192,7 @@ public class DocumentController {
     public List<DocumentAssetResponse> assets(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                               @PathVariable String sourceId,
                                               @RequestParam(value = "assetIds", required = false) String assetIds) {
-        return paperDocumentPersistenceService.listAssets(principal.getId(), sourceId, parseAssetIds(assetIds)).stream()
+        return documentPersistenceService.listAssets(principal.getId(), sourceId, parseAssetIds(assetIds)).stream()
                 .map(DocumentAssetResponse::from)
                 .toList();
     }
@@ -208,7 +208,7 @@ public class DocumentController {
     public ResponseEntity<byte[]> assetContent(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                @PathVariable String sourceId,
                                                @PathVariable String assetId) {
-        PaperDocumentPersistenceService.DocumentAssetView asset = paperDocumentPersistenceService.findAsset(principal.getId(), sourceId, assetId)
+        DocumentPersistenceService.DocumentAssetView asset = documentPersistenceService.findAsset(principal.getId(), sourceId, assetId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "资产不存在"));
         byte[] content = asset.content() == null ? new byte[0] : asset.content();
         MediaType mediaType = asset.contentType() == null || asset.contentType().isBlank()
@@ -231,7 +231,7 @@ public class DocumentController {
     public DocumentDetailResponse updateMetadata(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                  @PathVariable String sourceId,
                                                  @Valid @RequestBody DocumentMetadataRequest request) {
-        paperDocumentPersistenceService.updateMetadata(principal.getId(), sourceId, request.toUpdate());
+        documentPersistenceService.updateMetadata(principal.getId(), sourceId, request.toUpdate());
         return detail(principal, sourceId);
     }
 
@@ -493,7 +493,7 @@ public class DocumentController {
          * @param document 文档摘要
          * @return 文档摘要响应
          */
-        static DocumentSummaryResponse from(PaperDocumentPersistenceService.DocumentSummary document) {
+        static DocumentSummaryResponse from(DocumentPersistenceService.DocumentSummary document) {
             return new DocumentSummaryResponse(
                     document.sourceId(),
                     document.ownerUserId(),
@@ -540,7 +540,7 @@ public class DocumentController {
          * @param document 文档详情
          * @return 文档详情响应
          */
-        static DocumentDetailResponse from(PaperDocumentPersistenceService.DocumentDetail document) {
+        static DocumentDetailResponse from(DocumentPersistenceService.DocumentDetail document) {
             return new DocumentDetailResponse(
                     document.sourceId(),
                     document.ownerUserId(),
@@ -588,7 +588,7 @@ public class DocumentController {
          * @param chunk 分块视图
          * @return 分块响应
          */
-        static DocumentChunkResponse from(PaperDocumentPersistenceService.DocumentChunkView chunk) {
+        static DocumentChunkResponse from(DocumentPersistenceService.DocumentChunkView chunk) {
             return new DocumentChunkResponse(
                     chunk.chunkId(),
                     chunk.ownerUserId(),
@@ -630,7 +630,7 @@ public class DocumentController {
          * @param asset 资产视图
          * @return 资产响应
          */
-        static DocumentAssetResponse from(PaperDocumentPersistenceService.DocumentAssetView asset) {
+        static DocumentAssetResponse from(DocumentPersistenceService.DocumentAssetView asset) {
             return new DocumentAssetResponse(
                     asset.assetId(),
                     asset.sourceId(),
@@ -666,8 +666,8 @@ public class DocumentController {
          *
          * @return 元数据更新对象
          */
-        PaperDocumentPersistenceService.DocumentMetadataUpdate toUpdate() {
-            return new PaperDocumentPersistenceService.DocumentMetadataUpdate(
+        DocumentPersistenceService.DocumentMetadataUpdate toUpdate() {
+            return new DocumentPersistenceService.DocumentMetadataUpdate(
                     title,
                     authors,
                     abstractText,

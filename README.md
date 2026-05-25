@@ -181,7 +181,7 @@ npm run dev
 http://localhost:5173
 ```
 
-Vite 默认会把 `/auth`、`/documents`、`/rag`、`/conversations`、`/admin` 等请求代理到 `http://localhost:8080`。
+Vite 默认会把 `/auth`、`/documents`、`/agent`、`/conversations`、`/admin` 等请求代理到 `http://localhost:8080`。
 
 如需修改后端地址：
 
@@ -295,12 +295,11 @@ Authorization: Bearer <access-token>
 | `POST` | `/documents/{sourceId}/restore` | 恢复文档 |
 | `POST` | `/documents/{sourceId}/reindex` | 重建索引 |
 
-### RAG 问答
+### Agent 问答
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `POST` | `/rag/ask` | 普通问答 |
-| `POST` | `/rag/ask/stream` | SSE 流式问答 |
+| `POST` | `/agent/ask/stream` | Agent SSE 流式问答 |
 
 ### 会话
 

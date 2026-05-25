@@ -112,7 +112,7 @@ create table if not exists public.conversation (
     deleted_at timestamptz
 );
 
-comment on table public.conversation is 'RAG Agent 用户会话表';
+comment on table public.conversation is 'Agent 用户会话表';
 comment on column public.conversation.owner_user_id is '会话归属用户 ID';
 comment on column public.conversation.title is '会话标题';
 
@@ -137,6 +137,7 @@ create table if not exists public.conversation_message (
     message_order integer not null,
     content text not null,
     citations jsonb,
+    metadata jsonb,
     created_at timestamptz not null default now(),
 
     constraint chk_conversation_message_role check (role in ('USER', 'ASSISTANT')),
@@ -146,12 +147,18 @@ create table if not exists public.conversation_message (
 comment on table public.conversation_message is 'RAG Agent 会话消息表';
 comment on column public.conversation_message.role is '消息角色：USER、ASSISTANT';
 comment on column public.conversation_message.citations is 'Assistant 回答引用信息 JSON';
+comment on column public.conversation_message.metadata is '会话消息扩展元数据 JSON';
 
 create index if not exists idx_conversation_message_owner_conversation_order
     on public.conversation_message using btree (owner_user_id, conversation_id, message_order);
 
 create index if not exists idx_conversation_message_conversation_created_at
     on public.conversation_message using btree (conversation_id, created_at);
+
+alter table if exists public.conversation_message
+    add column if not exists metadata jsonb;
+
+comment on column public.conversation_message.metadata is '会话消息扩展元数据 JSON';
 
 -- ===== 10_sys_user_avatar.sql =====
 -- 为已有系统用户表补充头像字段。
@@ -457,4 +464,4 @@ create index if not exists idx_document_ingestion_job_status
 --   curl -F "file=@sample.pdf" -F "sourceId=sample-paper" -F "title=Sample Paper" http://localhost:8080/documents
 --
 -- 问答验证：
---   curl -H "Content-Type: application/json" -d '{"question":"这篇论文的核心观点是什么？","topK":3}' http://localhost:8080/rag/ask
+--   前端主链路通过 /agent/ask/stream 发起 agent 流式问答。

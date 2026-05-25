@@ -7,13 +7,13 @@ import com.lqr.paperragserver.common.model.DocumentIngestionResult;
 import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.common.model.ParsedDocument;
 import com.lqr.paperragserver.config.DocumentIngestionProperties;
-import com.lqr.paperragserver.document.impl.DocumentIngestionServiceImpl;
+import com.lqr.paperragserver.document.service.impl.DocumentIngestionServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentParsingService;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
 import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
-import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
-import com.lqr.paperragserver.paper.service.DocumentIngestionJobService;
-import com.lqr.paperragserver.paper.service.PaperDocumentPersistenceService;
+import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
+import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +35,7 @@ class DocumentIngestionServiceImplTest {
     private final DocumentSplittingService documentSplittingService = mock(DocumentSplittingService.class);
     private final EmbeddingService embeddingService = mock(EmbeddingService.class);
     private final VectorWriteService vectorWriteService = mock(VectorWriteService.class);
-    private final PaperDocumentPersistenceService paperDocumentPersistenceService = mock(PaperDocumentPersistenceService.class);
+    private final DocumentPersistenceService documentPersistenceService = mock(DocumentPersistenceService.class);
     private final DocumentIngestionJobService documentIngestionJobService = mock(DocumentIngestionJobService.class);
     private final DocumentUploadStorageService documentUploadStorageService = mock(DocumentUploadStorageService.class);
     private DocumentIngestionServiceImpl service;
@@ -47,7 +47,7 @@ class DocumentIngestionServiceImplTest {
                 documentSplittingService,
                 embeddingService,
                 vectorWriteService,
-                paperDocumentPersistenceService,
+                documentPersistenceService,
                 documentIngestionJobService,
                 documentUploadStorageService,
                 new DocumentIngestionProperties("storage", true, 3, new DocumentIngestionProperties.Listener(2, 4), null)
@@ -68,10 +68,10 @@ class DocumentIngestionServiceImplTest {
 
         assertThat(result.source()).isEqualTo(fixture.source());
         assertThat(result.chunkCount()).isEqualTo(1);
-        verify(paperDocumentPersistenceService).markParsing(ownerUserId, fixture.source(), "页面文本");
-        verify(paperDocumentPersistenceService).replaceAssets(ownerUserId, "source-1", List.of(fixture.asset()));
-        verify(paperDocumentPersistenceService).replaceChunks(ownerUserId, "source-1", List.of(fixture.chunk()));
-        verify(paperDocumentPersistenceService).markIndexed(ownerUserId, "source-1", 1);
+        verify(documentPersistenceService).markParsing(ownerUserId, fixture.source(), "页面文本");
+        verify(documentPersistenceService).replaceAssets(ownerUserId, "source-1", List.of(fixture.asset()));
+        verify(documentPersistenceService).replaceChunks(ownerUserId, "source-1", List.of(fixture.chunk()));
+        verify(documentPersistenceService).markIndexed(ownerUserId, "source-1", 1);
         verify(vectorWriteService).deleteBySourceId(ownerUserId, "source-1");
         verify(vectorWriteService).upsert(eq(ownerUserId), any());
     }
@@ -101,7 +101,7 @@ class DocumentIngestionServiceImplTest {
         verify(documentIngestionJobService).markRunningStage(ownerUserId, jobId, "source-1", DocumentIngestionJobService.STATUS_CHUNKING, 45);
         verify(documentIngestionJobService).markRunningStage(ownerUserId, jobId, "source-1", DocumentIngestionJobService.STATUS_EMBEDDING, 80);
         verify(documentIngestionJobService).markIndexed(ownerUserId, jobId, "source-1");
-        verify(paperDocumentPersistenceService).markIndexed(ownerUserId, "source-1", 1);
+        verify(documentPersistenceService).markIndexed(ownerUserId, "source-1", 1);
     }
 
     @Test
@@ -111,7 +111,7 @@ class DocumentIngestionServiceImplTest {
                 documentSplittingService,
                 embeddingService,
                 vectorWriteService,
-                paperDocumentPersistenceService,
+                documentPersistenceService,
                 documentIngestionJobService,
                 documentUploadStorageService,
                 new DocumentIngestionProperties("storage", false, 3, new DocumentIngestionProperties.Listener(2, 4), null)

@@ -8,8 +8,13 @@ export default {
 import { computed, nextTick, ref, watch } from 'vue';
 import EmptyState from '../common/EmptyState.vue';
 import CitationCards from './CitationCards.vue';
+import LiteratureSearchResults from './LiteratureSearchResults.vue';
 import { renderMarkdown } from '../../utils/markdown';
-import type { ConversationMessage } from '../../types';
+import type {
+  AgentResultMetadata,
+  ConversationMessage,
+  LiteratureSearchMessageMetadata,
+} from '../../types';
 
 const props = defineProps<{
   messages: ConversationMessage[];
@@ -28,8 +33,59 @@ const scrollSignal = computed(() => {
   return `${props.messages.length}:${last?.id ?? ''}:${last?.content ?? ''}:${last?.streaming ?? false}`;
 });
 
-function assistantHtml(content: string) {
-  return renderMarkdown(content || '正在生成回答...');
+const emptyContent = computed(() => ({
+  title: '开始使用论文超级助手',
+  description: '你可以让它检索本地论文、搜索外部文献，并综合分析研究趋势、方法差异和后续方向。',
+  examples: [
+    '请总结我上传论文中的核心研究问题和主要贡献',
+    '帮我找 Graph RAG 最新论文，并结合我的知识库总结趋势',
+    '这些论文在方法设计上有哪些共同点和差异？',
+  ],
+}));
+
+function assistantHtml(content: string, streaming?: boolean) {
+  if (content && content.trim()) {
+    return renderMarkdown(content);
+  }
+  return renderMarkdown(streaming ? '正在生成...' : '');
+}
+
+function isLiteratureSearchMetadata(metadata: ConversationMessage['metadata']): metadata is LiteratureSearchMessageMetadata {
+  return !!metadata
+    && typeof metadata === 'object'
+    && 'type' in metadata
+    && metadata.type === 'LITERATURE_SEARCH_RESULT'
+    && Array.isArray((metadata as LiteratureSearchMessageMetadata).items);
+}
+
+function isAgentResultMetadata(metadata: ConversationMessage['metadata']): metadata is AgentResultMetadata {
+  return !!metadata
+    && typeof metadata === 'object'
+    && 'type' in metadata
+    && metadata.type === 'AGENT_RESULT'
+    && Array.isArray((metadata as AgentResultMetadata).steps);
+}
+
+function literatureMetadata(message: ConversationMessage): LiteratureSearchMessageMetadata | null {
+  if (isLiteratureSearchMetadata(message.metadata)) {
+    return message.metadata;
+  }
+  if (isAgentResultMetadata(message.metadata) && message.metadata.literature) {
+    return message.metadata.literature;
+  }
+  return null;
+}
+
+function hasLiteratureMetadata(message: ConversationMessage) {
+  return literatureMetadata(message) !== null;
+}
+
+function literatureItems(message: ConversationMessage) {
+  return literatureMetadata(message)?.items ?? [];
+}
+
+function literatureQuery(message: ConversationMessage) {
+  return literatureMetadata(message)?.query;
 }
 
 watch(
@@ -50,18 +106,17 @@ watch(
   >
     <EmptyState
       v-if="!props.messages.length"
-      title="开始和你的论文知识库对话"
-      description="你可以询问论文贡献、方法对比、实验结论、局限性，系统会基于已上传论文给出可追溯回答。"
+      :title="emptyContent.title"
+      :description="emptyContent.description"
     >
       <div class="example-prompts">
-        <button type="button" @click="emit('askExample', '请总结我上传论文中的核心研究问题和主要贡献')">
-          总结核心贡献
-        </button>
-        <button type="button" @click="emit('askExample', '这些论文在方法设计上有哪些共同点和差异？')">
-          对比研究方法
-        </button>
-        <button type="button" @click="emit('askExample', '请基于引用说明相关工作的实验结论')">
-          查看实验结论
+        <button
+          v-for="example in emptyContent.examples"
+          :key="example"
+          type="button"
+          @click="emit('askExample', example)"
+        >
+          {{ example }}
         </button>
       </div>
     </EmptyState>
@@ -79,9 +134,35 @@ watch(
         </div>
         <div class="message-body">
           <div v-if="message.role === 'USER'" class="message-content">{{ message.content }}</div>
-          <div v-else class="message-content markdown-content" v-html="assistantHtml(message.content)" />
-          <span v-if="message.streaming" class="streaming-indicator">正在生成...</span>
-          <CitationCards v-if="message.role === 'ASSISTANT'" :citations="message.citations || []" />
+          <div
+            v-else
+            class="message-content markdown-content"
+            v-html="assistantHtml(message.content, message.streaming)"
+          />
+          <div v-if="message.role === 'ASSISTANT' && isAgentResultMetadata(message.metadata) && message.metadata.steps.length" class="agent-steps">
+            <details>
+              <summary>执行步骤</summary>
+              <ol>
+                <li v-for="step in message.metadata.steps" :key="`${message.id}-${step.index}`">
+                  <strong>{{ step.action }}</strong>
+                  <span>{{ step.thoughtSummary }}</span>
+                  <em v-if="step.observationSummary">{{ step.observationSummary }}</em>
+                </li>
+              </ol>
+            </details>
+          </div>
+          <span v-if="message.streaming" class="streaming-indicator">
+            正在执行任务...
+          </span>
+          <CitationCards v-if="message.role === 'ASSISTANT' && message.citations?.length" :citations="message.citations || []" />
+          <LiteratureSearchResults
+            v-if="message.role === 'ASSISTANT' && hasLiteratureMetadata(message)"
+            inline
+            :items="literatureItems(message)"
+            :last-query="literatureQuery(message)"
+            :has-searched="true"
+            :loading="false"
+          />
         </div>
       </article>
     </template>
@@ -296,6 +377,55 @@ watch(
 
 .markdown-content :deep(a:hover) {
   text-decoration: underline;
+}
+
+.agent-steps {
+  margin: 12px 0 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #f9fafb;
+}
+
+.agent-steps details {
+  padding: 10px 12px;
+}
+
+.agent-steps summary {
+  cursor: pointer;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.agent-steps ol {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+
+.agent-steps li {
+  color: #475569;
+  line-height: 1.6;
+}
+
+.agent-steps strong {
+  display: inline-flex;
+  margin-right: 8px;
+  color: #2563eb;
+  font-size: 12px;
+}
+
+.agent-steps span {
+  margin-right: 8px;
+}
+
+.agent-steps em {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-style: normal;
+  font-size: 12px;
 }
 
 .streaming-indicator {

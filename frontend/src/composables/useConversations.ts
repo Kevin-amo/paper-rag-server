@@ -8,7 +8,28 @@ import {
   updateConversation,
 } from '../api/conversations';
 import { getErrorMessage } from '../api/http';
-import type { Conversation, ConversationMessage } from '../types';
+import type {
+  Conversation,
+  ConversationMessage,
+  ConversationMessageMetadata,
+  LiteratureSearchMessageMetadata,
+} from '../types';
+
+function responseShape(value: unknown) {
+  if (value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value)) {
+    return 'array';
+  }
+  if (typeof value === 'string') {
+    return `string: ${value.slice(0, 80)}`;
+  }
+  if (typeof value === 'object') {
+    return `object keys: ${Object.keys(value).join(', ') || '(empty)'}`;
+  }
+  return typeof value;
+}
 
 function asArray<T>(value: T[] | { items?: T[] } | unknown, label: string): T[] {
   if (Array.isArray(value)) {
@@ -19,11 +40,19 @@ function asArray<T>(value: T[] | { items?: T[] } | unknown, label: string): T[] 
     return value.items;
   }
 
-  throw new Error(`${label} 接口返回格式异常`);
+  throw new Error(`${label} 接口返回格式异常（${responseShape(value)}）`);
 }
 
 function isNotFound(error: unknown) {
   return axios.isAxiosError(error) && error.response?.status === 404;
+}
+
+function isLiteratureSearchMetadata(metadata: ConversationMessageMetadata): metadata is LiteratureSearchMessageMetadata {
+  return !!metadata
+    && typeof metadata === 'object'
+    && 'type' in metadata
+    && metadata.type === 'LITERATURE_SEARCH_RESULT'
+    && Array.isArray((metadata as LiteratureSearchMessageMetadata).items);
 }
 
 export function useConversations() {
@@ -130,7 +159,8 @@ export function useConversations() {
 
   function isDisposableMessage(message: ConversationMessage) {
     const content = message.content.trim();
-    return (!content || content === '-') && !message.citations?.length;
+    const hasLiteratureResult = isLiteratureSearchMetadata(message.metadata) && message.metadata.items.length > 0;
+    return (!content || content === '-') && !message.citations?.length && !hasLiteratureResult;
   }
 
   async function cleanEmptyConversations() {
