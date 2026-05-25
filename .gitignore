@@ -34,7 +34,7 @@ application-local*.yaml
 frontend/node_modules/
 frontend/dist/
 frontend/.env.local
-storage/
+/storage/
 
 ### VS Code ###
 .vscode/
