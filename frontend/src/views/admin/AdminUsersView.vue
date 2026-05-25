@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import MainLayout from '../../layouts/MainLayout.vue';
 import PageHeader from '../../components/common/PageHeader.vue';
-import AdminUsersPanel from '../../components/AdminUsersPanel.vue';
+import AdminUsersPanel from '../../components/admin/AdminUsersPanel.vue';
 import { getErrorMessage } from '../../api/http';
 import { useAuth } from '../../composables/useAuth';
 import { ElMessage } from 'element-plus';

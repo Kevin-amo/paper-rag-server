@@ -3,8 +3,8 @@ package com.lqr.paperragserver.vector;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.ai.service.EmbeddingService;
 import com.lqr.paperragserver.common.model.DocumentChunk;
-import com.lqr.paperragserver.paper.mapper.PaperDocumentChunkMapper;
-import com.lqr.paperragserver.vector.impl.VectorWriteServiceImpl;
+import com.lqr.paperragserver.document.mapper.DocumentChunkMapper;
+import com.lqr.paperragserver.vector.service.impl.VectorWriteServiceImpl;
 import com.lqr.paperragserver.vector.mapper.VectorStoreMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class VectorWriteServiceTest {
 
     private final VectorStoreMapper vectorStoreMapper = mock(VectorStoreMapper.class);
-    private final PaperDocumentChunkMapper chunkMapper = mock(PaperDocumentChunkMapper.class);
+    private final DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final UUID ownerUserId = UUID.randomUUID();
     private VectorWriteServiceImpl service;

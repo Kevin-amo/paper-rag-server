@@ -4,6 +4,7 @@ import com.lqr.paperragserver.common.model.AnswerCitation;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface ConversationService {
@@ -28,6 +29,8 @@ public interface ConversationService {
 
     MessageView appendAssistantMessage(UUID ownerUserId, UUID conversationId, String content, List<AnswerCitation> citations);
 
+    MessageView appendAssistantMessage(UUID ownerUserId, UUID conversationId, String content, List<AnswerCitation> citations, Object metadata);
+
     void deleteConversation(UUID ownerUserId, UUID conversationId);
 
     record ConversationView(
@@ -46,6 +49,7 @@ public interface ConversationService {
             int messageOrder,
             String content,
             List<AnswerCitation> citations,
+            Map<String, Object> metadata,
             OffsetDateTime createdAt
     ) {
     }

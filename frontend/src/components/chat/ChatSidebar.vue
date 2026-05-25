@@ -181,13 +181,13 @@ function conversationTitle(conversation: Conversation) {
     <div class="brand-block">
       <div class="brand-mark">P</div>
       <div>
-        <strong>Paper RAG</strong>
+        <strong>Paper Agent</strong>
         <span>论文智能助手</span>
       </div>
     </div>
 
     <el-button class="new-chat-button" type="primary" size="large" :icon="Plus" @click="emit('createConversation')">
-      新建问答
+      论文智能助手
     </el-button>
 
     <nav class="sidebar-nav">

@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.auth;
 
-import com.lqr.paperragserver.auth.impl.VerificationCodeServiceImpl;
+import com.lqr.paperragserver.auth.service.impl.VerificationCodeServiceImpl;
 import com.lqr.paperragserver.config.SecurityProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

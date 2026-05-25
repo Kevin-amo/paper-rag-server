@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.document.service;
 
 import com.lqr.paperragserver.common.model.DocumentIngestionResult;
-import com.lqr.paperragserver.paper.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
 
 import java.util.Map;
 import java.util.UUID;

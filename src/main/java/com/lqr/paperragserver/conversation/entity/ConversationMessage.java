@@ -26,5 +26,8 @@ public class ConversationMessage {
     @TableField(value = "citations", typeHandler = JsonbTypeHandler.class)
     private Object citations;
 
+    @TableField(value = "metadata", typeHandler = JsonbTypeHandler.class)
+    private Object metadata;
+
     private OffsetDateTime createdAt;
 }
