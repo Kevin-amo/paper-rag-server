@@ -61,10 +61,10 @@ class RagAnswerServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new RagAnswerServiceImpl(ragRetrievalService, promptConstructionService, llmService, ragProperties, conversationService);
-        when(conversationService.createConversation(eq(ownerUserId), anyString(), eq("RAG")))
-                .thenReturn(new ConversationService.ConversationView(conversationId, ownerUserId, "测试会话", "RAG", null, null));
+        when(conversationService.createConversation(eq(ownerUserId), anyString()))
+                .thenReturn(new ConversationService.ConversationView(conversationId, ownerUserId, "测试会话", null, null));
         when(conversationService.requireConversation(eq(ownerUserId), eq(conversationId)))
-                .thenReturn(new ConversationService.ConversationView(conversationId, ownerUserId, "测试会话", "RAG", null, null));
+                .thenReturn(new ConversationService.ConversationView(conversationId, ownerUserId, "测试会话", null, null));
         when(conversationService.recentMessages(eq(ownerUserId), eq(conversationId), anyInt()))
                 .thenReturn(List.of());
     }

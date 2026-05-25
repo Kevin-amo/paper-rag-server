@@ -103,7 +103,7 @@ class ConversationControllerTest {
 
     private ConversationService.ConversationView conversationView(String title) {
         OffsetDateTime now = OffsetDateTime.now();
-        return new ConversationService.ConversationView(UUID.randomUUID(), ownerUserId, title, "RAG", now, now);
+        return new ConversationService.ConversationView(UUID.randomUUID(), ownerUserId, title, now, now);
     }
 
     private SecurityUserPrincipal principal(UUID userId) {

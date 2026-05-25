@@ -497,30 +497,6 @@ function conversationTitle(conversation: Conversation) {
   white-space: nowrap;
 }
 
-.conversation-type-badge {
-  flex: none;
-  display: inline-grid;
-  place-items: center;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.12);
-  color: #64748b;
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 800;
-}
-
-.conversation-type-badge.literature {
-  background: rgba(59, 130, 246, 0.12);
-  color: #2563eb;
-}
-
-.conversation-type-badge.rag {
-  background: rgba(16, 185, 129, 0.12);
-  color: #059669;
-}
-
 .conversation-pin-badge {
   flex: none;
   display: inline-grid;

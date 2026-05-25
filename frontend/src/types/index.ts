@@ -9,7 +9,6 @@ export type UserRole = 'USER' | 'ADMIN';
 export type UserStatus = 'ACTIVE' | 'DISABLED';
 export type DocumentStatus = 'PENDING' | 'PROCESSING' | 'INDEXED' | 'READY' | 'FAILED' | string;
 export type MessageRole = 'USER' | 'ASSISTANT';
-export type ConversationType = 'RAG' | 'LITERATURE' | 'AGENT';
 
 export interface DocumentSource {
   sourceId: string;
@@ -267,7 +266,6 @@ export interface Conversation {
   id: string;
   ownerUserId: string;
   title: string;
-  type: ConversationType;
   createdAt: string;
   updatedAt: string;
 }
