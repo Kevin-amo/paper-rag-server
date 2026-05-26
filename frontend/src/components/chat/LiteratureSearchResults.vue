@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import EmptyState from '../common/EmptyState.vue';
 import type { LiteratureSearchResult } from '../../types';
 
@@ -12,19 +13,39 @@ const props = defineProps<{
   inline?: boolean;
 }>();
 
-function sourceLabel(source: string | null | undefined) {
-  if (source === 'openalex') {
-    return 'OpenAlex';
-  }
-  return source || '来源未知';
-}
-
 function metaText(item: LiteratureSearchResult) {
   return [
     item.authors.length ? item.authors.join(', ') : '作者未知',
     item.year ?? '年份未知',
     item.primaryCategory || item.categories[0] || '分类未知',
   ].join(' · ');
+}
+
+function visibleTags(item: LiteratureSearchResult) {
+  return [item.primaryCategory, ...item.categories]
+    .filter((tag): tag is string => !!tag)
+    .filter((tag, index, tags) => tags.indexOf(tag) === index)
+    .slice(0, 3);
+}
+
+const activeAbstract = ref<{ title: string; text: string } | null>(null);
+
+function paperKey(item: LiteratureSearchResult, index: number) {
+  return `${item.externalId || item.title || 'paper'}-${index}`;
+}
+
+function openAbstract(item: LiteratureSearchResult) {
+  if (!item.abstractText) {
+    return;
+  }
+  activeAbstract.value = {
+    title: item.title || '未命名论文',
+    text: item.abstractText,
+  };
+}
+
+function closeAbstract() {
+  activeAbstract.value = null;
 }
 </script>
 
@@ -47,25 +68,27 @@ function metaText(item: LiteratureSearchResult) {
       </div>
 
       <div v-else class="literature-inline-panel">
-        <article v-for="(item, index) in props.items" :key="`${item.externalId || item.title || index}`" class="paper-card inline-paper-card">
+        <article
+          v-for="(item, index) in props.items"
+          :key="paperKey(item, index)"
+          class="paper-card inline-paper-card"
+        >
           <div class="paper-index">{{ index + 1 }}</div>
           <div class="paper-body">
             <h3>
-              <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer">
-                {{ item.title || '未命名论文' }}
-              </a>
-              <span v-else>{{ item.title || '未命名论文' }}</span>
+              {{ item.title || '未命名论文' }}
             </h3>
             <p class="paper-meta">{{ metaText(item) }}</p>
-            <p v-if="item.abstractText" class="paper-abstract">{{ item.abstractText }}</p>
+            <button
+              v-if="item.abstractText"
+              type="button"
+              class="abstract-button"
+              @click="openAbstract(item)"
+            >
+              查看摘要
+            </button>
             <div class="paper-tags">
-              <span>{{ sourceLabel(item.source) }}</span>
-              <span v-if="item.externalId">{{ item.externalId }}</span>
-              <span v-for="category in item.categories" :key="category">{{ category }}</span>
-            </div>
-            <div class="paper-links">
-              <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer">Abs</a>
-              <a v-if="item.pdfUrl" :href="item.pdfUrl" target="_blank" rel="noopener noreferrer">PDF</a>
+              <span v-for="tag in visibleTags(item)" :key="tag">{{ tag }}</span>
             </div>
           </div>
         </article>
@@ -90,30 +113,55 @@ function metaText(item: LiteratureSearchResult) {
       </div>
 
       <div v-else class="literature-panel">
-        <article v-for="(item, index) in props.items" :key="`${item.externalId || item.title || index}`" class="paper-card">
+        <article
+          v-for="(item, index) in props.items"
+          :key="paperKey(item, index)"
+          class="paper-card"
+        >
           <div class="paper-index">{{ index + 1 }}</div>
           <div class="paper-body">
             <h3>
-              <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer">
-                {{ item.title || '未命名论文' }}
-              </a>
-              <span v-else>{{ item.title || '未命名论文' }}</span>
+              {{ item.title || '未命名论文' }}
             </h3>
             <p class="paper-meta">{{ metaText(item) }}</p>
-            <p v-if="item.abstractText" class="paper-abstract">{{ item.abstractText }}</p>
+            <button
+              v-if="item.abstractText"
+              type="button"
+              class="abstract-button"
+              @click="openAbstract(item)"
+            >
+              查看摘要
+            </button>
             <div class="paper-tags">
-              <span>{{ sourceLabel(item.source) }}</span>
-              <span v-if="item.externalId">{{ item.externalId }}</span>
-              <span v-for="category in item.categories" :key="category">{{ category }}</span>
-            </div>
-            <div class="paper-links">
-              <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer">Abs</a>
-              <a v-if="item.pdfUrl" :href="item.pdfUrl" target="_blank" rel="noopener noreferrer">PDF</a>
+              <span v-for="tag in visibleTags(item)" :key="tag">{{ tag }}</span>
             </div>
           </div>
         </article>
       </div>
     </template>
+    <Teleport to="body">
+      <Transition name="abstract-modal">
+        <div
+          v-if="activeAbstract"
+          class="abstract-overlay"
+          role="presentation"
+          @click.self="closeAbstract"
+        >
+          <section class="abstract-dialog" role="dialog" aria-modal="true" aria-labelledby="abstract-dialog-title">
+            <header class="abstract-dialog-header">
+              <div>
+                <span>文献摘要</span>
+                <h2 id="abstract-dialog-title">{{ activeAbstract.title }}</h2>
+              </div>
+              <button type="button" class="abstract-close" aria-label="关闭摘要弹窗" @click="closeAbstract">
+                ×
+              </button>
+            </header>
+            <p class="abstract-dialog-content">{{ activeAbstract.text }}</p>
+          </section>
+        </div>
+      </Transition>
+    </Teleport>
   </section>
 </template>
 
@@ -225,15 +273,26 @@ function metaText(item: LiteratureSearchResult) {
   font-weight: 700;
 }
 
-.paper-abstract {
-  margin: 0;
-  color: #374151;
-  line-height: 1.75;
-  white-space: pre-wrap;
+.abstract-button {
+  justify-self: start;
+  padding: 7px 11px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
 
-.paper-tags,
-.paper-links {
+.abstract-button:hover {
+  border-color: #bfdbfe;
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+.paper-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -246,17 +305,6 @@ function metaText(item: LiteratureSearchResult) {
   color: #475569;
   font-size: 12px;
   font-weight: 800;
-}
-
-.paper-links a {
-  color: #2563eb;
-  font-size: 13px;
-  font-weight: 900;
-  text-decoration: none;
-}
-
-.paper-links a:hover {
-  text-decoration: underline;
 }
 
 .literature-state {
@@ -288,6 +336,107 @@ function metaText(item: LiteratureSearchResult) {
   font-size: 16px;
 }
 
+.abstract-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(7px);
+}
+
+.abstract-dialog {
+  width: min(720px, 100%);
+  max-height: min(76vh, 720px);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.26);
+}
+
+.abstract-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.abstract-dialog-header span {
+  display: inline-flex;
+  margin-bottom: 6px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.abstract-dialog-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.abstract-close {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.abstract-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.abstract-dialog-content {
+  overflow-y: auto;
+  margin: 0;
+  padding: 20px 24px 24px;
+  color: #374151;
+  line-height: 1.85;
+  white-space: pre-wrap;
+}
+
+.abstract-modal-enter-active,
+.abstract-modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.abstract-modal-enter-active .abstract-dialog,
+.abstract-modal-leave-active .abstract-dialog {
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.abstract-modal-enter-from,
+.abstract-modal-leave-to {
+  opacity: 0;
+}
+
+.abstract-modal-enter-from .abstract-dialog,
+.abstract-modal-leave-to .abstract-dialog {
+  opacity: 0;
+  transform: translateY(18px) scale(0.96);
+}
+
+.abstract-modal-enter-to .abstract-dialog,
+.abstract-modal-leave-from .abstract-dialog {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
 .error-state {
   border-color: #fecaca;
   background: #fff7f7;
