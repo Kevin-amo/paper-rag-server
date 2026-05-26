@@ -26,6 +26,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * AgentService 的流式问答测试，覆盖事件输出、最终回答持久化和异常事件处理。
+ */
 class AgentServiceTest {
 
     private final UUID ownerUserId = UUID.randomUUID();

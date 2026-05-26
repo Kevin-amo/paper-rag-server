@@ -8,6 +8,9 @@ import lombok.Data;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 会话实体，对应 conversation 表，记录用户会话的标题、归属和软删除状态。
+ */
 @Data
 @TableName("public.conversation")
 public class Conversation {

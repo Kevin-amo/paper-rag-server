@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 智能体流式响应事件，描述一次问答过程中的开始、步骤、思考摘要、工具调用、增量回答和结束状态。
+ */
 public record AgentStreamEvent(
         String type,
         UUID conversationId,

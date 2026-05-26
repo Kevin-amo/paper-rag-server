@@ -7,6 +7,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * 智能体工具注册表，按工具名称统一管理可被规划器调用的能力。
+ */
 @Component
 public class AgentToolRegistry {
 
