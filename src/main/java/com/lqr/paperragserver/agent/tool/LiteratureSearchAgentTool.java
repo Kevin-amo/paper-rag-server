@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 外部文献搜索工具，负责把智能体动作参数转换为文献检索请求，并返回可展示的搜索证据与元数据。
+ */
 @Component
 @RequiredArgsConstructor
 public class LiteratureSearchAgentTool implements AgentTool {

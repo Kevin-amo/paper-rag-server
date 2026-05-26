@@ -27,6 +27,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * AgentLoop 的执行循环测试，覆盖工具调用、引用归并、重复动作拦截和停止条件。
+ */
 class AgentLoopTest {
 
     private final UUID ownerUserId = UUID.randomUUID();

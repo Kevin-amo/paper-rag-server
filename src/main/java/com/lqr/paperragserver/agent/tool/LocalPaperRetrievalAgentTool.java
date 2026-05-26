@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 本地论文检索工具，负责从当前用户已入库的论文知识库中召回片段并生成引用信息。
+ */
 @Component
 @RequiredArgsConstructor
 public class LocalPaperRetrievalAgentTool implements AgentTool {

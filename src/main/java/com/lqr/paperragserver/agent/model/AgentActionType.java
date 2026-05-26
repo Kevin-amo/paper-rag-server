@@ -1,5 +1,8 @@
 package com.lqr.paperragserver.agent.model;
 
+/**
+ * 智能体规划阶段支持的动作类型，用于区分本地论文检索、外部文献搜索和结束回答。
+ */
 public enum AgentActionType {
     LOCAL_PAPER_RETRIEVAL("local_paper_retrieval"),
     LITERATURE_SEARCH("literature_search"),

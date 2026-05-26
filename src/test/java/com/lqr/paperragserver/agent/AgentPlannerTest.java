@@ -15,6 +15,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * AgentPlanner 的规划测试，覆盖动作选择、参数归一化、降级决策和流式最终回答。
+ */
 class AgentPlannerTest {
 
     @Test
@@ -160,6 +163,9 @@ class AgentPlannerTest {
         assertThat(deltas).containsExactly("hello ", "world");
     }
 
+    /**
+     * 测试用 LLM 服务契约，用于以固定输出替代真实模型调用。
+     */
     private interface StubLlmService extends LlmService {
         @Override
         String generate(PromptConstructionService.Prompt prompt);

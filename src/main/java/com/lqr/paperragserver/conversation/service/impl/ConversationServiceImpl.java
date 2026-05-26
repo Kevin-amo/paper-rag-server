@@ -20,6 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 会话服务实现，负责会话生命周期、消息读写、历史窗口和回答引用元数据的持久化转换。
+ */
 @Service
 @RequiredArgsConstructor
 public class ConversationServiceImpl implements ConversationService {

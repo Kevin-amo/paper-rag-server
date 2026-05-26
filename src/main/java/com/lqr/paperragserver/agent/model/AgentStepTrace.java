@@ -3,6 +3,9 @@ package com.lqr.paperragserver.agent.model;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 智能体单步执行轨迹，记录步骤序号、动作、动作输入和工具观察摘要。
+ */
 public record AgentStepTrace(
         int index,
         String thoughtSummary,

@@ -7,6 +7,9 @@ import org.apache.ibatis.annotations.Update;
 
 import java.util.UUID;
 
+/**
+ * 会话数据访问接口，提供会话标题更新、活跃时间刷新和软删除操作。
+ */
 public interface ConversationMapper extends BaseMapper<Conversation> {
 
     @Update("""

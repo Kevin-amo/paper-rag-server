@@ -16,6 +16,9 @@ import reactor.core.Disposable;
 
 import java.io.IOException;
 
+/**
+ * 论文智能体接口控制器，对外提供基于 SSE 的流式问答入口。
+ */
 @RestController
 @RequestMapping("/agent")
 public class AgentController {
