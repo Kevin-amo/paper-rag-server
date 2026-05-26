@@ -1,6 +1,10 @@
 package com.lqr.paperragserver.config;
 
+import com.lqr.paperragserver.auth.config.SecurityProperties;
+import com.lqr.paperragserver.document.config.DocumentIngestionProperties;
 import com.lqr.paperragserver.literature.config.LiteratureSearchProperties;
+import com.lqr.paperragserver.rag.config.RagProperties;
+import com.lqr.paperragserver.storage.config.OssProperties;
 import org.apache.tika.Tika;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;

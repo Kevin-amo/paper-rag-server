@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.agent.model;
+package com.lqr.paperragserver.agent.dto;
 
 import com.lqr.paperragserver.common.model.AnswerCitation;
 

@@ -23,6 +23,7 @@ const props = defineProps<{
 }>();
 
 const listRef = ref<HTMLElement | null>(null);
+const AUTO_SCROLL_THRESHOLD_PX = 80;
 
 const emit = defineEmits<{
   askExample: [question: string];
@@ -88,11 +89,20 @@ function literatureQuery(message: ConversationMessage) {
   return literatureMetadata(message)?.query;
 }
 
+function isNearBottom(element: HTMLElement) {
+  return element.scrollHeight - element.scrollTop - element.clientHeight <= AUTO_SCROLL_THRESHOLD_PX;
+}
+
 watch(
   scrollSignal,
   async () => {
+    const shouldFollowOutput = listRef.value ? isNearBottom(listRef.value) : true;
+
     await nextTick();
-    listRef.value?.scrollTo({ top: listRef.value.scrollHeight, behavior: 'smooth' });
+
+    if (shouldFollowOutput) {
+      listRef.value?.scrollTo({ top: listRef.value.scrollHeight, behavior: 'smooth' });
+    }
   },
 );
 </script>

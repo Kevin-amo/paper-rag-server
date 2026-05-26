@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.document;
 
-import com.lqr.paperragserver.config.DocumentIngestionProperties;
+import com.lqr.paperragserver.document.config.DocumentIngestionProperties;
 import com.lqr.paperragserver.document.service.impl.LocalDocumentUploadStorageService;
 import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
 import org.junit.jupiter.api.Test;

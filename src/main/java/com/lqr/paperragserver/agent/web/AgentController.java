@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.agent.web;
 
-import com.lqr.paperragserver.agent.model.AgentAskRequest;
-import com.lqr.paperragserver.agent.model.AgentStreamEvent;
+import com.lqr.paperragserver.agent.dto.AgentAskRequest;
+import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
 import com.lqr.paperragserver.agent.service.AgentService;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import jakarta.validation.Valid;

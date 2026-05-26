@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.config;
+package com.lqr.paperragserver.storage.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.unit.DataSize;

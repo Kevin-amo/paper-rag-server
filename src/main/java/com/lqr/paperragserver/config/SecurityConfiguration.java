@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.config;
 
+import com.lqr.paperragserver.auth.config.SecurityProperties;
 import com.lqr.paperragserver.auth.security.JwtAuthenticationFilter;
 import com.lqr.paperragserver.auth.security.RestAccessDeniedHandler;
 import com.lqr.paperragserver.auth.security.RestAuthenticationEntryPoint;

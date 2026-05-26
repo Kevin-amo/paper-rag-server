@@ -4,7 +4,7 @@ import com.lqr.paperragserver.agent.model.AgentToolResult;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.model.AnswerCitation;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
-import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.rag.config.RagProperties;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

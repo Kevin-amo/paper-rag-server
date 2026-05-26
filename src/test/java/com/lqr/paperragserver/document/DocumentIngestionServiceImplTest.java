@@ -6,7 +6,7 @@ import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.DocumentIngestionResult;
 import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.common.model.ParsedDocument;
-import com.lqr.paperragserver.config.DocumentIngestionProperties;
+import com.lqr.paperragserver.document.config.DocumentIngestionProperties;
 import com.lqr.paperragserver.document.service.impl.DocumentIngestionServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentParsingService;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;

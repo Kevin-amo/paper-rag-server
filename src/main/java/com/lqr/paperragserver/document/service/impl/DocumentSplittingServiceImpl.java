@@ -2,7 +2,7 @@ package com.lqr.paperragserver.document.service.impl;
 
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.DocumentSource;
-import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.rag.config.RagProperties;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
 import lombok.RequiredArgsConstructor;

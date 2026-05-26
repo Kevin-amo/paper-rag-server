@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.auth.service.impl;
 
 import com.lqr.paperragserver.auth.service.LoginAttemptService;
-import com.lqr.paperragserver.config.SecurityProperties;
+import com.lqr.paperragserver.auth.config.SecurityProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;

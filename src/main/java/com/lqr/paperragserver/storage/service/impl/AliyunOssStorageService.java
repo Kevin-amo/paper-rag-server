@@ -3,7 +3,7 @@ package com.lqr.paperragserver.storage.service.impl;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.model.ObjectMetadata;
-import com.lqr.paperragserver.config.OssProperties;
+import com.lqr.paperragserver.storage.config.OssProperties;
 import com.lqr.paperragserver.storage.service.ObjectStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

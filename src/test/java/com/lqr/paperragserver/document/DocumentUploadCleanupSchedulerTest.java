@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.document;
 
-import com.lqr.paperragserver.config.DocumentIngestionProperties;
+import com.lqr.paperragserver.document.config.DocumentIngestionProperties;
 import com.lqr.paperragserver.document.service.impl.DocumentUploadCleanupScheduler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

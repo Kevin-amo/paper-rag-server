@@ -1,8 +1,8 @@
 package com.lqr.paperragserver.agent;
 
-import com.lqr.paperragserver.agent.model.AgentAskRequest;
+import com.lqr.paperragserver.agent.dto.AgentAskRequest;
+import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
 import com.lqr.paperragserver.agent.model.AgentStepTrace;
-import com.lqr.paperragserver.agent.model.AgentStreamEvent;
 import com.lqr.paperragserver.agent.service.AgentLoop;
 import com.lqr.paperragserver.agent.service.AgentPlanner;
 import com.lqr.paperragserver.agent.service.AgentService;

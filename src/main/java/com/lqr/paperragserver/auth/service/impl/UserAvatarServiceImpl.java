@@ -6,7 +6,7 @@ import com.lqr.paperragserver.auth.mapper.SysUserMapper;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.auth.service.AuthService;
 import com.lqr.paperragserver.auth.service.UserAvatarService;
-import com.lqr.paperragserver.config.OssProperties;
+import com.lqr.paperragserver.storage.config.OssProperties;
 import com.lqr.paperragserver.storage.service.ObjectStorageService;
 import lombok.RequiredArgsConstructor;
 import org.apache.tika.Tika;

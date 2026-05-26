@@ -1,16 +1,20 @@
-package com.lqr.paperragserver.web;
+package com.lqr.paperragserver.document.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
+import com.lqr.paperragserver.document.dto.BatchDocumentIngestionItemResponse;
+import com.lqr.paperragserver.document.dto.BatchDocumentIngestionResponse;
+import com.lqr.paperragserver.document.dto.DocumentJobResponse;
+import com.lqr.paperragserver.document.dto.DocumentUploadAcceptedResponse;
+import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
 import com.lqr.paperragserver.document.model.DocumentIngestionMessage;
+import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
 import com.lqr.paperragserver.document.service.DocumentIngestionProducer;
 import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.service.DocumentManagementService;
-import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
-import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
-import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
+import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -70,7 +74,7 @@ class DocumentControllerTest {
                 .thenReturn(job);
         when(documentIngestionJobService.findJob(ownerUserId, job.getId())).thenReturn(Optional.of(job));
 
-        ResponseEntity<DocumentController.DocumentUploadAcceptedResponse> response = controller.ingest(principal, file, "source-a", "Paper A");
+        ResponseEntity<DocumentUploadAcceptedResponse> response = controller.ingest(principal, file, "source-a", "Paper A");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         assertThat(response.getBody()).isNotNull();
@@ -109,7 +113,7 @@ class DocumentControllerTest {
                 ]
                 """;
 
-        ResponseEntity<DocumentController.BatchDocumentIngestionResponse> response = controller.ingestBatch(
+        ResponseEntity<BatchDocumentIngestionResponse> response = controller.ingestBatch(
                 principal,
                 new org.springframework.web.multipart.MultipartFile[]{file1, file2},
                 itemsJson
@@ -119,7 +123,7 @@ class DocumentControllerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().acceptedCount()).isEqualTo(2);
         assertThat(response.getBody().failureCount()).isZero();
-        assertThat(response.getBody().items()).extracting(DocumentController.BatchDocumentIngestionItemResponse::jobId)
+        assertThat(response.getBody().items()).extracting(BatchDocumentIngestionItemResponse::jobId)
                 .containsExactly(job1.getId(), job2.getId());
         verify(documentIngestionProducer, times(2)).publish(any(DocumentIngestionMessage.class));
         verify(documentIngestionService, never()).ingest(any(), any(), any(), any());
@@ -133,7 +137,7 @@ class DocumentControllerTest {
         job.setRetryCount(2);
         when(documentIngestionJobService.findJob(ownerUserId, job.getId())).thenReturn(Optional.of(job));
 
-        DocumentController.DocumentJobResponse response = controller.job(principal, job.getId());
+        DocumentJobResponse response = controller.job(principal, job.getId());
 
         assertThat(response.jobId()).isEqualTo(job.getId());
         assertThat(response.sourceId()).isEqualTo("source-a");

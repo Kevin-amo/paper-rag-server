@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.agent.model;
+package com.lqr.paperragserver.agent.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
