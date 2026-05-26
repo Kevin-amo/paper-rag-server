@@ -3,12 +3,12 @@ package com.lqr.paperragserver.agent.service;
 import com.lqr.paperragserver.agent.model.AgentActionType;
 import com.lqr.paperragserver.agent.model.AgentDecision;
 import com.lqr.paperragserver.agent.model.AgentStepTrace;
-import com.lqr.paperragserver.agent.model.AgentStreamEvent;
+import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
 import com.lqr.paperragserver.agent.model.AgentToolResult;
 import com.lqr.paperragserver.agent.tool.AgentTool;
 import com.lqr.paperragserver.agent.tool.AgentToolRegistry;
 import com.lqr.paperragserver.common.model.AnswerCitation;
-import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.rag.config.RagProperties;
 import com.lqr.paperragserver.conversation.service.ConversationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,10 +20,14 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+/**
+ * 论文智能体的执行循环，负责按规划决策调用工具、收集证据、归并引用并生成执行轨迹。
+ */
 @Service
 @RequiredArgsConstructor
 public class AgentLoop {
 
+    // 定义单步执行最大次数
     private static final int MAX_STEPS = 5;
 
     private final AgentPlanner planner;
@@ -195,6 +199,9 @@ public class AgentLoop {
         };
     }
 
+    /**
+     * 智能体单轮执行完成后的结果快照，包含回答草稿、引用、元数据、步骤轨迹和工具观察。
+     */
     public record AgentLoopResult(
             String draftAnswer,
             List<AnswerCitation> citations,

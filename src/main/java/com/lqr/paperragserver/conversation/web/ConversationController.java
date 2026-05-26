@@ -1,9 +1,10 @@
-package com.lqr.paperragserver.web;
+package com.lqr.paperragserver.conversation.web;
 
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
+import com.lqr.paperragserver.conversation.dto.CreateConversationRequest;
+import com.lqr.paperragserver.conversation.dto.UpdateConversationRequest;
 import com.lqr.paperragserver.conversation.service.ConversationService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -56,11 +57,5 @@ public class ConversationController {
     public void delete(@AuthenticationPrincipal SecurityUserPrincipal principal,
                        @PathVariable UUID conversationId) {
         conversationService.deleteConversation(principal.getId(), conversationId);
-    }
-
-    public record CreateConversationRequest(@Size(max = 160, message = "会话标题不能超过160个字符") String title) {
-    }
-
-    public record UpdateConversationRequest(@Size(max = 160, message = "会话标题不能超过160个字符") String title) {
     }
 }

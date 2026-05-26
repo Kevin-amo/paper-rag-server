@@ -3,7 +3,7 @@ package com.lqr.paperragserver.auth.security;
 import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.mapper.SysRoleMapper;
 import com.lqr.paperragserver.auth.mapper.SysUserMapper;
-import com.lqr.paperragserver.config.SecurityProperties;
+import com.lqr.paperragserver.auth.config.SecurityProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

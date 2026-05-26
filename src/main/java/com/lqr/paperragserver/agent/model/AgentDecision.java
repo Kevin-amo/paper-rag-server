@@ -2,6 +2,9 @@ package com.lqr.paperragserver.agent.model;
 
 import java.util.Map;
 
+/**
+ * 智能体规划器输出的下一步决策，包含动作类型、动作输入、结束标记和回答草稿。
+ */
 public record AgentDecision(
         String thoughtSummary,
         AgentActionType action,

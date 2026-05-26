@@ -10,6 +10,9 @@ import lombok.Data;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 会话消息实体，对应 conversation_message 表，记录消息内容、角色、顺序、引用和扩展元数据。
+ */
 @Data
 @TableName(value = "public.conversation_message", autoResultMap = true)
 public class ConversationMessage {

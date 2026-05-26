@@ -1,5 +1,6 @@
-package com.lqr.paperragserver.web;
+package com.lqr.paperragserver.common.exception;
 
+import com.lqr.paperragserver.common.api.ApiErrorResponse;
 import com.lqr.paperragserver.literature.exception.LiteratureSearchException;
 import com.lqr.paperragserver.mcp.McpException;
 import jakarta.servlet.http.HttpServletRequest;

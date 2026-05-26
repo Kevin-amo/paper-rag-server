@@ -5,6 +5,9 @@ import com.lqr.paperragserver.common.model.AnswerCitation;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 智能体工具执行结果，承载观察摘要、证据文本、引用列表和结构化元数据。
+ */
 public record AgentToolResult(
         String observationSummary,
         String evidenceText,

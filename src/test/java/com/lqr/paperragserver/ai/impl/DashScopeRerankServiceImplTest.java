@@ -3,7 +3,7 @@ package com.lqr.paperragserver.ai.impl;
 import com.lqr.paperragserver.ai.service.impl.DashScopeRerankServiceImpl;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
-import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.rag.config.RagProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

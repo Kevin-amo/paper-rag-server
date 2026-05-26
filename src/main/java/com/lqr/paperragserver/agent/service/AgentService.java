@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.agent.service;
 
-import com.lqr.paperragserver.agent.model.AgentAskRequest;
-import com.lqr.paperragserver.agent.model.AgentStreamEvent;
+import com.lqr.paperragserver.agent.dto.AgentAskRequest;
+import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
 import com.lqr.paperragserver.conversation.service.ConversationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+/**
+ * 论文智能体对话服务，负责创建或接续会话、驱动执行循环，并以流式事件输出回答过程。
+ */
 @Service
 @RequiredArgsConstructor
 public class AgentService {

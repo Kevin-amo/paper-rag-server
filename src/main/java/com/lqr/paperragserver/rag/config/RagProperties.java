@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.config;
+package com.lqr.paperragserver.rag.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.ConstructorBinding;

@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.document.service.impl;
 
-import com.lqr.paperragserver.config.DocumentIngestionProperties;
+import com.lqr.paperragserver.document.config.DocumentIngestionProperties;
 import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

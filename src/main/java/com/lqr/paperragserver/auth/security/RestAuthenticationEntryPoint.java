@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.auth.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lqr.paperragserver.web.ApiErrorResponse;
+import com.lqr.paperragserver.common.api.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
