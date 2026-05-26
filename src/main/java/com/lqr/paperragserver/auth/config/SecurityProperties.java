@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.config;
+package com.lqr.paperragserver.auth.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

@@ -8,6 +8,9 @@ import org.apache.ibatis.annotations.Select;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 会话消息数据访问接口，提供消息顺序分配和最近消息窗口查询。
+ */
 public interface ConversationMessageMapper extends BaseMapper<ConversationMessage> {
 
     @Select("""

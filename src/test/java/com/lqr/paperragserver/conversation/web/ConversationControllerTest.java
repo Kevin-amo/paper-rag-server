@@ -1,8 +1,10 @@
-package com.lqr.paperragserver.web;
+package com.lqr.paperragserver.conversation.web;
 
 import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.common.model.AnswerCitation;
+import com.lqr.paperragserver.conversation.dto.CreateConversationRequest;
+import com.lqr.paperragserver.conversation.dto.UpdateConversationRequest;
 import com.lqr.paperragserver.conversation.service.ConversationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +50,7 @@ class ConversationControllerTest {
 
         ConversationService.ConversationView response = controller.create(
                 principal,
-                new ConversationController.CreateConversationRequest("新会话")
+                new CreateConversationRequest("新会话")
         );
 
         assertThat(response).isEqualTo(conversation);
@@ -64,7 +66,7 @@ class ConversationControllerTest {
         ConversationService.ConversationView response = controller.update(
                 principal,
                 conversationId,
-                new ConversationController.UpdateConversationRequest("重命名会话")
+                new UpdateConversationRequest("重命名会话")
         );
 
         assertThat(response).isEqualTo(conversation);

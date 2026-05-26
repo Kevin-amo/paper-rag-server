@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.document.config;
 
-import com.lqr.paperragserver.config.DocumentIngestionProperties;
+import com.lqr.paperragserver.document.config.DocumentIngestionProperties;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;

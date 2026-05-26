@@ -18,6 +18,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 论文智能体的决策与回答规划组件，负责根据用户目标、会话历史和工具观察选择下一步动作或组织最终回复。
+ */
 @Service
 @RequiredArgsConstructor
 public class AgentPlanner {

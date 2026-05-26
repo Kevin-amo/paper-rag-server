@@ -3,7 +3,7 @@ package com.lqr.paperragserver.rag;
 import com.lqr.paperragserver.ai.service.RerankService;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
-import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.rag.config.RagProperties;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.rag.service.impl.RagRetrievalServiceImpl;
 import org.junit.jupiter.api.BeforeEach;

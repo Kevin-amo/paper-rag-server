@@ -1,13 +1,13 @@
-package com.lqr.paperragserver.web;
+package com.lqr.paperragserver.auth.web;
 
+import com.lqr.paperragserver.auth.dto.LoginRequest;
+import com.lqr.paperragserver.auth.dto.RegisterEmailCodeRequest;
+import com.lqr.paperragserver.auth.dto.RegisterRequest;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.auth.service.AuthService;
 import com.lqr.paperragserver.auth.service.UserAvatarService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -80,33 +80,5 @@ public class AuthController {
             return realIp.trim();
         }
         return request.getRemoteAddr();
-    }
-
-    /**
-     * 登录请求体。
-     */
-    public record LoginRequest(
-            @NotBlank(message = "用户名不能为空") String username,
-            @NotBlank(message = "密码不能为空") String password
-    ) {
-    }
-
-    /**
-     * 邮箱注册验证码请求体。
-     */
-    public record RegisterEmailCodeRequest(
-            @NotBlank(message = "邮箱不能为空") @Email(message = "邮箱格式不合法") String email
-    ) {
-    }
-
-    /**
-     * 邮箱验证码注册请求体。
-     */
-    public record RegisterRequest(
-            @NotBlank(message = "用户名不能为空") String username,
-            @NotBlank(message = "密码不能为空") String password,
-            @NotBlank(message = "邮箱不能为空") @Email(message = "邮箱格式不合法") String email,
-            @NotBlank(message = "验证码不能为空") @Pattern(regexp = "\\d{6}", message = "验证码必须是6位数字") String emailCode
-    ) {
     }
 }

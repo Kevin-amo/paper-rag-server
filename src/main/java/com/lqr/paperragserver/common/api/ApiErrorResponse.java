@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.web;
+package com.lqr.paperragserver.common.api;
 
 import java.time.OffsetDateTime;
 

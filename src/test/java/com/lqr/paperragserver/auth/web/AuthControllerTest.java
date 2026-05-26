@@ -1,4 +1,4 @@
-package com.lqr.paperragserver.web;
+package com.lqr.paperragserver.auth.web;
 
 import com.lqr.paperragserver.auth.service.AuthService;
 import com.lqr.paperragserver.auth.service.UserAvatarService;

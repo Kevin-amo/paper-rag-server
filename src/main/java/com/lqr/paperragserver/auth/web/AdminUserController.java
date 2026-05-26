@@ -1,10 +1,14 @@
-package com.lqr.paperragserver.web;
+package com.lqr.paperragserver.auth.web;
 
+import com.lqr.paperragserver.auth.dto.CreateUserRequest;
+import com.lqr.paperragserver.auth.dto.ResetPasswordRequest;
+import com.lqr.paperragserver.auth.dto.UpdateRolesRequest;
+import com.lqr.paperragserver.auth.dto.UpdateStatusRequest;
+import com.lqr.paperragserver.auth.dto.UpdateUserRequest;
 import com.lqr.paperragserver.auth.service.UserAdminService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -71,41 +74,5 @@ public class AdminUserController {
     @DeleteMapping("/{id}")
     public void deleteUser(@PathVariable UUID id) {
         userAdminService.deleteUser(id);
-    }
-
-    /**
-     * 创建用户请求体。
-     */
-    public record CreateUserRequest(
-            @NotBlank(message = "用户名不能为空") String username,
-            @NotBlank(message = "密码不能为空") String password,
-            String displayName,
-            String email,
-            List<String> roles
-    ) {
-    }
-
-    /**
-     * 更新用户基础资料请求体。
-     */
-    public record UpdateUserRequest(String displayName, String email) {
-    }
-
-    /**
-     * 更新用户角色请求体。
-     */
-    public record UpdateRolesRequest(List<String> roles) {
-    }
-
-    /**
-     * 更新用户状态请求体。
-     */
-    public record UpdateStatusRequest(@NotBlank(message = "状态不能为空") String status) {
-    }
-
-    /**
-     * 重置密码请求体。
-     */
-    public record ResetPasswordRequest(@NotBlank(message = "密码不能为空") String password) {
     }
 }

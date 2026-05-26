@@ -2,14 +2,14 @@ package com.lqr.paperragserver.agent;
 
 import com.lqr.paperragserver.agent.model.AgentActionType;
 import com.lqr.paperragserver.agent.model.AgentDecision;
-import com.lqr.paperragserver.agent.model.AgentStreamEvent;
+import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
 import com.lqr.paperragserver.agent.model.AgentToolResult;
 import com.lqr.paperragserver.agent.service.AgentLoop;
 import com.lqr.paperragserver.agent.service.AgentPlanner;
 import com.lqr.paperragserver.agent.tool.AgentTool;
 import com.lqr.paperragserver.agent.tool.AgentToolRegistry;
 import com.lqr.paperragserver.common.model.AnswerCitation;
-import com.lqr.paperragserver.config.RagProperties;
+import com.lqr.paperragserver.rag.config.RagProperties;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -27,6 +27,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * AgentLoop 的执行循环测试，覆盖工具调用、引用归并、重复动作拦截和停止条件。
+ */
 class AgentLoopTest {
 
     private final UUID ownerUserId = UUID.randomUUID();

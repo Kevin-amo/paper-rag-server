@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.document.service.impl;
 
-import com.lqr.paperragserver.config.DocumentIngestionProperties;
+import com.lqr.paperragserver.document.config.DocumentIngestionProperties;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

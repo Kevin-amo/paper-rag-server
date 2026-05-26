@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.auth.service.impl;
 
 import com.lqr.paperragserver.auth.service.VerificationCodeService;
-import com.lqr.paperragserver.config.SecurityProperties;
+import com.lqr.paperragserver.auth.config.SecurityProperties;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

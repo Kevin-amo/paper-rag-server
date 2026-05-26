@@ -1,7 +1,7 @@
 package com.lqr.paperragserver.agent.web;
 
-import com.lqr.paperragserver.agent.model.AgentAskRequest;
-import com.lqr.paperragserver.agent.model.AgentStreamEvent;
+import com.lqr.paperragserver.agent.dto.AgentAskRequest;
+import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
 import com.lqr.paperragserver.agent.service.AgentService;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import jakarta.validation.Valid;
@@ -16,6 +16,9 @@ import reactor.core.Disposable;
 
 import java.io.IOException;
 
+/**
+ * 论文智能体接口控制器，对外提供基于 SSE 的流式问答入口。
+ */
 @RestController
 @RequestMapping("/agent")
 public class AgentController {
