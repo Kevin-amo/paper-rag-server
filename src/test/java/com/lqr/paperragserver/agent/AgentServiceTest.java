@@ -111,6 +111,44 @@ class AgentServiceTest {
         verify(conversationService, never()).appendAssistantMessage(eq(ownerUserId), eq(conversationId), any(), any(), any());
     }
 
+    @Test
+    void streamAnswerShouldUseFinalGenerationForPureLiteratureSearch() {
+        List<ConversationService.MessageView> history = List.of();
+        List<AgentStepTrace> steps = List.of(new AgentStepTrace(
+                1,
+                "用户需要搜索外部文献，我将调用外部文献搜索。",
+                "literature_search",
+                Map.of("query", "RAG", "limit", 3),
+                "外部文献搜索完成，找到 3 篇论文。"
+        ));
+        List<String> observations = List.of("- [RAG Paper](https://example.org/paper)\n  - 作者：Alice\n  - 年份：2025\n  - 分类：AI");
+        Map<String, Object> metadata = Map.of(
+                "type", "AGENT_RESULT",
+                "steps", steps,
+                "literature", Map.of(
+                        "type", "LITERATURE_SEARCH_RESULT",
+                        "query", "RAG",
+                        "items", List.of(Map.of("title", "RAG Paper"), Map.of("title", "Graph RAG"), Map.of("title", "RAG Survey"))
+                )
+        );
+        AgentLoop.AgentLoopResult loopResult = new AgentLoop.AgentLoopResult(null, List.of(), metadata, steps, observations);
+        mockConversation(history);
+        when(agentLoop.run(eq(ownerUserId), eq(conversationId), eq("stream question"), eq(null), eq(history), any()))
+                .thenReturn(loopResult);
+        when(planner.finalAnswerStream("stream question", history, steps, observations))
+                .thenReturn(Flux.just("LLM 输出的轻量文献列表"));
+
+        List<AgentStreamEvent> events = service.streamAnswer(ownerUserId, new AgentAskRequest(null, "stream question", null))
+                .collectList()
+                .block(Duration.ofSeconds(2));
+
+        assertThat(events).isNotNull();
+        assertThat(events.stream().map(AgentStreamEvent::type)).containsExactly("start", "delta", "done");
+        assertThat(events.get(1).delta()).isEqualTo("LLM 输出的轻量文献列表");
+        verify(planner).finalAnswerStream("stream question", history, steps, observations);
+        verify(conversationService).appendAssistantMessage(ownerUserId, conversationId, "LLM 输出的轻量文献列表", List.of(), metadata);
+    }
+
     private void mockConversation(List<ConversationService.MessageView> history) {
         when(conversationService.createConversation(ownerUserId, "stream question"))
                 .thenReturn(new ConversationService.ConversationView(

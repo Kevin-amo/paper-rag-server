@@ -30,7 +30,6 @@ import java.util.Set;
 @Service
 public class OpenAlexLiteratureClient {
 
-    private static final String SORT_RELEVANCE = "relevance";
     private static final String SORT_DATE = "date";
 
     private final RestClient.Builder restClientBuilder;
@@ -232,7 +231,7 @@ public class OpenAlexLiteratureClient {
     }
 
     private String openAlexSort(String sortBy) {
-        return SORT_DATE.equals(sortBy) ? "publication_date:desc" : "relevance_score:desc";
+        return "relevance_score:desc";
     }
 
     URI openAlexUri(

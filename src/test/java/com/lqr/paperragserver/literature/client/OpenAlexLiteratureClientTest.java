@@ -113,7 +113,7 @@ class OpenAlexLiteratureClientTest {
     }
 
     @Test
-    void openAlexUriShouldUsePublicationDateSortWhenDateSortRequested() {
+    void openAlexUriShouldUseRelevanceScoreSortWhenDateSortRequested() {
         var properties = new LiteratureSearchProperties.OpenAlex(
                 true,
                 "https://api.openalex.org/works",
@@ -128,7 +128,7 @@ class OpenAlexLiteratureClientTest {
                 properties
         );
 
-        assertThat(uri.toString()).contains("sort=publication_date:desc");
+        assertThat(uri.toString()).contains("sort=relevance_score:desc");
     }
 
     @Test

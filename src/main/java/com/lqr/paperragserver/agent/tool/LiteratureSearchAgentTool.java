@@ -50,12 +50,8 @@ public class LiteratureSearchAgentTool implements AgentTool {
         ));
         List<LiteratureSearchResult> items = response.items();
         String evidence = items.stream()
-                .map(item -> "[外部文献] " + nullToEmpty(item.title())
-                        + "\n作者：" + String.join(", ", item.authors())
-                        + "\n年份：" + nullToEmpty(item.year())
-                        + "\n链接：" + nullToEmpty(firstNonBlank(item.pdfUrl(), item.url()))
-                        + "\n摘要：" + cut(item.abstractText(), 700))
-                .reduce((left, right) -> left + "\n\n" + right)
+                .map(this::formatEvidenceItem)
+                .reduce((left, right) -> left + "\n" + right)
                 .orElse("未找到外部文献结果。");
         return new AgentToolResult(
                 "外部文献搜索完成，找到 " + items.size() + " 篇论文。",
@@ -97,19 +93,38 @@ public class LiteratureSearchAgentTool implements AgentTool {
         }
     }
 
-    private String firstNonBlank(String first, String second) {
-        return first == null || first.isBlank() ? second : first;
-    }
-
     private String nullToEmpty(Object value) {
         return value == null ? "" : String.valueOf(value);
     }
 
-    private String cut(String content, int maxLength) {
-        if (content == null) {
-            return "";
+    private String formatEvidenceItem(LiteratureSearchResult item) {
+        String title = nullToEmpty(item.title());
+        String link = firstNonBlank(item.url(), item.doi(), item.externalId());
+        String titleLine = link.isBlank() ? "- " + title : "- [" + title + "](" + link + ")";
+        return titleLine
+                + "\n  - 作者：" + String.join(", ", item.authors())
+                + "\n  - 年份：" + nullToEmpty(item.year())
+                + "\n  - 分类：" + categoryOf(item);
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
         }
-        String normalized = content.trim();
-        return normalized.length() <= maxLength ? normalized : normalized.substring(0, maxLength) + "...";
+        return "";
+    }
+
+    private String categoryOf(LiteratureSearchResult item) {
+        String primaryCategory = stringValue(item.primaryCategory());
+        if (!primaryCategory.isBlank()) {
+            return primaryCategory;
+        }
+        return item.categories().stream()
+                .map(this::stringValue)
+                .filter(category -> !category.isBlank())
+                .findFirst()
+                .orElse("分类未知");
     }
 }

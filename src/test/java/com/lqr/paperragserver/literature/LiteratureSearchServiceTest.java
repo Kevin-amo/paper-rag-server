@@ -160,7 +160,7 @@ class LiteratureSearchServiceTest {
     void dateSearchShouldFetchMoreCandidatesAndReturnOnlyUserLimit() {
         LiteratureSearchResult newest = openAlexResult("Newest", "2025-01-01");
         LiteratureSearchResult older = openAlexResult("Older", "2024-01-01");
-        when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of(newest, older));
+        when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of(older, newest));
 
         LiteratureSearchResponse response = service.search(new LiteratureSearchRequest("Graph RAG", 1, null, null, "date"));
 
@@ -207,8 +207,8 @@ class LiteratureSearchServiceTest {
     private LiteratureSearchResult openAlexResult(String title, String publishedDate) {
         return new LiteratureSearchResult(
                 title, List.of("Alice"), "Abstract", 2024, publishedDate, null,
-                List.of("Artificial Intelligence"), "Artificial Intelligence", "https://doi.org/10.1000/test", "https://example.org/paper",
-                "https://example.org/paper.pdf", "openalex", "https://openalex.org/W123"
+                List.of("Artificial Intelligence"), "Artificial Intelligence", "https://doi.org/10.1000/test",
+                "https://example.org/paper", "https://example.org/paper.pdf", "openalex", "https://openalex.org/W123"
         );
     }
 }

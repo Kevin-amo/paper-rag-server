@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -57,7 +58,7 @@ public class LiteratureSearchService {
                     sortBy,
                     literatureProperties.openalex()
             );
-            LiteratureSearchResponse response = new LiteratureSearchResponse(trimToUserLimit(items, limit, sortBy));
+            LiteratureSearchResponse response = new LiteratureSearchResponse(sortAndTrimToUserLimit(items, limit, sortBy));
             cacheIfEnabled(cacheKey, response);
             return response;
         } catch (RuntimeException ex) {
@@ -82,15 +83,23 @@ public class LiteratureSearchService {
         return Math.min(Math.max(limit * 10, 10), 50);
     }
 
-    private List<LiteratureSearchResult> trimToUserLimit(
+    private List<LiteratureSearchResult> sortAndTrimToUserLimit(
             List<LiteratureSearchResult> items,
             int limit,
             String sortBy
     ) {
-        if (!SORT_DATE.equals(sortBy) || items.size() <= limit) {
-            return items;
+        List<LiteratureSearchResult> sorted = SORT_DATE.equals(sortBy)
+                ? items.stream()
+                .sorted(Comparator.comparing(
+                        LiteratureSearchResult::publishedDate,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
+                .toList()
+                : items;
+        if (sorted.size() <= limit) {
+            return sorted;
         }
-        return items.stream().limit(limit).toList();
+        return sorted.stream().limit(limit).toList();
     }
 
     private void cacheIfEnabled(LiteratureSearchCache.Key key, LiteratureSearchResponse response) {

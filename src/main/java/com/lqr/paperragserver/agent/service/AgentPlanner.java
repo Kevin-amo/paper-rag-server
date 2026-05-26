@@ -91,7 +91,7 @@ public class AgentPlanner {
                 + "\n\n已执行步骤：\n" + formatSteps(steps)
                 + "\n\n观察结果：\n" + formatObservations(observations)
                 + "\n\n输出 JSON 格式："
-                + "\n本地 RAG：{\"thoughtSummary\":\"...\",\"action\":\"local_paper_retrieval\",\"actionInput\":{\"query\":\"...\",\"topK\":5},\"finish\":false,\"answer\":null}"
+                + "\n本地 RAG：{\"thoughtSummary\":\"...\",\"action\":\"local_paper_retrieval\",\"actionInput\":{\"query\":\"...\",\"topK\":" + (topK == null ? "默认配置" : topK) + "},\"finish\":false,\"answer\":null}"
                 + "\n外部文献：{\"thoughtSummary\":\"...\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"...\",\"limit\":5,\"sortBy\":\"relevance|date\",\"dateFrom\":null},\"finish\":false,\"answer\":null}"
                 + "\n结束：{\"thoughtSummary\":\"...\",\"action\":\"finish\",\"actionInput\":{},\"finish\":true,\"answer\":\"...\"}"
                 + "\n如果 finish=true，可以给一个很短的 answer 草稿；最终回答会由后续生成器完成。";
@@ -176,7 +176,7 @@ public class AgentPlanner {
     private void applyTopK(AgentActionType action, Map<String, Object> input, Integer topK) {
         if (action == AgentActionType.LOCAL_PAPER_RETRIEVAL) {
             if (topK != null) {
-                input.putIfAbsent("topK", topK);
+                input.put("topK", topK);
             }
             return;
         }

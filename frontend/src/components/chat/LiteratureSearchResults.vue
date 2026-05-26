@@ -28,6 +28,10 @@ function visibleTags(item: LiteratureSearchResult) {
     .slice(0, 3);
 }
 
+function paperUrl(item: LiteratureSearchResult) {
+  return item.url || item.doi || item.externalId || '';
+}
+
 const activeAbstract = ref<{ title: string; text: string } | null>(null);
 
 function paperKey(item: LiteratureSearchResult, index: number) {
@@ -76,7 +80,15 @@ function closeAbstract() {
           <div class="paper-index">{{ index + 1 }}</div>
           <div class="paper-body">
             <h3>
-              {{ item.title || '未命名论文' }}
+              <a
+                v-if="paperUrl(item)"
+                :href="paperUrl(item)"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {{ item.title || '未命名论文' }}
+              </a>
+              <span v-else>{{ item.title || '未命名论文' }}</span>
             </h3>
             <p class="paper-meta">{{ metaText(item) }}</p>
             <button
@@ -121,7 +133,15 @@ function closeAbstract() {
           <div class="paper-index">{{ index + 1 }}</div>
           <div class="paper-body">
             <h3>
-              {{ item.title || '未命名论文' }}
+              <a
+                v-if="paperUrl(item)"
+                :href="paperUrl(item)"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {{ item.title || '未命名论文' }}
+              </a>
+              <span v-else>{{ item.title || '未命名论文' }}</span>
             </h3>
             <p class="paper-meta">{{ metaText(item) }}</p>
             <button

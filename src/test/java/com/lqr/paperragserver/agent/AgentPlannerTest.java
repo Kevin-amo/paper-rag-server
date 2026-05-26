@@ -69,6 +69,21 @@ class AgentPlannerTest {
     }
 
     @Test
+    void decideShouldPreferRequestTopKOverModelLocalTopK() {
+        AgentPlanner planner = new AgentPlanner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"检索本地论文。\",\"action\":\"local_paper_retrieval\",\"actionInput\":{\"query\":\"RAG\",\"topK\":5},\"finish\":false,\"answer\":null}",
+                new ObjectMapper(),
+                new AgentToolRegistry(List.of()),
+                new LiteratureSearchIntentParser()
+        );
+
+        AgentDecision decision = planner.decide("总结我上传的RAG论文", List.of(), List.of(), List.of(), 10);
+
+        assertThat(decision.action()).isEqualTo(AgentActionType.LOCAL_PAPER_RETRIEVAL);
+        assertThat(decision.actionInput()).containsEntry("topK", 10);
+    }
+
+    @Test
     void fallbackLiteratureSearchShouldNotCarryTopK() {
         AgentPlanner planner = new AgentPlanner(
                 (StubLlmService) prompt -> {
