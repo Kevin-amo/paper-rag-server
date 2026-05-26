@@ -144,23 +144,23 @@ watch(
         </div>
         <div class="message-body">
           <div v-if="message.role === 'USER'" class="message-content">{{ message.content }}</div>
-          <div
-            v-else
-            class="message-content markdown-content"
-            v-html="assistantHtml(message.content, message.streaming)"
-          />
-          <div v-if="message.role === 'ASSISTANT' && isAgentResultMetadata(message.metadata) && message.metadata.steps.length" class="agent-steps">
-            <details>
-              <summary>执行步骤</summary>
-              <ol>
-                <li v-for="step in message.metadata.steps" :key="`${message.id}-${step.index}`">
-                  <strong>{{ step.action }}</strong>
-                  <span>{{ step.thoughtSummary }}</span>
-                  <em v-if="step.observationSummary">{{ step.observationSummary }}</em>
-                </li>
-              </ol>
-            </details>
-          </div>
+          <template v-else>
+            <div v-if="isAgentResultMetadata(message.metadata) && message.metadata.steps.length" class="agent-steps">
+              <details>
+                <summary>分析过程</summary>
+                <ol>
+                  <li v-for="step in message.metadata.steps" :key="`${message.id}-${step.index}`">
+                    <span>{{ step.thoughtSummary }}</span>
+                    <em v-if="step.observationSummary">{{ step.observationSummary }}</em>
+                  </li>
+                </ol>
+              </details>
+            </div>
+            <div
+              class="message-content markdown-content"
+              v-html="assistantHtml(message.content, message.streaming)"
+            />
+          </template>
           <span v-if="message.streaming" class="streaming-indicator">
             正在执行任务...
           </span>
