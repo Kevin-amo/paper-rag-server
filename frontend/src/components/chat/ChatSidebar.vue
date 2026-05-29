@@ -187,7 +187,7 @@ function conversationTitle(conversation: Conversation) {
     </div>
 
     <el-button class="new-chat-button" type="primary" size="large" :icon="Plus" @click="emit('createConversation')">
-      论文智能助手
+      新聊天
     </el-button>
 
     <nav class="sidebar-nav">

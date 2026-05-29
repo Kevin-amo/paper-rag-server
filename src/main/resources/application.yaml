@@ -75,6 +75,13 @@ mybatis-plus:
   type-handlers-package: com.lqr.paperragserver.common.typehandler
 
 app:
+  mail:
+    resend:
+      enabled: ${RESEND_ENABLED:true}
+      api-key: ${RESEND_API_KEY:}
+      from: ${RESEND_FROM:PaperRAG <noreply@example.com>}
+      endpoint: ${RESEND_ENDPOINT:https://api.resend.com/emails}
+      timeout: ${RESEND_TIMEOUT:10s}
   literature:
     search:
       openalex:
