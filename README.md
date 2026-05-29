@@ -51,22 +51,35 @@ paper-rag-server/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/lqr/paperragserver/
+│   │   │   ├── agent/           # Agent 编排、工具调用和流式问答入口
 │   │   │   ├── ai/              # LLM、Embedding、Rerank、Prompt 构造
-│   │   │   ├── auth/            # 认证、用户、角色、JWT
-│   │   │   ├── config/          # Spring 配置和应用配置属性
+│   │   │   ├── auth/            # 认证、用户、角色、JWT、验证码频控
+│   │   │   ├── common/          # 通用响应、异常、日志和类型处理
+│   │   │   ├── config/          # Spring Security、MyBatis 和应用配置
 │   │   │   ├── conversation/    # 会话和消息
-│   │   │   ├── document/        # 文档上传、解析、切分、入库
-│   │   │   ├── paper/           # 文档持久化、任务、元数据
+│   │   │   ├── document/        # 文档上传、解析、切分、入库和资源管理
+│   │   │   ├── literature/      # 外部文献检索、意图解析和缓存
+│   │   │   ├── mail/            # 邮件发送配置和服务
 │   │   │   ├── rag/             # RAG 检索和回答
 │   │   │   ├── storage/         # 对象存储
-│   │   │   ├── vector/          # 向量写入
-│   │   │   └── web/             # REST API 控制器
+│   │   │   └── vector/          # 向量写入
 │   │   └── resources/
 │   │       ├── application.yaml
 │   │       ├── application-local.example.yaml
 │   │       └── sql/paper-rag.sql
 │   └── test/                    # 单元测试和 Web 层测试
-├── frontend/                    # Vue 前端项目
+├── frontend/
+│   ├── src/
+│   │   ├── api/                 # 前端 API 请求封装
+│   │   ├── components/          # 页面组件和业务组件
+│   │   ├── composables/         # 前端状态和业务组合逻辑
+│   │   ├── layouts/             # 页面布局
+│   │   ├── router/              # 前端路由
+│   │   ├── types/               # TypeScript 类型
+│   │   ├── utils/               # 前端工具方法
+│   │   └── views/               # 页面视图
+│   ├── package.json
+│   └── vite.config.ts
 ├── storage/                     # 本地上传/解析临时文件，默认被 git 忽略
 ├── docker-compose.yml           # PostgreSQL、Redis、RabbitMQ
 └── pom.xml
@@ -253,6 +266,11 @@ src/main/resources/application-local.yaml
 | `RABBITMQ_PASSWORD` | RabbitMQ 密码 | `admin` |
 | `DASHSCOPE_API_KEY` | DashScope API Key | 空 |
 | `JWT_SECRET` | JWT 签名密钥 | 本地开发默认值 |
+| `REGISTER_EMAIL_CODE_TTL` | 注册邮箱验证码有效期 | `5m` |
+| `REGISTER_EMAIL_CODE_EMAIL_COOLDOWN` | 同一邮箱发送冷却时间 | `60s` |
+| `REGISTER_EMAIL_CODE_EMAIL_DAILY_LIMIT` | 同一邮箱每日发送上限 | `10` |
+| `REGISTER_EMAIL_CODE_IP_MINUTE_LIMIT` | 同一 IP 每分钟发送上限 | `20` |
+| `REGISTER_EMAIL_CODE_IP_DAILY_LIMIT` | 同一 IP 每日发送上限 | `200` |
 | `DOCUMENT_INGESTION_STORAGE_DIR` | 文档上传临时目录 | `storage/document-ingestion` |
 | `RAG_DEFAULT_TOP_K` | 默认召回数量 | `3` |
 | `RAG_RERANK_ENABLED` | 是否启用重排序 | `true` |
@@ -277,6 +295,8 @@ Authorization: Bearer <access-token>
 | `GET` | `/auth/me` | 当前用户信息 |
 | `POST` | `/auth/me/avatar` | 上传头像 |
 | `POST` | `/auth/logout` | 登出 |
+
+注册邮箱验证码发送会进行 Redis 频控：同一邮箱默认 `60s` 冷却、24 小时窗口内最多 `10` 次；同一 IP 默认每分钟最多 `20` 次、24 小时窗口内最多 `200` 次。触发上限时接口返回 `429 TOO_MANY_REQUESTS`。
 
 ### 文档
 
