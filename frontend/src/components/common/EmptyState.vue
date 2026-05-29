@@ -22,12 +22,15 @@ defineProps<{
   gap: 8px;
   min-height: 220px;
   padding: 32px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 26px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.92));
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow:
+    0 18px 44px rgba(15, 23, 42, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
   text-align: center;
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
 }
 
 .empty-state.compact {
@@ -42,7 +45,7 @@ defineProps<{
   height: 42px;
   border-radius: 999px;
   color: var(--app-primary);
-  background: var(--app-primary-soft);
+  background: rgba(0, 122, 255, 0.1);
   font-size: 26px;
   font-weight: 700;
 }

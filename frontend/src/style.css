@@ -1,19 +1,29 @@
 :root {
-  --app-bg: #ffffff;
-  --app-sidebar-bg: #f5f6f8;
-  --app-surface: #ffffff;
-  --app-surface-soft: #f7f8fa;
-  --app-border: #e5e7eb;
-  --app-text: #111827;
-  --app-text-muted: #6b7280;
-  --app-primary: #5b7cfa;
-  --app-primary-dark: #4f7cff;
-  --app-primary-soft: #eef3ff;
-  --app-danger: #dc2626;
+  --app-bg: #f5f5f7;
+  --app-sidebar-bg: rgba(255, 255, 255, 0.58);
+  --app-surface: rgba(255, 255, 255, 0.78);
+  --app-surface-strong: rgba(255, 255, 255, 0.92);
+  --app-surface-soft: rgba(242, 242, 247, 0.76);
+  --app-glass: rgba(255, 255, 255, 0.62);
+  --app-glass-strong: rgba(255, 255, 255, 0.82);
+  --app-border: rgba(209, 209, 214, 0.72);
+  --app-border-strong: rgba(174, 174, 178, 0.46);
+  --app-text: #1d1d1f;
+  --app-text-muted: #6e6e73;
+  --app-text-subtle: #8e8e93;
+  --app-primary: #007aff;
+  --app-primary-dark: #0a84ff;
+  --app-primary-soft: rgba(0, 122, 255, 0.1);
+  --app-danger: #ff3b30;
+  --app-success: #34c759;
+  --app-warning: #ff9f0a;
+  --app-radius-xl: 32px;
   --app-radius-lg: 24px;
   --app-radius-md: 16px;
-  --app-shadow: 0 12px 36px rgba(15, 23, 42, 0.08);
-  --app-shadow-subtle: 0 8px 24px rgba(15, 23, 42, 0.05);
+  --app-shadow: 0 28px 80px rgba(15, 23, 42, 0.13);
+  --app-shadow-subtle: 0 12px 32px rgba(15, 23, 42, 0.07);
+  --app-shadow-glow: 0 18px 38px rgba(0, 122, 255, 0.16);
+  --app-focus-ring: 0 0 0 4px rgba(0, 122, 255, 0.13);
 
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   color: var(--app-text);
@@ -51,13 +61,14 @@ a {
 .el-card,
 .el-dialog,
 .el-drawer {
-  --el-border-radius-base: 14px;
+  --el-border-radius-base: 16px;
 }
 
 .el-button {
-  --el-button-hover-bg-color: #f3f6ff;
-  --el-button-hover-border-color: #d9e2ff;
-  font-weight: 700;
+  --el-button-hover-bg-color: rgba(255, 255, 255, 0.88);
+  --el-button-hover-border-color: rgba(0, 122, 255, 0.26);
+  border-radius: 999px;
+  font-weight: 750;
 }
 
 .el-button--primary {
@@ -65,42 +76,118 @@ a {
   --el-button-border-color: var(--app-primary);
   --el-button-hover-bg-color: var(--app-primary-dark);
   --el-button-hover-border-color: var(--app-primary-dark);
+  box-shadow: 0 12px 26px rgba(0, 122, 255, 0.2);
 }
 
 .el-drawer {
-  background: #ffffff;
+  background: rgba(248, 249, 252, 0.92);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
 }
 
 .el-drawer__header {
   margin-bottom: 0;
-  padding: 22px 24px 14px;
-  border-bottom: 1px solid var(--app-border);
+  padding: 24px 26px 16px;
+  border-bottom: 1px solid rgba(209, 209, 214, 0.58);
 }
 
 .el-drawer__body {
-  padding: 20px 24px 24px;
-  background: #ffffff;
+  padding: 22px 26px 26px;
+  background: transparent;
 }
 
 .el-dialog {
-  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.86);
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
 }
 
 .el-dialog__title {
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 850;
 }
 
 .app-card {
-  border: 1px solid var(--app-border);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: var(--app-radius-lg);
-  background: var(--app-surface);
+  background: var(--app-glass-strong);
   box-shadow: var(--app-shadow-subtle);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
 }
 
 .app-muted {
   color: var(--app-text-muted);
+}
+
+.apple-surface {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: var(--app-glass);
+  box-shadow: var(--app-shadow-subtle);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+}
+
+.el-message {
+  --apple-message-accent: #007aff;
+  --el-message-bg-color: rgba(255, 255, 255, 0.76);
+  --el-message-border-color: rgba(255, 255, 255, 0.62);
+  --el-message-text-color: #1d1d1f;
+  min-width: min(420px, calc(100vw - 32px));
+  padding: 13px 18px 13px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(246, 247, 251, 0.74)) !important;
+  box-shadow:
+    0 18px 45px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  color: #1d1d1f;
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+}
+
+.el-message::before {
+  width: 9px;
+  height: 9px;
+  margin-right: 12px;
+  border-radius: 999px;
+  background: var(--apple-message-accent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--apple-message-accent) 16%, transparent);
+  content: '';
+  flex: 0 0 auto;
+}
+
+.el-message .el-message__icon {
+  margin-right: 10px;
+  color: var(--apple-message-accent);
+  font-size: 18px;
+}
+
+.el-message .el-message__content {
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.el-message--success {
+  --apple-message-accent: #34c759;
+}
+
+.el-message--warning {
+  --apple-message-accent: #ff9f0a;
+}
+
+.el-message--error {
+  --apple-message-accent: #ff3b30;
+}
+
+.el-message--info {
+  --apple-message-accent: #007aff;
 }
 
 @media (max-width: 768px) {

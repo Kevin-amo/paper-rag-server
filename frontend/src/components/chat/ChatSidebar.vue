@@ -307,15 +307,22 @@ function conversationTitle(conversation: Conversation) {
 
 <style scoped>
 .chat-sidebar {
-  width: 300px;
-  min-width: 300px;
-  height: 100vh;
+  width: 306px;
+  min-width: 306px;
+  height: calc(100vh - 36px);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 15px;
+  overflow: hidden;
   padding: 18px 14px;
-  border-right: 1px solid var(--app-border);
-  background: var(--app-sidebar-bg);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow:
+    0 22px 56px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(24px) saturate(175%);
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
 }
 
 .brand-block {
@@ -328,14 +335,14 @@ function conversationTitle(conversation: Conversation) {
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 11px;
+  width: 34px;
+  height: 34px;
+  border-radius: 13px;
   color: #fff;
-  background: var(--app-primary);
+  background: linear-gradient(135deg, #007aff, #5ac8fa);
   font-size: 15px;
   font-weight: 900;
-  box-shadow: 0 8px 18px rgba(91, 124, 250, 0.22);
+  box-shadow: 0 10px 22px rgba(0, 122, 255, 0.24);
 }
 
 .brand-block strong,
@@ -362,20 +369,22 @@ function conversationTitle(conversation: Conversation) {
   width: 100%;
   height: 46px;
   justify-content: center;
-  border: 1px solid var(--app-border);
+  border: 1px solid rgba(255, 255, 255, 0.76);
   border-radius: 18px;
-  background: #fff;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(242, 247, 255, 0.84));
   color: var(--app-text);
-  font-weight: 800;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
+  font-weight: 850;
+  box-shadow:
+    0 12px 24px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .new-chat-button:hover,
 .new-chat-button:focus {
-  border-color: #d9e2ff;
-  background: #fff;
+  border-color: rgba(0, 122, 255, 0.28);
+  background: #ffffff;
   color: var(--app-primary);
-  box-shadow: 0 8px 20px rgba(91, 124, 250, 0.1);
+  box-shadow: var(--app-shadow-glow);
 }
 
 .sidebar-nav {
@@ -390,17 +399,19 @@ function conversationTitle(conversation: Conversation) {
   gap: 10px;
   padding: 10px 12px;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: 15px;
   background: transparent;
   color: var(--app-text-muted);
   cursor: pointer;
   text-align: left;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .nav-item:hover,
 .nav-item.active {
-  background: #ffffff;
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
   color: var(--app-text);
 }
 
@@ -437,21 +448,23 @@ function conversationTitle(conversation: Conversation) {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 2px;
-  min-height: 38px;
+  min-height: 40px;
   padding: 4px 5px 4px 10px;
   border: 1px solid transparent;
-  border-radius: 13px;
+  border-radius: 15px;
   background: transparent;
-  transition: background 0.16s ease, border-color 0.16s ease;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
 .conversation-item:hover {
-  background: #ffffff;
+  border-color: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.56);
 }
 
 .conversation-item.active {
-  border-color: #dbe6ff;
-  background: #eaf1ff;
+  border-color: rgba(0, 122, 255, 0.24);
+  background: rgba(0, 122, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
 .conversation-select {
@@ -528,10 +541,13 @@ function conversationTitle(conversation: Conversation) {
 }
 
 :global(.conversation-action-popper) {
-  border: 1px solid var(--app-border) !important;
-  border-radius: 16px !important;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.72) !important;
+  border-radius: 18px !important;
+  background: rgba(255, 255, 255, 0.88) !important;
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12) !important;
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
 }
 
 :global(.conversation-action-popper .el-popper__arrow) {
@@ -621,10 +637,12 @@ function conversationTitle(conversation: Conversation) {
   gap: 10px;
   margin-top: auto;
   padding: 10px;
-  border: 1px solid var(--app-border);
-  border-radius: 18px;
-  background: #ffffff;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
 .user-avatar {
@@ -636,7 +654,7 @@ function conversationTitle(conversation: Conversation) {
   border: 0;
   border-radius: 999px;
   color: var(--app-primary);
-  background: var(--app-primary-soft);
+  background: rgba(0, 122, 255, 0.1);
   cursor: pointer;
   padding: 0;
 }
@@ -648,7 +666,7 @@ function conversationTitle(conversation: Conversation) {
 }
 
 .user-avatar:hover {
-  box-shadow: 0 0 0 3px rgba(91, 124, 250, 0.12);
+  box-shadow: var(--app-focus-ring);
 }
 
 .avatar-action {
@@ -679,8 +697,7 @@ function conversationTitle(conversation: Conversation) {
     min-width: 0;
     height: auto;
     max-height: 46vh;
-    border-right: 0;
-    border-bottom: 1px solid var(--app-border);
+    border-radius: 26px;
   }
 
   .sidebar-nav {
@@ -691,6 +708,7 @@ function conversationTitle(conversation: Conversation) {
 @media (max-width: 640px) {
   .chat-sidebar {
     padding: 12px;
+    border-radius: 24px;
   }
 
   .sidebar-nav {

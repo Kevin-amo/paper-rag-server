@@ -120,7 +120,7 @@ defineExpose({ fillQuestion });
   bottom: 0;
   z-index: 5;
   padding: 0 0 20px;
-  background: #ffffff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(247, 248, 252, 0.72) 42%, rgba(247, 248, 252, 0.9));
 }
 
 .composer-box {
@@ -129,10 +129,14 @@ defineExpose({ fillQuestion });
   width: min(960px, calc(100% - 48px));
   margin: 0 auto;
   padding: 14px 14px 12px;
-  border: 1px solid var(--app-border);
+  border: 1px solid rgba(255, 255, 255, 0.78);
   border-radius: 28px;
-  background: #ffffff;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 18px 44px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
 }
 
 .composer-box :deep(.el-textarea__inner) {
@@ -146,8 +150,12 @@ defineExpose({ fillQuestion });
   padding: 2px 4px;
 }
 
+.composer-box :deep(.el-textarea__inner:focus) {
+  box-shadow: none;
+}
+
 .composer-box :deep(.el-textarea__inner::placeholder) {
-  color: #9ca3af;
+  color: var(--app-text-subtle);
 }
 
 .composer-actions {
@@ -167,17 +175,17 @@ defineExpose({ fillQuestion });
 .composer-pill {
   height: 30px;
   padding: 0 10px;
-  border: 1px solid var(--app-border);
+  border: 1px solid rgba(255, 255, 255, 0.74);
   border-radius: 999px;
-  background: #f9fafb;
+  background: rgba(242, 242, 247, 0.74);
   color: var(--app-text-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .composer-pill:hover {
-  border-color: #d9e2ff;
-  background: #f3f6ff;
+  border-color: rgba(0, 122, 255, 0.26);
+  background: rgba(255, 255, 255, 0.88);
   color: var(--app-primary);
 }
 
@@ -185,13 +193,19 @@ defineExpose({ fillQuestion });
   width: 40px;
   height: 40px;
   border: 0;
-  background: var(--app-primary);
-  box-shadow: 0 8px 18px rgba(91, 124, 250, 0.22);
+  background: linear-gradient(135deg, var(--app-primary), #5ac8fa);
+  box-shadow: 0 12px 24px rgba(0, 122, 255, 0.24);
+}
+
+.send-button:hover,
+.send-button:focus {
+  background: linear-gradient(135deg, #0a84ff, #64d2ff);
+  box-shadow: 0 14px 28px rgba(0, 122, 255, 0.28);
 }
 
 .send-button.is-disabled,
 .send-button.is-disabled:hover {
-  background: #d1d5db;
+  background: rgba(174, 174, 178, 0.82);
   color: #ffffff;
   box-shadow: none;
 }
@@ -200,9 +214,10 @@ defineExpose({ fillQuestion });
   display: grid;
   gap: 18px;
   padding: 16px;
-  border: 1px solid var(--app-border);
-  border-radius: 20px;
-  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
 .advanced-setting-header {
@@ -237,34 +252,35 @@ defineExpose({ fillQuestion });
 
 .topk-option {
   height: 38px;
-  border: 1px solid var(--app-border);
+  border: 1px solid rgba(209, 209, 214, 0.72);
   border-radius: 999px;
-  background: #fff;
-  color: #374151;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--app-text);
   cursor: pointer;
   font: inherit;
-  font-weight: 700;
+  font-weight: 750;
   transition: all 0.16s ease;
 }
 
 .topk-option:hover {
-  border-color: #d9e2ff;
+  border-color: rgba(0, 122, 255, 0.28);
   color: var(--app-primary);
 }
 
 .topk-option.active {
-  border-color: #d9e2ff;
-  background: var(--app-primary-soft);
+  border-color: rgba(0, 122, 255, 0.28);
+  background: rgba(0, 122, 255, 0.1);
   color: var(--app-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 :global(.advanced-dialog .el-dialog) {
-  border-radius: 24px;
+  border-radius: 26px;
 }
 
 :global(.advanced-dialog .el-dialog__title) {
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 850;
 }
 
 @media (max-width: 640px) {

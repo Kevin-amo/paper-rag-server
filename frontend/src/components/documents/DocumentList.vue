@@ -136,9 +136,10 @@ function handleCurrentChange(value: number) {
   grid-template-columns: minmax(220px, 1fr) auto auto;
   gap: 10px;
   padding: 10px;
-  border: 1px solid var(--app-border);
-  border-radius: 20px;
-  background: #f7f8fa;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
 .library-toolbar .el-button,
@@ -149,7 +150,7 @@ function handleCurrentChange(value: number) {
 }
 
 .library-toolbar :deep(.el-input__wrapper) {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .library-content {
@@ -167,16 +168,18 @@ function handleCurrentChange(value: number) {
   align-items: center;
   gap: 12px;
   padding: 15px;
-  border: 1px solid var(--app-border);
-  border-radius: 18px;
-  background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.68);
   cursor: pointer;
-  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
 .paper-card:hover {
-  border-color: #d9e2ff;
-  background: #fbfcff;
+  border-color: rgba(0, 122, 255, 0.28);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
   transform: translateY(-1px);
 }
 
@@ -212,7 +215,7 @@ function handleCurrentChange(value: number) {
 }
 
 .paper-subtle {
-  color: #9ca3af;
+  color: var(--app-text-subtle);
   font-size: 12px;
 }
 
