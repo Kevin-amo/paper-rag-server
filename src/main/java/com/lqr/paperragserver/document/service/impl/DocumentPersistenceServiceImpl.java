@@ -16,6 +16,7 @@ import com.lqr.paperragserver.document.mapper.DocumentChunkMapper;
 import com.lqr.paperragserver.document.mapper.DocumentMapper;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +39,7 @@ import java.util.stream.Collectors;
 /**
  * 基于 MyBatis-Plus 的文档元数据持久化服务。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocumentPersistenceServiceImpl implements DocumentPersistenceService {
@@ -183,6 +185,14 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
                 contentText,
                 toJson(metadata)
         );
+        log.info("document.persistence.status ownerUserId={} sourceId={} status=PARSING progress={} fileName={} fileType={} fileSize={} contentLength={}",
+                ownerUserId,
+                source.sourceId(),
+                30,
+                stringValue(metadata.get(MetadataKeys.FILE_NAME)),
+                stringValue(metadata.get(MetadataKeys.CONTENT_TYPE)),
+                longValue(metadata.get(MetadataKeys.CONTENT_LENGTH)),
+                contentText == null ? 0 : contentText.length());
     }
 
     /**
@@ -194,12 +204,15 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
         assetMapper.delete(new LambdaQueryWrapper<DocumentAssetEntity>()
                 .eq(DocumentAssetEntity::getOwnerUserId, ownerUserId)
                 .eq(DocumentAssetEntity::getSourceId, sourceId));
+        int assetCount = assets == null ? 0 : assets.size();
         if (assets == null || assets.isEmpty()) {
+            log.info("document.persistence.assets.replace ownerUserId={} sourceId={} assetCount={}", ownerUserId, sourceId, assetCount);
             return;
         }
         for (DocumentAsset asset : assets) {
             assetMapper.insert(toAssetEntity(ownerUserId, asset));
         }
+        log.info("document.persistence.assets.replace ownerUserId={} sourceId={} assetCount={}", ownerUserId, sourceId, assetCount);
     }
 
     /**
@@ -254,12 +267,15 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
         chunkMapper.delete(new LambdaQueryWrapper<DocumentChunkEntity>()
                 .eq(DocumentChunkEntity::getOwnerUserId, ownerUserId)
                 .eq(DocumentChunkEntity::getSourceId, sourceId));
+        int chunkCount = chunks == null ? 0 : chunks.size();
         if (chunks == null || chunks.isEmpty()) {
+            log.info("document.persistence.chunks.replace ownerUserId={} sourceId={} chunkCount={}", ownerUserId, sourceId, chunkCount);
             return;
         }
         for (DocumentChunk chunk : chunks) {
             chunkMapper.insert(toChunkEntity(ownerUserId, chunk));
         }
+        log.info("document.persistence.chunks.replace ownerUserId={} sourceId={} chunkCount={}", ownerUserId, sourceId, chunkCount);
     }
 
     /**
@@ -268,6 +284,8 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
     @Override
     public void markIndexed(UUID ownerUserId, String sourceId, int chunkCount) {
         documentMapper.markIndexed(ownerUserId, sourceId, chunkCount);
+        log.info("document.persistence.status ownerUserId={} sourceId={} status=INDEXED progress={} chunkCount={}",
+                ownerUserId, sourceId, 100, chunkCount);
     }
 
     /**
@@ -276,6 +294,8 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
     @Override
     public void markFailed(UUID ownerUserId, String sourceId, String errorMessage) {
         documentMapper.markFailed(ownerUserId, sourceId, cut(errorMessage, 4000));
+        log.info("document.persistence.status ownerUserId={} sourceId={} status=FAILED progress={} errorMessageLength={}",
+                ownerUserId, sourceId, 100, errorMessage == null ? 0 : errorMessage.length());
     }
 
     /**

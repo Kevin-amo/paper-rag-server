@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.literature.service;
 
+import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.literature.client.OpenAlexLiteratureClient;
 import com.lqr.paperragserver.literature.config.LiteratureSearchProperties;
 import com.lqr.paperragserver.literature.exception.LiteratureSearchException;
@@ -8,15 +9,18 @@ import com.lqr.paperragserver.literature.model.LiteratureSearchResponse;
 import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
 import com.lqr.paperragserver.literature.support.LiteratureSearchCache;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
 /**
  * 文献搜索业务入口。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LiteratureSearchService {
@@ -31,36 +35,52 @@ public class LiteratureSearchService {
     private final LiteratureSearchCache cache;
 
     public LiteratureSearchResponse search(LiteratureSearchRequest request) {
+        long startNanos = System.nanoTime();
         int limit = resolveLimit(request.limit());
         String sortBy = resolveSortBy(request.sortBy());
         List<String> categories = normalizeCategories(request.categories());
         String query = normalizeQuery(request.query());
         String dateFrom = normalizeText(request.dateFrom());
-        LiteratureSearchCache.Key cacheKey = new LiteratureSearchCache.Key(query, limit, sortBy, categories, dateFrom);
+        String dateTo = normalizeText(request.dateTo());
+        LiteratureSearchCache.Key cacheKey = new LiteratureSearchCache.Key(query, limit, sortBy, categories, dateFrom, dateTo);
+        log.info("literature.search.start queryExcerpt={} limit={} sortBy={} dateFrom={} dateTo={} categoryCount={} cacheEnabled={}",
+                LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, dateTo, categories.size(), literatureProperties.cache().isEnabled());
 
         if (literatureProperties.cache().isEnabled()) {
             var cached = cache.get(cacheKey);
             if (cached.isPresent()) {
+                log.info("literature.search.cache.hit queryExcerpt={} limit={} sortBy={} dateFrom={} dateTo={} resultCount={} costMs={}",
+                        LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, dateTo, cached.get().items().size(), elapsedMs(startNanos));
                 return cached.get();
             }
+            log.info("literature.search.cache.miss queryExcerpt={} limit={} sortBy={} dateFrom={} dateTo={}",
+                    LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, dateTo);
         }
 
         if (!literatureProperties.openalex().isEnabled()) {
+            log.warn("literature.search.fallback queryExcerpt={} limit={} sortBy={} dateFrom={} dateTo={} reason=OPENALEX_DISABLED",
+                    LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, dateTo);
             throw new LiteratureSearchException(HttpStatus.SERVICE_UNAVAILABLE, "OPENALEX_DISABLED", OPENALEX_DISABLED_MESSAGE);
         }
 
         try {
             int fetchLimit = resolveFetchLimit(limit, sortBy);
+            log.info("literature.search.openalex.start queryExcerpt={} limit={} fetchLimit={} sortBy={} dateFrom={} dateTo={}",
+                    LogSanitizer.safeExcerpt(query, 160), limit, fetchLimit, sortBy, dateFrom, dateTo);
             List<LiteratureSearchResult> items = openAlexLiteratureClient.search(
-                    normalizedRequest(request, query, categories, dateFrom, sortBy),
+                    normalizedRequest(request, query, categories, dateFrom, dateTo, sortBy),
                     fetchLimit,
                     sortBy,
                     literatureProperties.openalex()
             );
-            LiteratureSearchResponse response = new LiteratureSearchResponse(trimToUserLimit(items, limit, sortBy));
+            LiteratureSearchResponse response = new LiteratureSearchResponse(sortAndTrimToUserLimit(items, limit, sortBy));
             cacheIfEnabled(cacheKey, response);
+            log.info("literature.search.done queryExcerpt={} limit={} fetchLimit={} sortBy={} dateFrom={} dateTo={} resultCount={} costMs={}",
+                    LogSanitizer.safeExcerpt(query, 160), limit, fetchLimit, sortBy, dateFrom, dateTo, response.items().size(), elapsedMs(startNanos));
             return response;
         } catch (RuntimeException ex) {
+            log.warn("literature.search.failed queryExcerpt={} limit={} sortBy={} dateFrom={} dateTo={} reason={} costMs={}",
+                    LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, dateTo, exceptionCode(ex), elapsedMs(startNanos), ex);
             throw allSourcesUnavailable(ex);
         }
     }
@@ -70,9 +90,10 @@ public class LiteratureSearchService {
             String query,
             List<String> categories,
             String dateFrom,
+            String dateTo,
             String sortBy
     ) {
-        return new LiteratureSearchRequest(request.conversationId(), query, request.limit(), categories, dateFrom, sortBy);
+        return new LiteratureSearchRequest(request.conversationId(), query, request.limit(), categories, dateFrom, dateTo, sortBy);
     }
 
     private int resolveFetchLimit(int limit, String sortBy) {
@@ -82,15 +103,23 @@ public class LiteratureSearchService {
         return Math.min(Math.max(limit * 10, 10), 50);
     }
 
-    private List<LiteratureSearchResult> trimToUserLimit(
+    private List<LiteratureSearchResult> sortAndTrimToUserLimit(
             List<LiteratureSearchResult> items,
             int limit,
             String sortBy
     ) {
-        if (!SORT_DATE.equals(sortBy) || items.size() <= limit) {
-            return items;
+        List<LiteratureSearchResult> sorted = SORT_DATE.equals(sortBy)
+                ? items.stream()
+                .sorted(Comparator.comparing(
+                        LiteratureSearchResult::publishedDate,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
+                .toList()
+                : items;
+        if (sorted.size() <= limit) {
+            return sorted;
         }
-        return items.stream().limit(limit).toList();
+        return sorted.stream().limit(limit).toList();
     }
 
     private void cacheIfEnabled(LiteratureSearchCache.Key key, LiteratureSearchResponse response) {
@@ -153,5 +182,16 @@ public class LiteratureSearchService {
             return "retrieval augmented generation";
         }
         return normalized;
+    }
+
+    private String exceptionCode(Throwable ex) {
+        if (ex instanceof LiteratureSearchException literatureSearchException) {
+            return literatureSearchException.code();
+        }
+        return ex == null ? "UNKNOWN" : ex.getClass().getSimpleName();
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 }

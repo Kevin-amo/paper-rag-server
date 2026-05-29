@@ -52,7 +52,8 @@ public class LiteratureSearchCache {
             int limit,
             String sortBy,
             List<String> categories,
-            String dateFrom
+            String dateFrom,
+            String dateTo
     ) {
         public Key {
             categories = categories == null ? List.of() : List.copyOf(categories);

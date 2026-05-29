@@ -27,6 +27,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -52,6 +53,7 @@ import java.util.UUID;
 /**
  * 文档入库与管理接口。
  */
+@Slf4j
 @RestController
 @RequestMapping("/documents")
 @RequiredArgsConstructor
@@ -70,9 +72,22 @@ public class DocumentController {
                                                                  @RequestParam("file") MultipartFile file,
                                                                  @RequestParam(value = "sourceId", required = false) String sourceId,
                                                                  @RequestParam(value = "title", required = false) String title) throws IOException {
-        DocumentIngestionJob job = createAndPublishJob(principal.getId(), file, sourceId, title, null);
-        return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(DocumentUploadAcceptedResponse.from(job));
+        long startNanos = System.nanoTime();
+        UUID ownerUserId = principal.getId();
+        String fileName = file.getOriginalFilename();
+        log.info("document.upload.start ownerUserId={} sourceId={} fileName={} fileType={} fileSize={}",
+                ownerUserId, sourceId, fileName, file.getContentType(), file.getSize());
+        try {
+            DocumentIngestionJob job = createAndPublishJob(ownerUserId, file, sourceId, title, null);
+            log.info("document.upload.done ownerUserId={} jobId={} sourceId={} fileName={} fileType={} fileSize={} costMs={}",
+                    ownerUserId, job.getId(), job.getSourceId(), job.getFileName(), file.getContentType(), file.getSize(), elapsedMs(startNanos));
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(DocumentUploadAcceptedResponse.from(job));
+        } catch (IOException | RuntimeException ex) {
+            log.error("document.upload.failed ownerUserId={} sourceId={} fileName={} fileType={} fileSize={} costMs={}",
+                    ownerUserId, sourceId, fileName, file.getContentType(), file.getSize(), elapsedMs(startNanos), ex);
+            throw ex;
+        }
     }
 
     @PostMapping(path = "/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -91,16 +106,25 @@ public class DocumentController {
             MultipartFile file = files[index];
             BatchDocumentIngestionItemRequest item = requests.get(index);
             String fileName = originalFileName(file, item);
+            long itemStartNanos = System.nanoTime();
+            log.info("document.upload.start ownerUserId={} sourceId={} fileName={} fileType={} fileSize={} batchIndex={} batchSize={}",
+                    principal.getId(), item.sourceId(), fileName, file.getContentType(), file.getSize(), index, files.length);
             try {
                 DocumentIngestionJob job = createAndPublishJob(principal.getId(), file, item.sourceId(), item.title(), fileName);
+                log.info("document.upload.done ownerUserId={} jobId={} sourceId={} fileName={} fileType={} fileSize={} batchIndex={} batchSize={} costMs={}",
+                        principal.getId(), job.getId(), job.getSourceId(), job.getFileName(), file.getContentType(), file.getSize(), index, files.length, elapsedMs(itemStartNanos));
                 results.add(BatchDocumentIngestionItemResponse.accepted(index, fileName, job));
                 acceptedCount++;
             } catch (Exception ex) {
+                log.error("document.upload.failed ownerUserId={} sourceId={} fileName={} fileType={} fileSize={} batchIndex={} batchSize={} costMs={}",
+                        principal.getId(), item.sourceId(), fileName, file.getContentType(), file.getSize(), index, files.length, elapsedMs(itemStartNanos), ex);
                 String errorMessage = ex.getMessage() == null || ex.getMessage().isBlank() ? "上传失败" : ex.getMessage();
                 results.add(BatchDocumentIngestionItemResponse.failure(index, fileName, errorMessage));
             }
         }
 
+        log.info("document.upload.batch.done ownerUserId={} totalCount={} acceptedCount={} failedCount={}",
+                principal.getId(), files.length, acceptedCount, files.length - acceptedCount);
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(new BatchDocumentIngestionResponse(results, acceptedCount, files.length - acceptedCount));
     }
@@ -266,6 +290,10 @@ public class DocumentController {
         } catch (Exception ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "items 参数不是合法 JSON", ex);
         }
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
     private String originalFileName(MultipartFile file, BatchDocumentIngestionItemRequest item) {

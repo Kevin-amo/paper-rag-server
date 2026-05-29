@@ -113,7 +113,7 @@ class OpenAlexLiteratureClientTest {
     }
 
     @Test
-    void openAlexUriShouldUsePublicationDateSortWhenDateSortRequested() {
+    void openAlexUriShouldUseRelevanceScoreSortWhenDateSortRequested() {
         var properties = new LiteratureSearchProperties.OpenAlex(
                 true,
                 "https://api.openalex.org/works",
@@ -128,7 +128,7 @@ class OpenAlexLiteratureClientTest {
                 properties
         );
 
-        assertThat(uri.toString()).contains("sort=publication_date:desc");
+        assertThat(uri.toString()).contains("sort=relevance_score:desc");
     }
 
     @Test
@@ -148,6 +148,25 @@ class OpenAlexLiteratureClientTest {
         );
 
         assertThat(uri.toString()).contains("sort=relevance_score:desc");
+    }
+
+    @Test
+    void openAlexUriShouldCombineDateFromAndDateToInSingleFilterParam() {
+        var properties = new LiteratureSearchProperties.OpenAlex(
+                true,
+                "https://api.openalex.org/works",
+                Duration.ofSeconds(10),
+                null
+        );
+
+        var uri = client.openAlexUri(
+                new LiteratureSearchRequest("RAG", 3, null, "2026-01-01", "2026-12-31", "date"),
+                3,
+                "date",
+                properties
+        );
+
+        assertThat(uri.toString()).contains("filter=from_publication_date:2026-01-01,to_publication_date:2026-12-31");
     }
 
     @Test

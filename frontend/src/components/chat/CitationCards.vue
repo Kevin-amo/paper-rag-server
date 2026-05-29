@@ -45,7 +45,7 @@ function scorePercent(score: number) {
         <strong>{{ citation.title || citation.sourceId || '未命名论文' }}</strong>
         <span class="score-pill">
           <el-icon><TrendCharts /></el-icon>
-          相关度 {{ scorePercent(citation.rankScore) }}
+          排序分 {{ scorePercent(citation.rankScore) }}
         </span>
       </div>
       <p :title="citation.excerpt || '暂无片段摘要'">{{ citation.excerpt || '暂无片段摘要' }}</p>

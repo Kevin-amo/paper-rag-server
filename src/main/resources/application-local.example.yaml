@@ -21,6 +21,16 @@ spring:
     dashscope:
       api-key: ${DASHSCOPE_API_KEY:}
 
+logging:
+  level:
+    com.lqr.paperragserver: INFO
+    com.lqr.paperragserver.document: ${LOG_LEVEL_DOCUMENT:INFO}
+    com.lqr.paperragserver.rag: ${LOG_LEVEL_RAG:INFO}
+    com.lqr.paperragserver.agent: ${LOG_LEVEL_AGENT:INFO}
+    com.lqr.paperragserver.literature: ${LOG_LEVEL_LITERATURE:INFO}
+    com.lqr.paperragserver.vector: ${LOG_LEVEL_VECTOR:INFO}
+    com.lqr.paperragserver.ai: ${LOG_LEVEL_AI:INFO}
+
 app:
   literature:
     search:

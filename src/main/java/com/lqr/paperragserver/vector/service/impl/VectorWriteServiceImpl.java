@@ -9,6 +9,7 @@ import com.lqr.paperragserver.document.mapper.DocumentChunkMapper;
 import com.lqr.paperragserver.vector.mapper.VectorStoreMapper;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,10 +18,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 基于 pgvector 表的向量写入实现。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VectorWriteServiceImpl implements VectorWriteService {
@@ -40,26 +43,40 @@ public class VectorWriteServiceImpl implements VectorWriteService {
     @Transactional
     public void upsert(UUID ownerUserId, List<EmbeddingService.EmbeddingVector> vectors) {
         if (vectors == null || vectors.isEmpty()) {
+            log.info("vector.write.start ownerUserId={} vectorCount={} sourceIdDistribution={}", ownerUserId, 0, Map.of());
+            log.info("vector.write.done ownerUserId={} vectorCount={} sourceIdDistribution={} embeddingDimensions={} costMs={}",
+                    ownerUserId, 0, Map.of(), embeddingDimensions, 0);
             return;
         }
-        for (EmbeddingService.EmbeddingVector vector : vectors) {
-            DocumentChunk chunk = vector.chunk();
-            UUID vectorStoreId = UUID.nameUUIDFromBytes((ownerUserId + "::" + chunk.chunkId()).getBytes(StandardCharsets.UTF_8));
-            Map<String, Object> metadata = new java.util.LinkedHashMap<>();
-            if (vector.metadata() != null) {
-                metadata.putAll(vector.metadata());
+        long startNanos = System.nanoTime();
+        Map<String, Long> sourceDistribution = sourceDistribution(vectors);
+        log.info("vector.write.start ownerUserId={} vectorCount={} sourceIdDistribution={}", ownerUserId, vectors.size(), sourceDistribution);
+        try {
+            for (EmbeddingService.EmbeddingVector vector : vectors) {
+                DocumentChunk chunk = vector.chunk();
+                UUID vectorStoreId = UUID.nameUUIDFromBytes((ownerUserId + "::" + chunk.chunkId()).getBytes(StandardCharsets.UTF_8));
+                Map<String, Object> metadata = new java.util.LinkedHashMap<>();
+                if (vector.metadata() != null) {
+                    metadata.putAll(vector.metadata());
+                }
+                metadata.put(MetadataKeys.OWNER_USER_ID, ownerUserId.toString());
+                metadata.put(MetadataKeys.SOURCE_ID, chunk.sourceId());
+                metadata.put(MetadataKeys.CHUNK_ID, chunk.chunkId());
+                metadata.put(MetadataKeys.CHUNK_INDEX, chunk.chunkIndex());
+                vectorStoreMapper.upsert(
+                        vectorStoreId,
+                        chunk.content(),
+                        toJson(metadata),
+                        toVectorLiteral(vector.vector())
+                );
+                chunkMapper.updateVectorStoreId(ownerUserId, chunk.chunkId(), vectorStoreId);
             }
-            metadata.put(MetadataKeys.OWNER_USER_ID, ownerUserId.toString());
-            metadata.put(MetadataKeys.SOURCE_ID, chunk.sourceId());
-            metadata.put(MetadataKeys.CHUNK_ID, chunk.chunkId());
-            metadata.put(MetadataKeys.CHUNK_INDEX, chunk.chunkIndex());
-            vectorStoreMapper.upsert(
-                    vectorStoreId,
-                    chunk.content(),
-                    toJson(metadata),
-                    toVectorLiteral(vector.vector())
-            );
-            chunkMapper.updateVectorStoreId(ownerUserId, chunk.chunkId(), vectorStoreId);
+            log.info("vector.write.done ownerUserId={} vectorCount={} sourceIdDistribution={} embeddingDimensions={} costMs={}",
+                    ownerUserId, vectors.size(), sourceDistribution, embeddingDimensions, elapsedMs(startNanos));
+        } catch (RuntimeException ex) {
+            log.error("vector.write.failed ownerUserId={} vectorCount={} sourceIdDistribution={} embeddingDimensions={} costMs={}",
+                    ownerUserId, vectors.size(), sourceDistribution, embeddingDimensions, elapsedMs(startNanos), ex);
+            throw ex;
         }
     }
 
@@ -72,9 +89,22 @@ public class VectorWriteServiceImpl implements VectorWriteService {
     @Transactional
     public void deleteBySourceId(UUID ownerUserId, String sourceId) {
         if (ownerUserId == null || sourceId == null || sourceId.isBlank()) {
+            log.warn("vector.delete.skipped ownerUserId={} sourceId={} reason=INVALID_ARGUMENT", ownerUserId, sourceId);
             return;
         }
+        long startNanos = System.nanoTime();
         vectorStoreMapper.deleteBySourceId(ownerUserId.toString(), sourceId);
+        log.info("vector.delete.done ownerUserId={} sourceId={} costMs={}", ownerUserId, sourceId, elapsedMs(startNanos));
+    }
+
+    private Map<String, Long> sourceDistribution(List<EmbeddingService.EmbeddingVector> vectors) {
+        return vectors.stream()
+                .map(vector -> vector.chunk().sourceId())
+                .collect(Collectors.groupingBy(sourceId -> sourceId, Collectors.counting()));
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
     /**

@@ -71,9 +71,6 @@ function literatureMetadata(message: ConversationMessage): LiteratureSearchMessa
   if (isLiteratureSearchMetadata(message.metadata)) {
     return message.metadata;
   }
-  if (isAgentResultMetadata(message.metadata) && message.metadata.literature) {
-    return message.metadata.literature;
-  }
   return null;
 }
 
