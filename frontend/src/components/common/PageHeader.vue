@@ -26,17 +26,24 @@ defineProps<{
   justify-content: space-between;
   gap: 24px;
   padding: 28px 32px;
+  border: 1px solid rgba(255, 255, 255, 0.74);
   border-radius: var(--app-radius-lg);
-  color: #fff;
-  background: linear-gradient(135deg, var(--app-primary-dark) 0%, var(--app-primary) 48%, #60a5fa 100%);
-  box-shadow: 0 20px 45px rgba(37, 99, 235, 0.2);
+  color: var(--app-text);
+  background:
+    radial-gradient(circle at 10% 0, rgba(0, 122, 255, 0.15), transparent 20rem),
+    rgba(255, 255, 255, 0.66);
+  box-shadow:
+    0 20px 45px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
 }
 
 .page-eyebrow {
   margin: 0 0 8px;
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--app-primary);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -50,7 +57,7 @@ h1 {
 .page-description {
   max-width: 760px;
   margin: 12px 0 0;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--app-text-muted);
   line-height: 1.7;
 }
 

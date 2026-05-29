@@ -63,9 +63,10 @@ function scorePercent(score: number) {
   gap: 10px;
   margin-top: 18px;
   padding: 12px;
-  border: 1px solid var(--app-border);
-  border-radius: 18px;
-  background: #f7f8fa;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.56);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
 
 .citation-heading {
@@ -92,9 +93,9 @@ function scorePercent(score: number) {
 
 .citation-card {
   padding: 12px;
-  border: 1px solid #edf0f4;
-  border-radius: 14px;
-  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
 }
 
 .citation-topline {
@@ -119,7 +120,7 @@ function scorePercent(score: number) {
   height: 24px;
   padding: 0 8px;
   border-radius: 999px;
-  background: var(--app-primary-soft);
+  background: rgba(0, 122, 255, 0.1);
   color: var(--app-primary);
   font-size: 12px;
   font-weight: 800;

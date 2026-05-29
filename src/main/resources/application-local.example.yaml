@@ -32,6 +32,13 @@ logging:
     com.lqr.paperragserver.ai: ${LOG_LEVEL_AI:INFO}
 
 app:
+  mail:
+    resend:
+      enabled: true
+      api-key: ${RESEND_API_KEY:}
+      from: PaperRAG <noreply@example.com>
+      endpoint: https://api.resend.com/emails
+      timeout: 10s
   literature:
     search:
       openalex:

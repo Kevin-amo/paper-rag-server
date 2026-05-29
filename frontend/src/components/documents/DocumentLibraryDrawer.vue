@@ -74,7 +74,7 @@ const visible = computed({
   margin: 0;
   color: var(--app-primary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 850;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -82,7 +82,8 @@ const visible = computed({
 .drawer-heading h2 {
   margin: 0;
   color: var(--app-text);
-  font-size: 22px;
+  font-size: 23px;
+  letter-spacing: -0.025em;
 }
 
 .drawer-heading span {

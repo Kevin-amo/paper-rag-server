@@ -1,7 +1,8 @@
 package com.lqr.paperragserver.auth.service.impl;
 
-import com.lqr.paperragserver.auth.service.VerificationCodeService;
 import com.lqr.paperragserver.auth.config.SecurityProperties;
+import com.lqr.paperragserver.auth.service.VerificationCodeService;
+import com.lqr.paperragserver.mail.service.MailService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -32,6 +34,7 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
 
     private final StringRedisTemplate redisTemplate;
     private final SecurityProperties securityProperties;
+    private final MailService mailService;
 
     @Override
     public void createRegisterEmailCode(String email, String clientIp) {
@@ -47,9 +50,18 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
         requireWithinLimit(registerIpDailyKey(normalizedIp), DAILY_COUNTER_TTL, config.ipDailyLimit(), "当前 IP 今日验证码发送次数已达上限");
 
         String code = "%06d".formatted(ThreadLocalRandom.current().nextInt(1_000_000));
-        redisTemplate.opsForValue().set(registerEmailCodeKey(normalizedEmail), code, config.codeTtl());
-        redisTemplate.opsForValue().set(registerEmailCooldownKey(normalizedEmail), "1", config.emailCooldown());
-        log.info("邮箱注册验证码已生成：email={}, ip={}, code={}, ttl={}s", normalizedEmail, normalizedIp, code, config.codeTtl().toSeconds());
+        String codeKey = registerEmailCodeKey(normalizedEmail);
+        String cooldownKey = registerEmailCooldownKey(normalizedEmail);
+        redisTemplate.opsForValue().set(codeKey, code, config.codeTtl());
+        redisTemplate.opsForValue().set(cooldownKey, "1", config.emailCooldown());
+        try {
+            mailService.sendRegisterEmailCode(normalizedEmail, code, config.codeTtl());
+            log.info("邮箱注册验证码邮件已发送：email={}, ip={}, ttl={}s", normalizedEmail, normalizedIp, config.codeTtl().toSeconds());
+        } catch (RuntimeException ex) {
+            redisTemplate.delete(List.of(codeKey, cooldownKey));
+            log.warn("邮箱注册验证码邮件发送失败：email={}, ip={}", normalizedEmail, normalizedIp, ex);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "验证码邮件发送失败，请稍后再试", ex);
+        }
     }
 
     @Override
