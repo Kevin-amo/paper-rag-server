@@ -45,7 +45,7 @@ class AgentLoopTest {
                 Map.of("localPaperChunks", List.of(Map.of("chunkId", "chunk-1")))
         ));
         AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
-        when(planner.decide(eq("问题"), anyList(), anyList(), anyList(), eq(3)))
+        when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(3)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
                         AgentActionType.LOCAL_PAPER_RETRIEVAL,
@@ -57,7 +57,7 @@ class AgentLoopTest {
         when(planner.finalAnswer(eq("问题"), anyList(), anyList(), anyList())).thenReturn("最终回答");
         List<AgentStreamEvent> events = new ArrayList<>();
 
-        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", 3, List.of(), events::add);
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", 3, List.of(), null, events::add);
 
         assertThat(result.draftAnswer()).isEqualTo("最终回答");
         assertThat(result.observations()).contains("本地论文证据");
@@ -79,7 +79,7 @@ class AgentLoopTest {
                 Map.of("localPaperChunks", List.of())
         ));
         AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
-        when(planner.decide(eq("问题"), anyList(), anyList(), anyList(), eq(8)))
+        when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(8)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
                         AgentActionType.LOCAL_PAPER_RETRIEVAL,
@@ -89,7 +89,7 @@ class AgentLoopTest {
                 ))
                 .thenReturn(AgentDecision.finish("证据足够。", "最终回答"));
 
-        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", 8, List.of(), event -> {
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", 8, List.of(), null, event -> {
         });
 
         assertThat(result.citations()).hasSize(8);
@@ -106,7 +106,7 @@ class AgentLoopTest {
                 new AgentToolResult("第二次找到 8 个相关片段。", "第二次本地论文证据", citations("second", 8, 10.1), Map.of())
         );
         AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
-        when(planner.decide(eq("问题"), anyList(), anyList(), anyList(), eq(8)))
+        when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(8)))
                 .thenReturn(new AgentDecision(
                         "先检索一个角度。",
                         AgentActionType.LOCAL_PAPER_RETRIEVAL,
@@ -122,7 +122,7 @@ class AgentLoopTest {
                         null
                 ));
 
-        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", 8, List.of(), event -> {
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", 8, List.of(), null, event -> {
         });
 
         assertThat(result.metadata()).containsEntry("stopReason", "REPEATED_ACTION");
@@ -142,7 +142,7 @@ class AgentLoopTest {
                 new AgentToolResult("找到 2 个相关片段。", "本地论文证据", List.of(lower, higher), Map.of())
         );
         AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
-        when(planner.decide(eq("问题"), anyList(), anyList(), anyList(), eq(8)))
+        when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(8)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
                         AgentActionType.LOCAL_PAPER_RETRIEVAL,
@@ -152,7 +152,7 @@ class AgentLoopTest {
                 ))
                 .thenReturn(AgentDecision.finish("证据足够。", "最终回答"));
 
-        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", 8, List.of(), event -> {
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", 8, List.of(), null, event -> {
         });
 
         assertThat(result.citations()).containsExactly(higher);
@@ -173,7 +173,7 @@ class AgentLoopTest {
                 ))
         ));
         AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
-        when(planner.decide(eq("问题"), anyList(), anyList(), anyList(), eq(3)))
+        when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(3)))
                 .thenReturn(new AgentDecision(
                         "搜索外部文献。",
                         AgentActionType.LITERATURE_SEARCH,
@@ -183,7 +183,7 @@ class AgentLoopTest {
                 ))
                 .thenReturn(AgentDecision.finish("证据足够。", "最终回答"));
 
-        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", 3, List.of(), event -> {
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", 3, List.of(), null, event -> {
         });
 
         assertThat(result.citations()).isEmpty();
@@ -203,7 +203,7 @@ class AgentLoopTest {
                 Map.of()
         ));
         AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
-        when(planner.decide(eq("问题"), anyList(), anyList(), anyList(), eq(null)))
+        when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(null)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
                         AgentActionType.LOCAL_PAPER_RETRIEVAL,
@@ -213,7 +213,7 @@ class AgentLoopTest {
                 ))
                 .thenReturn(AgentDecision.finish("证据足够。", "最终回答"));
 
-        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", null, List.of(), event -> {
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", null, List.of(), null, event -> {
         });
 
         assertThat(result.citations()).hasSize(3);
@@ -233,7 +233,7 @@ class AgentLoopTest {
                 ))
         ));
         AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
-        when(planner.decide(eq("给我搜一篇关于 RAG 的文献，要最新的"), anyList(), anyList(), anyList(), eq(3)))
+        when(planner.decide(eq("给我搜一篇关于 RAG 的文献，要最新的"), anyList(), any(), anyList(), anyList(), eq(3)))
                 .thenReturn(new AgentDecision(
                         "虽然本地知识库有3篇相关论文，但用户需要最新文献",
                         AgentActionType.LITERATURE_SEARCH,
@@ -244,7 +244,7 @@ class AgentLoopTest {
                 .thenReturn(AgentDecision.finish("证据足够。", "最终回答"));
         List<AgentStreamEvent> events = new ArrayList<>();
 
-        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "给我搜一篇关于 RAG 的文献，要最新的", 3, List.of(), events::add);
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "给我搜一篇关于 RAG 的文献，要最新的", 3, List.of(), null, events::add);
 
         assertThat(events.stream()
                 .filter(event -> "thought".equals(event.type()))
@@ -266,7 +266,7 @@ class AgentLoopTest {
                 Map.of("literature", Map.of("type", "LITERATURE_SEARCH_RESULT", "query", "问题", "items", List.of()))
         ));
         AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
-        when(planner.decide(eq("问题"), anyList(), anyList(), anyList(), eq(null)))
+        when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(null)))
                 .thenReturn(new AgentDecision(
                         "继续搜索。",
                         AgentActionType.LITERATURE_SEARCH,
@@ -276,7 +276,7 @@ class AgentLoopTest {
                 ));
         when(planner.finalAnswer(eq("问题"), anyList(), anyList(), anyList())).thenReturn("达到步数上限后的回答");
 
-        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", null, List.of(), event -> {
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", null, List.of(), null, event -> {
         });
 
         assertThat(result.draftAnswer()).isNull();
@@ -294,7 +294,7 @@ class AgentLoopTest {
         when(tool.description()).thenReturn("literature_search description");
         when(tool.execute(any(), any())).thenThrow(new RuntimeException("外部文献服务暂不可用，请稍后重试"));
         AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
-        when(planner.decide(eq("问题"), anyList(), anyList(), anyList(), eq(null)))
+        when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(null)))
                 .thenReturn(new AgentDecision(
                         "先搜索外部文献。",
                         AgentActionType.LITERATURE_SEARCH,
@@ -305,7 +305,7 @@ class AgentLoopTest {
         when(planner.finalAnswer(eq("问题"), anyList(), anyList(), anyList())).thenReturn("外部文献服务暂不可用，请稍后重试。可以先换一个检索目标或稍后再试。");
         List<AgentStreamEvent> events = new ArrayList<>();
 
-        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", null, List.of(), events::add);
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, "问题", null, List.of(), null, events::add);
 
         assertThat(result.draftAnswer()).isNull();
         assertThat(result.observations()).anyMatch(observation -> observation.contains("外部文献服务暂不可用"));

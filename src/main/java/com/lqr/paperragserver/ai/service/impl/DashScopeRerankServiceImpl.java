@@ -52,10 +52,16 @@ public class DashScopeRerankServiceImpl implements RerankService {
      */
     @Override
     public List<RetrievedChunk> rerank(String question, List<RetrievedChunk> candidates, int topN) {
-        if (!available(question, candidates, topN)) {
+        RagProperties.RerankProperties rerank = ragProperties.rerank();
+        long startNanos = System.nanoTime();
+        String unavailableReason = unavailableReason(question, candidates, topN);
+        if (unavailableReason != null) {
+            log.warn("rerank.fallback enabled={} model={} candidateCount={} topN={} fallbackReason={} costMs={}",
+                    rerank.enabled(), rerank.model(), candidates == null ? 0 : candidates.size(), topN, unavailableReason, elapsedMs(startNanos));
             return candidates == null ? List.of() : candidates;
         }
-        RagProperties.RerankProperties rerank = ragProperties.rerank();
+        log.info("rerank.start enabled={} model={} candidateCount={} topN={}",
+                rerank.enabled(), rerank.model(), candidates.size(), topN);
         try {
             DashScopeRerankResponse response = client(rerank)
                     .post()
@@ -66,22 +72,39 @@ public class DashScopeRerankServiceImpl implements RerankService {
                     .body(request(question, candidates, rerank, topN))
                     .retrieve()
                     .body(DashScopeRerankResponse.class);
-            return applyResponse(candidates, response, topN);
+            int resultCount = resultCount(response);
+            List<RetrievedChunk> reranked = applyResponse(candidates, response, topN);
+            log.info("rerank.done enabled={} model={} candidateCount={} topN={} resultCount={} rerankedCount={} costMs={}",
+                    rerank.enabled(), rerank.model(), candidates.size(), topN, resultCount, reranked.size(), elapsedMs(startNanos));
+            return reranked;
         } catch (RuntimeException ex) {
-            log.warn("DashScope rerank failed, fallback to fusion ranking", ex);
+            log.warn("rerank.fallback enabled={} model={} candidateCount={} topN={} fallbackReason=API_EXCEPTION costMs={}",
+                    rerank.enabled(), rerank.model(), candidates.size(), topN, elapsedMs(startNanos), ex);
             return candidates;
         }
     }
 
     private boolean available(String question, List<RetrievedChunk> candidates, int topN) {
-        return ragProperties.rerank().enabled()
-                && question != null
-                && !question.isBlank()
-                && candidates != null
-                && !candidates.isEmpty()
-                && topN > 0
-                && apiKey != null
-                && !apiKey.isBlank();
+        return unavailableReason(question, candidates, topN) == null;
+    }
+
+    private String unavailableReason(String question, List<RetrievedChunk> candidates, int topN) {
+        if (!ragProperties.rerank().enabled()) {
+            return "DISABLED";
+        }
+        if (question == null || question.isBlank()) {
+            return "EMPTY_QUESTION";
+        }
+        if (candidates == null || candidates.isEmpty()) {
+            return "EMPTY_CANDIDATES";
+        }
+        if (topN <= 0) {
+            return "INVALID_TOP_N";
+        }
+        if (apiKey == null || apiKey.isBlank()) {
+            return "MISSING_API_KEY";
+        }
+        return null;
     }
 
     private RestClient client(RagProperties.RerankProperties rerank) {
@@ -114,6 +137,7 @@ public class DashScopeRerankServiceImpl implements RerankService {
                                                DashScopeRerankResponse response,
                                                int topN) {
         if (response == null || response.output() == null || response.output().results() == null || response.output().results().isEmpty()) {
+            log.warn("rerank.fallback candidateCount={} topN={} fallbackReason=EMPTY_RESPONSE", candidates.size(), topN);
             return candidates;
         }
         List<DashScopeRerankResult> validResults = response.output().results().stream()
@@ -122,6 +146,8 @@ public class DashScopeRerankServiceImpl implements RerankService {
                 .limit(Math.min(topN, candidates.size()))
                 .toList();
         if (validResults.isEmpty()) {
+            log.warn("rerank.fallback candidateCount={} topN={} resultCount={} fallbackReason=NO_VALID_RESULT",
+                    candidates.size(), topN, response.output().results().size());
             return candidates;
         }
         List<RetrievedChunk> reranked = new ArrayList<>();
@@ -137,6 +163,17 @@ public class DashScopeRerankServiceImpl implements RerankService {
             }
         }
         return reranked;
+    }
+
+    private int resultCount(DashScopeRerankResponse response) {
+        if (response == null || response.output() == null || response.output().results() == null) {
+            return 0;
+        }
+        return response.output().results().size();
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
     private record DashScopeRerankRequest(
