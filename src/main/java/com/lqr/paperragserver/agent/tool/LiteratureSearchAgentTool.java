@@ -59,17 +59,20 @@ public class LiteratureSearchAgentTool implements AgentTool {
         Integer limit = intValue(input.get("limit"), 5);
         String sortBy = stringValue(input.get("sortBy"));
         String dateFrom = stringValue(input.get("dateFrom"));
-        log.info("agent.tool.literature_search.start ownerUserId={} queryExcerpt={} limit={} sortBy={} dateFrom={}",
-                ownerUserId, LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom);
+        String dateTo = stringValue(input.get("dateTo"));
+        List<String> categories = stringList(input.get("categories"));
+        log.info("agent.tool.literature_search.start ownerUserId={} queryExcerpt={} limit={} sortBy={} dateFrom={} dateTo={} categoryCount={}",
+                ownerUserId, LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, dateTo, categories.size());
         if (query.isBlank()) {
             log.warn("agent.tool.literature_search.skipped ownerUserId={} reason=EMPTY_QUERY", ownerUserId);
-            return new AgentToolResult("文献搜索跳过：query 为空。", "", List.of(), literatureMetadata(query, limit, sortBy, dateFrom, List.of()));
+            return new AgentToolResult("文献搜索跳过：query 为空。", "", List.of(), literatureMetadata(query, limit, sortBy, dateFrom, dateTo, categories, List.of()));
         }
         LiteratureSearchResponse response = literatureSearchService.search(new LiteratureSearchRequest(
                 query,
                 limit,
-                List.of(),
+                categories,
                 dateFrom.isBlank() ? null : dateFrom,
+                dateTo.isBlank() ? null : dateTo,
                 sortBy.isBlank() ? null : sortBy
         ));
         List<LiteratureSearchResult> items = response.items();
@@ -77,9 +80,9 @@ public class LiteratureSearchAgentTool implements AgentTool {
                 .map(this::formatEvidenceItem)
                 .reduce((left, right) -> left + "\n" + right)
                 .orElse("未找到外部文献结果。");
-        Map<String, Object> metadata = literatureMetadata(query, limit, sortBy, dateFrom, items);
-        log.info("agent.tool.literature_search.done ownerUserId={} queryExcerpt={} limit={} sortBy={} dateFrom={} resultCount={} metadataKeys={} costMs={}",
-                ownerUserId, LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, items.size(), metadata.keySet(), elapsedMs(startNanos));
+        Map<String, Object> metadata = literatureMetadata(query, limit, sortBy, dateFrom, dateTo, categories, items);
+        log.info("agent.tool.literature_search.done ownerUserId={} queryExcerpt={} limit={} sortBy={} dateFrom={} dateTo={} categoryCount={} resultCount={} metadataKeys={} costMs={}",
+                ownerUserId, LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, dateTo, categories.size(), items.size(), metadata.keySet(), elapsedMs(startNanos));
         return new AgentToolResult(
                 "外部文献搜索完成，找到 " + items.size() + " 篇论文。",
                 evidence,
@@ -95,15 +98,24 @@ public class LiteratureSearchAgentTool implements AgentTool {
      * @param limit    结果数量上限
      * @param sortBy   排序方式
      * @param dateFrom 起始日期过滤条件
+     * @param dateTo   截止日期过滤条件
+     * @param categories 分类过滤条件
      * @param items    搜索结果列表
      * @return 可写入智能体结果的文献元数据
      */
-    private Map<String, Object> literatureMetadata(String query, Integer limit, String sortBy, String dateFrom, List<LiteratureSearchResult> items) {
+    private Map<String, Object> literatureMetadata(String query,
+                                                   Integer limit,
+                                                   String sortBy,
+                                                   String dateFrom,
+                                                   String dateTo,
+                                                   List<String> categories,
+                                                   List<LiteratureSearchResult> items) {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("limit", limit);
         params.put("dateFrom", dateFrom == null || dateFrom.isBlank() ? null : dateFrom);
+        params.put("dateTo", dateTo == null || dateTo.isBlank() ? null : dateTo);
         params.put("sortBy", sortBy == null || sortBy.isBlank() ? null : sortBy);
-        params.put("categories", List.of());
+        params.put("categories", categories == null ? List.of() : categories);
         Map<String, Object> literature = new LinkedHashMap<>();
         literature.put("type", "LITERATURE_SEARCH_RESULT");
         literature.put("query", query);
@@ -141,6 +153,17 @@ public class LiteratureSearchAgentTool implements AgentTool {
         } catch (NumberFormatException ex) {
             return fallback;
         }
+    }
+
+    private List<String> stringList(Object value) {
+        if (!(value instanceof List<?> values) || values.isEmpty()) {
+            return List.of();
+        }
+        return values.stream()
+                .map(this::stringValue)
+                .filter(item -> !item.isBlank())
+                .distinct()
+                .toList();
     }
 
     /**

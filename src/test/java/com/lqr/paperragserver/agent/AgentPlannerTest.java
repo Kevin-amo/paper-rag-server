@@ -7,11 +7,14 @@ import com.lqr.paperragserver.agent.service.AgentPlanner;
 import com.lqr.paperragserver.agent.tool.AgentToolRegistry;
 import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
+import com.lqr.paperragserver.literature.model.LiteratureSearchContext;
+import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
 import com.lqr.paperragserver.literature.support.LiteratureSearchIntentParser;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -176,6 +179,108 @@ class AgentPlannerTest {
                 .block();
 
         assertThat(deltas).containsExactly("hello ", "world");
+    }
+
+    @Test
+    void decideShouldInheritLiteratureQueryForYearFollowUp() {
+        AgentPlanner planner = new AgentPlanner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"有没 2026 年的\",\"limit\":5},\"finish\":false,\"answer\":null}",
+                new ObjectMapper(),
+                new AgentToolRegistry(List.of()),
+                new LiteratureSearchIntentParser()
+        );
+
+        AgentDecision decision = planner.decide("有没 2026 年的", List.of(), literatureContext("RAG", 1, List.of()), List.of(), List.of(), null);
+
+        assertThat(decision.action()).isEqualTo(AgentActionType.LITERATURE_SEARCH);
+        assertThat(decision.actionInput()).containsEntry("query", "RAG");
+        assertThat(decision.actionInput()).containsEntry("limit", 1);
+        assertThat(decision.actionInput()).containsEntry("sortBy", "date");
+        assertThat(decision.actionInput()).containsEntry("dateFrom", "2026-01-01");
+        assertThat(decision.actionInput()).containsEntry("dateTo", "2026-12-31");
+    }
+
+    @Test
+    void decideShouldInheritLiteratureQueryForLatestFollowUp() {
+        AgentPlanner planner = new AgentPlanner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"最新的\"},\"finish\":false,\"answer\":null}",
+                new ObjectMapper(),
+                new AgentToolRegistry(List.of()),
+                new LiteratureSearchIntentParser()
+        );
+
+        AgentDecision decision = planner.decide("最新的", List.of(), literatureContext("RAG", 5, List.of()), List.of(), List.of(), null);
+
+        assertThat(decision.actionInput()).containsEntry("query", "RAG");
+        assertThat(decision.actionInput()).containsEntry("sortBy", "date");
+    }
+
+    @Test
+    void decideShouldInheritLiteratureQueryAndOverrideLimitForMoreResults() {
+        AgentPlanner planner = new AgentPlanner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"再找 3 篇\",\"limit\":5},\"finish\":false,\"answer\":null}",
+                new ObjectMapper(),
+                new AgentToolRegistry(List.of()),
+                new LiteratureSearchIntentParser()
+        );
+
+        AgentDecision decision = planner.decide("再找 3 篇", List.of(), literatureContext("RAG", 5, List.of()), List.of(), List.of(), null);
+
+        assertThat(decision.actionInput()).containsEntry("query", "RAG");
+        assertThat(decision.actionInput()).containsEntry("limit", 3);
+    }
+
+    @Test
+    void decideShouldFinishWhenPreviousLiteratureItemsMatchYearFilter() {
+        AgentPlanner planner = new AgentPlanner(
+                (StubLlmService) prompt -> {
+                    throw new AssertionError("不应调用模型");
+                },
+                new ObjectMapper(),
+                new AgentToolRegistry(List.of()),
+                new LiteratureSearchIntentParser()
+        );
+        LiteratureSearchResult matching = literatureResult("RAG 2026", 2026, "2026-03-01");
+        LiteratureSearchResult other = literatureResult("RAG 2025", 2025, "2025-03-01");
+
+        AgentDecision decision = planner.decide("这些里面有 2026 年的吗", List.of(), literatureContext("RAG", 5, List.of(matching, other)), List.of(), List.of(), null);
+
+        assertThat(decision.finish()).isTrue();
+        assertThat(decision.action()).isEqualTo(AgentActionType.FINISH);
+        assertThat(decision.answer()).contains("RAG 2026").doesNotContain("RAG 2025");
+    }
+
+    private LiteratureSearchContext literatureContext(String query, int limit, List<LiteratureSearchResult> items) {
+        return new LiteratureSearchContext(
+                query,
+                limit,
+                "relevance",
+                null,
+                null,
+                List.of(),
+                items,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                null
+        );
+    }
+
+    private LiteratureSearchResult literatureResult(String title, int year, String publishedDate) {
+        return new LiteratureSearchResult(
+                title,
+                List.of("Alice"),
+                "Abstract",
+                year,
+                publishedDate,
+                null,
+                List.of("AI"),
+                "AI",
+                "https://doi.org/test",
+                "https://example.org/" + title.replace(' ', '-'),
+                null,
+                "openalex",
+                "W" + year
+        );
     }
 
     /**

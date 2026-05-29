@@ -11,6 +11,7 @@ import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.common.model.AnswerCitation;
 import com.lqr.paperragserver.rag.config.RagProperties;
 import com.lqr.paperragserver.conversation.service.ConversationService;
+import com.lqr.paperragserver.literature.model.LiteratureSearchContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class AgentLoop {
      * @param question       用户本轮问题
      * @param topK           本地检索片段数量配置
      * @param history        最近会话历史
+     * @param lastLiteratureContext 最近一次外部文献搜索上下文
      * @param sink           流式事件消费者
      * @return 智能体循环结果快照
      */
@@ -53,17 +55,18 @@ public class AgentLoop {
                                String question,
                                Integer topK,
                                List<ConversationService.MessageView> history,
+                               LiteratureSearchContext lastLiteratureContext,
                                Consumer<AgentStreamEvent> sink) {
         List<AgentStepTrace> steps = new ArrayList<>();
         List<String> observations = new ArrayList<>();
         List<AnswerCitation> citations = new ArrayList<>();
         Map<String, Object> extraMetadata = new LinkedHashMap<>();
 
-        log.info("agent.loop.start ownerUserId={} conversationId={} questionLength={} questionExcerpt={} topK={} historyCount={} maxSteps={}",
-                ownerUserId, conversationId, textLength(question), LogSanitizer.safeExcerpt(question, 160), topK, size(history), MAX_STEPS);
+        log.info("agent.loop.start ownerUserId={} conversationId={} questionLength={} questionExcerpt={} topK={} historyCount={} hasLiteratureContext={} maxSteps={}",
+                ownerUserId, conversationId, textLength(question), LogSanitizer.safeExcerpt(question, 160), topK, size(history), lastLiteratureContext != null, MAX_STEPS);
         for (int index = 1; index <= MAX_STEPS; index++) {
             sink.accept(AgentStreamEvent.step(conversationId, index));
-            AgentDecision decision = planner.decide(question, history, steps, observations, topK);
+            AgentDecision decision = planner.decide(question, history, lastLiteratureContext, steps, observations, topK);
             String thoughtSummary = deterministicThoughtSummary(decision.action());
             log.info("agent.plan.step conversationId={} step={} action={} finish={} actionInputSummary={}",
                     conversationId, index, decision.action(), decision.finish(), LogSanitizer.safeActionInput(decision.actionInput()));

@@ -4,6 +4,8 @@ import com.lqr.paperragserver.agent.dto.AgentAskRequest;
 import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
 import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.conversation.service.ConversationService;
+import com.lqr.paperragserver.literature.model.LiteratureSearchContext;
+import com.lqr.paperragserver.literature.support.LiteratureSearchContextResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class AgentService {
     private final ConversationService conversationService;
     private final AgentLoop agentLoop;
     private final AgentPlanner planner;
+    private final LiteratureSearchContextResolver literatureSearchContextResolver;
 
     /**
      * 处理一次智能体流式问答，负责会话解析、执行循环、最终回答生成和消息持久化。
@@ -40,28 +43,39 @@ public class AgentService {
             log.info("agent.ask.start ownerUserId={} conversationId={} questionLength={} questionExcerpt={} topK={}",
                     ownerUserId, activeConversationId, textLength(request.question()), LogSanitizer.safeExcerpt(request.question(), 160), request.topK());
             try {
+                // 解析对话上下文
                 ConversationService.ConversationView conversation = resolveConversation(ownerUserId, activeConversationId, request.question());
+                // 更新对话标识符
                 UUID resolvedConversationId = conversation.id();
                 activeConversationId = resolvedConversationId;
+                // 发送流式响应开始事件
                 sink.next(AgentStreamEvent.start(resolvedConversationId));
+                // 保存用户提问
                 conversationService.appendUserMessage(ownerUserId, resolvedConversationId, request.question());
+                // 获取最近会话历史
                 List<ConversationService.MessageView> history = conversationService.recentMessages(
                         ownerUserId,
                         resolvedConversationId,
                         ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT
                 );
-                log.info("agent.ask.context ownerUserId={} conversationId={} historyCount={} topK={}",
-                        ownerUserId, resolvedConversationId, history.size(), request.topK());
+                // 获取最近 Literature 搜索上下文
+                LiteratureSearchContext lastLiteratureContext = literatureSearchContextResolver.resolve(history).orElse(null);
+                log.info("agent.ask.context ownerUserId={} conversationId={} historyCount={} topK={} hasLiteratureContext={}",
+                        ownerUserId, resolvedConversationId, history.size(), request.topK(), lastLiteratureContext != null);
 
+                // 执行 agent loop
                 AgentLoop.AgentLoopResult result = agentLoop.run(
                         ownerUserId,
                         resolvedConversationId,
                         request.question(),
                         request.topK(),
                         history,
+                        lastLiteratureContext,
                         sink::next
                 );
+                // 生成最终回答
                 String answer = streamFinalAnswer(resolvedConversationId, request.question(), history, result, sink::next);
+                // 持久化到数据库
                 conversationService.appendAssistantMessage(
                         ownerUserId,
                         resolvedConversationId,

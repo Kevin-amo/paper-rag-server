@@ -193,6 +193,42 @@ class LiteratureSearchServiceTest {
         verify(openAlexLiteratureClient, times(1)).search(any(), org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq("date"), any());
     }
 
+    @Test
+    void searchShouldPassDateToToOpenAlexClient() {
+        LiteratureSearchResult result = openAlexResult("RAG 2026", "2026-01-01");
+        when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of(result));
+
+        LiteratureSearchResponse response = service.search(new LiteratureSearchRequest("Graph RAG", 3, null, "2026-01-01", "2026-12-31", "date"));
+
+        assertThat(response.items()).containsExactly(result);
+        verify(openAlexLiteratureClient).search(
+                org.mockito.ArgumentMatchers.argThat(request -> "2026-12-31".equals(request.dateTo())),
+                org.mockito.ArgumentMatchers.eq(30),
+                org.mockito.ArgumentMatchers.eq("date"),
+                any()
+        );
+    }
+
+    @Test
+    void cacheShouldSeparateDateTo() {
+        LiteratureSearchResult firstRange = openAlexResult("First Range", "2026-01-01");
+        LiteratureSearchResult secondRange = openAlexResult("Second Range", "2026-06-01");
+        when(openAlexLiteratureClient.search(org.mockito.ArgumentMatchers.argThat(request -> request != null && "2026-03-31".equals(request.dateTo())), anyInt(), anyString(), any()))
+                .thenReturn(List.of(firstRange));
+        when(openAlexLiteratureClient.search(org.mockito.ArgumentMatchers.argThat(request -> request != null && "2026-12-31".equals(request.dateTo())), anyInt(), anyString(), any()))
+                .thenReturn(List.of(secondRange));
+
+        LiteratureSearchResponse first = service.search(new LiteratureSearchRequest("Graph RAG", 1, null, "2026-01-01", "2026-03-31", "relevance"));
+        LiteratureSearchResponse second = service.search(new LiteratureSearchRequest("Graph RAG", 1, null, "2026-01-01", "2026-12-31", "relevance"));
+        LiteratureSearchResponse cachedFirst = service.search(new LiteratureSearchRequest("Graph RAG", 1, null, "2026-01-01", "2026-03-31", "relevance"));
+
+        assertThat(first.items()).containsExactly(firstRange);
+        assertThat(second.items()).containsExactly(secondRange);
+        assertThat(cachedFirst.items()).containsExactly(firstRange);
+        verify(openAlexLiteratureClient, times(1)).search(org.mockito.ArgumentMatchers.argThat(request -> request != null && "2026-03-31".equals(request.dateTo())), anyInt(), anyString(), any());
+        verify(openAlexLiteratureClient, times(1)).search(org.mockito.ArgumentMatchers.argThat(request -> request != null && "2026-12-31".equals(request.dateTo())), anyInt(), anyString(), any());
+    }
+
     private LiteratureSearchProperties searchProperties(boolean openAlexEnabled, boolean cacheEnabled) {
         return new LiteratureSearchProperties(
                 new LiteratureSearchProperties.OpenAlex(openAlexEnabled, "https://api.openalex.org/works", Duration.ofSeconds(10), null),

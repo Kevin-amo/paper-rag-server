@@ -8,6 +8,7 @@ import com.lqr.paperragserver.agent.service.AgentPlanner;
 import com.lqr.paperragserver.agent.service.AgentService;
 import com.lqr.paperragserver.common.model.AnswerCitation;
 import com.lqr.paperragserver.conversation.service.ConversationService;
+import com.lqr.paperragserver.literature.support.LiteratureSearchContextResolver;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
@@ -36,7 +37,8 @@ class AgentServiceTest {
     private final ConversationService conversationService = mock(ConversationService.class);
     private final AgentLoop agentLoop = mock(AgentLoop.class);
     private final AgentPlanner planner = mock(AgentPlanner.class);
-    private final AgentService service = new AgentService(conversationService, agentLoop, planner);
+    private final LiteratureSearchContextResolver literatureSearchContextResolver = mock(LiteratureSearchContextResolver.class);
+    private final AgentService service = new AgentService(conversationService, agentLoop, planner, literatureSearchContextResolver);
 
     @Test
     void streamAnswerShouldEmitLiveDeltasAndPersistFinalAnswer() {
@@ -53,9 +55,9 @@ class AgentServiceTest {
         Map<String, Object> metadata = Map.of("type", "AGENT_RESULT", "steps", List.of());
         AgentLoop.AgentLoopResult loopResult = new AgentLoop.AgentLoopResult(null, citations, metadata, steps, observations);
         mockConversation(history);
-        when(agentLoop.run(eq(ownerUserId), eq(conversationId), eq("stream question"), eq(5), eq(history), any()))
+        when(agentLoop.run(eq(ownerUserId), eq(conversationId), eq("stream question"), eq(5), eq(history), any(), any()))
                 .thenAnswer(invocation -> {
-                    Consumer<AgentStreamEvent> sink = invocation.getArgument(5);
+                    Consumer<AgentStreamEvent> sink = invocation.getArgument(6);
                     sink.accept(AgentStreamEvent.step(conversationId, 1));
                     sink.accept(AgentStreamEvent.thought(conversationId, 1, "先检索本地论文。"));
                     sink.accept(AgentStreamEvent.toolCall(conversationId, 1, "local_paper_retrieval", Map.of("query", "stream question")));
@@ -95,7 +97,7 @@ class AgentServiceTest {
         List<String> observations = List.of("本地论文证据");
         AgentLoop.AgentLoopResult loopResult = new AgentLoop.AgentLoopResult(null, List.of(), Map.of(), steps, observations);
         mockConversation(history);
-        when(agentLoop.run(eq(ownerUserId), eq(conversationId), eq("stream question"), eq(null), eq(history), any()))
+        when(agentLoop.run(eq(ownerUserId), eq(conversationId), eq("stream question"), eq(null), eq(history), any(), any()))
                 .thenReturn(loopResult);
         when(planner.finalAnswerStream("stream question", history, steps, observations))
                 .thenReturn(Flux.concat(Flux.just("partial"), Flux.error(new RuntimeException("model stream failed"))));
@@ -133,7 +135,7 @@ class AgentServiceTest {
         );
         AgentLoop.AgentLoopResult loopResult = new AgentLoop.AgentLoopResult(null, List.of(), metadata, steps, observations);
         mockConversation(history);
-        when(agentLoop.run(eq(ownerUserId), eq(conversationId), eq("stream question"), eq(null), eq(history), any()))
+        when(agentLoop.run(eq(ownerUserId), eq(conversationId), eq("stream question"), eq(null), eq(history), any(), any()))
                 .thenReturn(loopResult);
         when(planner.finalAnswerStream("stream question", history, steps, observations))
                 .thenReturn(Flux.just("LLM 输出的轻量文献列表"));

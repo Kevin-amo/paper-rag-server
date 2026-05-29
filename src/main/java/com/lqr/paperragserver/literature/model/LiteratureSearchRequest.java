@@ -16,9 +16,14 @@ public record LiteratureSearchRequest(
         @Positive(message = "limit 必须为正数") Integer limit,
         List<String> categories,
         @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "dateFrom 格式必须为 YYYY-MM-DD") String dateFrom,
+        @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "dateTo 格式必须为 YYYY-MM-DD") String dateTo,
         String sortBy
 ) {
     public LiteratureSearchRequest(String query, Integer limit, List<String> categories, String dateFrom, String sortBy) {
-        this(null, query, limit, categories, dateFrom, sortBy);
+        this(null, query, limit, categories, dateFrom, null, sortBy);
+    }
+
+    public LiteratureSearchRequest(String query, Integer limit, List<String> categories, String dateFrom, String dateTo, String sortBy) {
+        this(null, query, limit, categories, dateFrom, dateTo, sortBy);
     }
 }

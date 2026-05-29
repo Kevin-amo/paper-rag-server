@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -80,6 +81,43 @@ class LiteratureSearchAgentToolTest {
         AgentToolResult output = tool.execute(UUID.randomUUID(), Map.of("query", "RAG"));
 
         assertThat(output.evidenceText()).contains("分类：分类未知");
+    }
+
+    @Test
+    void executeShouldPassDateToAndKeepParamsInMetadata() {
+        LiteratureSearchResult result = result(
+                "RAG 2026",
+                List.of("Alice"),
+                "Abstract",
+                List.of("AI"),
+                "AI"
+        );
+        when(literatureSearchService.search(argThat(request ->
+                "RAG".equals(request.query())
+                        && "2026-01-01".equals(request.dateFrom())
+                        && "2026-12-31".equals(request.dateTo())
+                        && request.categories().contains("Computer Science")
+        ))).thenReturn(new LiteratureSearchResponse(List.of(result)));
+
+        AgentToolResult output = tool.execute(UUID.randomUUID(), Map.of(
+                "query", "RAG",
+                "limit", 1,
+                "sortBy", "date",
+                "dateFrom", "2026-01-01",
+                "dateTo", "2026-12-31",
+                "categories", List.of("Computer Science")
+        ));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> literature = (Map<String, Object>) output.metadata().get("literature");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> params = (Map<String, Object>) literature.get("params");
+        assertThat(literature).containsEntry("query", "RAG");
+        assertThat(params).containsEntry("limit", 1);
+        assertThat(params).containsEntry("sortBy", "date");
+        assertThat(params).containsEntry("dateFrom", "2026-01-01");
+        assertThat(params).containsEntry("dateTo", "2026-12-31");
+        assertThat((List<LiteratureSearchResult>) literature.get("items")).containsExactly(result);
     }
 
     private LiteratureSearchResult result(
