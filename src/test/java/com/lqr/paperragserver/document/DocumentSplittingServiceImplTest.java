@@ -48,15 +48,15 @@ class DocumentSplittingServiceImplTest {
         List<DocumentChunk> first = service.split(source, text);
         List<DocumentChunk> second = service.split(source, text);
 
-        assertThat(first).hasSize(7);
-        assertThat(first).extracting(DocumentChunk::chunkIndex).containsExactly(0, 1, 2, 3, 4, 5, 6);
+        assertThat(first).hasSize(6);
+        assertThat(first).extracting(DocumentChunk::chunkIndex).containsExactly(0, 1, 2, 3, 4, 5);
         assertThat(first).extracting(chunk -> String.valueOf(chunk.metadata().get("sectionType")))
-                .containsExactly("TITLE", "CONTENTS", "ABSTRACT", "SECTION", "SECTION", "CONCLUSION", "REFERENCES");
+                .containsExactly("CONTENTS", "ABSTRACT", "SECTION", "SECTION", "CONCLUSION", "REFERENCES");
         assertThat(first).extracting(chunk -> String.valueOf(chunk.metadata().get("sectionTitle")))
-                .containsExactly("Deep Learning for RAG", "Contents", "摘要", "1 引言", "1.1 方法", "结论", "参考文献");
+                .containsExactly("Contents", "摘要", "1 引言", "1.1 方法", "结论", "参考文献");
         assertThat(first).extracting(chunk -> ((Number) chunk.metadata().get("sectionLevel")).intValue())
-                .containsExactly(0, 1, 1, 1, 2, 1, 1);
-        assertThat(first.get(1).content()).contains("Contents").contains("1 Introduction ........ 1").contains("1.1 Method ........ 3");
+                .containsExactly(1, 1, 1, 2, 1, 1);
+        assertThat(first.get(0).content()).contains("Contents").contains("1 Introduction ........ 1").contains("1.1 Method ........ 3");
         assertThat(first).extracting(DocumentChunk::chunkId)
                 .containsExactlyElementsOf(second.stream().map(DocumentChunk::chunkId).toList());
         assertThat(first).allSatisfy(chunk -> {
@@ -94,7 +94,7 @@ class DocumentSplittingServiceImplTest {
                 .contains("2 实验结果 ........ 5");
         assertThat(contentsChunks.get(0).metadata()).containsEntry("sectionTitle", "目录");
         assertThat(chunks).extracting(chunk -> String.valueOf(chunk.metadata().get("sectionType")))
-                .containsExactly("TITLE", "CONTENTS", "CONCLUSION");
+                .containsExactly("CONTENTS", "CONCLUSION");
     }
 
     @Test
@@ -130,7 +130,7 @@ class DocumentSplittingServiceImplTest {
                 .contains("2.1 业务分析3");
         assertThat(contentsChunks.get(0).metadata()).containsEntry("sectionTitle", "目录");
         assertThat(chunks).extracting(chunk -> String.valueOf(chunk.metadata().get("sectionType")))
-                .containsExactly("TITLE", "CONTENTS", "SECTION", "SECTION");
+                .containsExactly("CONTENTS", "SECTION", "SECTION");
     }
 
     @Test
@@ -175,6 +175,58 @@ class DocumentSplittingServiceImplTest {
         assertThat(chunks.getFirst().metadata()).doesNotContainKey("documentAssets");
     }
 
+    @Test
+    void splitShouldMergeStandaloneAbstractHeadingIntoFollowingBody() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(800, 120, 5, 0));
+        DocumentSource source = new DocumentSource("source-abstract", "Paper Abstract", "paper.pdf", Map.of("title", "Paper Abstract"));
+        String text = """
+                Abstract
+
+                This paper proposes a retrieval augmented generation method.
+                """;
+
+        List<DocumentChunk> chunks = service.split(source, text);
+
+        assertThat(chunks).hasSize(1);
+        assertThat(chunks).noneMatch(chunk -> "Abstract".equals(chunk.content()));
+        assertThat(chunks.getFirst().content())
+                .contains("Abstract")
+                .contains("This paper proposes a retrieval augmented generation method.");
+        assertThat(chunks.getFirst().metadata()).containsEntry("sectionType", "ABSTRACT");
+    }
+
+    @Test
+    void splitShouldMergeNumberedIntroductionHeadingIntoFollowingBody() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(800, 120, 5, 0));
+        DocumentSource source = new DocumentSource("source-introduction", "Paper Introduction", "paper.pdf", Map.of("title", "Paper Introduction"));
+        String text = """
+                1 Introduction
+
+                Retrieval augmented generation combines retrieval with generation.
+                """;
+
+        List<DocumentChunk> chunks = service.split(source, text);
+
+        assertThat(chunks).hasSize(1);
+        assertThat(chunks).noneMatch(chunk -> "1 Introduction".equals(chunk.content()));
+        assertThat(chunks.getFirst().content())
+                .contains("1 Introduction")
+                .contains("Retrieval augmented generation combines retrieval with generation.");
+        assertThat(chunks.getFirst().metadata()).containsEntry("sectionTitle", "1 Introduction");
+    }
+
+    @Test
+    void splitShouldKeepAbstractWithInlineBody() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(800, 120, 5, 0));
+        DocumentSource source = new DocumentSource("source-inline-abstract", "Inline Abstract", "paper.pdf", Map.of("title", "Inline Abstract"));
+        String text = "Abstract: This paper proposes a retrieval augmented generation method.";
+
+        List<DocumentChunk> chunks = service.split(source, text);
+
+        assertThat(chunks).hasSize(1);
+        assertThat(chunks.getFirst().content()).isEqualTo("Abstract: This paper proposes a retrieval augmented generation method.");
+        assertThat(chunks.getFirst().metadata()).containsEntry("sectionTitle", "Abstract");
+    }
     @Test
     void splitShouldReturnEmptyListForBlankText() {
         DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(8, 2, 5, 0));

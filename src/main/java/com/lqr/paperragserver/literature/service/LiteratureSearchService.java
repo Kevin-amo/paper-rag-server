@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.literature.service;
 
+import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.literature.client.OpenAlexLiteratureClient;
 import com.lqr.paperragserver.literature.config.LiteratureSearchProperties;
 import com.lqr.paperragserver.literature.exception.LiteratureSearchException;
@@ -8,6 +9,7 @@ import com.lqr.paperragserver.literature.model.LiteratureSearchResponse;
 import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
 import com.lqr.paperragserver.literature.support.LiteratureSearchCache;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +20,7 @@ import java.util.Locale;
 /**
  * 文献搜索业务入口。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LiteratureSearchService {
@@ -32,26 +35,37 @@ public class LiteratureSearchService {
     private final LiteratureSearchCache cache;
 
     public LiteratureSearchResponse search(LiteratureSearchRequest request) {
+        long startNanos = System.nanoTime();
         int limit = resolveLimit(request.limit());
         String sortBy = resolveSortBy(request.sortBy());
         List<String> categories = normalizeCategories(request.categories());
         String query = normalizeQuery(request.query());
         String dateFrom = normalizeText(request.dateFrom());
         LiteratureSearchCache.Key cacheKey = new LiteratureSearchCache.Key(query, limit, sortBy, categories, dateFrom);
+        log.info("literature.search.start queryExcerpt={} limit={} sortBy={} dateFrom={} categoryCount={} cacheEnabled={}",
+                LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, categories.size(), literatureProperties.cache().isEnabled());
 
         if (literatureProperties.cache().isEnabled()) {
             var cached = cache.get(cacheKey);
             if (cached.isPresent()) {
+                log.info("literature.search.cache.hit queryExcerpt={} limit={} sortBy={} dateFrom={} resultCount={} costMs={}",
+                        LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, cached.get().items().size(), elapsedMs(startNanos));
                 return cached.get();
             }
+            log.info("literature.search.cache.miss queryExcerpt={} limit={} sortBy={} dateFrom={}",
+                    LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom);
         }
 
         if (!literatureProperties.openalex().isEnabled()) {
+            log.warn("literature.search.fallback queryExcerpt={} limit={} sortBy={} dateFrom={} reason=OPENALEX_DISABLED",
+                    LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom);
             throw new LiteratureSearchException(HttpStatus.SERVICE_UNAVAILABLE, "OPENALEX_DISABLED", OPENALEX_DISABLED_MESSAGE);
         }
 
         try {
             int fetchLimit = resolveFetchLimit(limit, sortBy);
+            log.info("literature.search.openalex.start queryExcerpt={} limit={} fetchLimit={} sortBy={} dateFrom={}",
+                    LogSanitizer.safeExcerpt(query, 160), limit, fetchLimit, sortBy, dateFrom);
             List<LiteratureSearchResult> items = openAlexLiteratureClient.search(
                     normalizedRequest(request, query, categories, dateFrom, sortBy),
                     fetchLimit,
@@ -60,8 +74,12 @@ public class LiteratureSearchService {
             );
             LiteratureSearchResponse response = new LiteratureSearchResponse(sortAndTrimToUserLimit(items, limit, sortBy));
             cacheIfEnabled(cacheKey, response);
+            log.info("literature.search.done queryExcerpt={} limit={} fetchLimit={} sortBy={} dateFrom={} resultCount={} costMs={}",
+                    LogSanitizer.safeExcerpt(query, 160), limit, fetchLimit, sortBy, dateFrom, response.items().size(), elapsedMs(startNanos));
             return response;
         } catch (RuntimeException ex) {
+            log.warn("literature.search.failed queryExcerpt={} limit={} sortBy={} dateFrom={} reason={} costMs={}",
+                    LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, exceptionCode(ex), elapsedMs(startNanos), ex);
             throw allSourcesUnavailable(ex);
         }
     }
@@ -162,5 +180,16 @@ public class LiteratureSearchService {
             return "retrieval augmented generation";
         }
         return normalized;
+    }
+
+    private String exceptionCode(Throwable ex) {
+        if (ex instanceof LiteratureSearchException literatureSearchException) {
+            return literatureSearchException.code();
+        }
+        return ex == null ? "UNKNOWN" : ex.getClass().getSimpleName();
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 }

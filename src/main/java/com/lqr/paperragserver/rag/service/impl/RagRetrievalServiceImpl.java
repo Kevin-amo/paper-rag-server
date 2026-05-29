@@ -1,6 +1,7 @@
 package com.lqr.paperragserver.rag.service.impl;
 
 import com.lqr.paperragserver.ai.service.RerankService;
+import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
@@ -9,6 +10,7 @@ import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
 import jdk.jfr.Registered;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -24,6 +26,7 @@ import java.util.UUID;
 /**
  * 基于向量库的检索实现。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RagRetrievalServiceImpl implements RagRetrievalService {
@@ -42,72 +45,139 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
      */
     @Override
     public List<RetrievedChunk> retrieve(UUID ownerUserId, String question, int topK) {
+        long startNanos = System.nanoTime();
         if (ownerUserId == null || question == null || question.isBlank()) {
+            log.warn("rag.retrieve.skipped ownerUserId={} queryLength={} requestedTopK={} reason=INVALID_ARGUMENT",
+                    ownerUserId, question == null ? 0 : question.length(), topK);
             return List.of();
         }
         int resolvedTopK = topK > 0 ? topK : ragProperties.defaultTopK();
         int candidateTopK = rerankCandidateTopK(resolvedTopK);
-        SearchRequest.Builder builder = SearchRequest.builder()
-                .query(question)
-                .topK(candidateTopK);
         double similarityThreshold = ragProperties.similarityThreshold();
-        if (similarityThreshold > 0) {
-            builder.similarityThreshold(similarityThreshold);
-        } else {
-            builder.similarityThresholdAll();
-        }
-        List<Document> documents = vectorStore.similaritySearch(builder.build());
-        List<RetrievedChunk> vectorChunks = new ArrayList<>(documents.size());
-        int index = 0;
-        for (Document document : documents) {
-            Map<String, Object> metadata = document.getMetadata();
-            String sourceId = metadata == null ? null : String.valueOf(metadata.getOrDefault(MetadataKeys.SOURCE_ID, ""));
-            String metadataOwnerUserId = metadata == null ? null : String.valueOf(metadata.getOrDefault(MetadataKeys.OWNER_USER_ID, ""));
-            if (!ownerUserId.toString().equals(metadataOwnerUserId) || !isIndexedDocument(ownerUserId, sourceId)) {
-                continue;
+        log.info("rag.retrieve.start ownerUserId={} queryExcerpt={} requestedTopK={} resolvedTopK={} candidateTopK={} similarityThreshold={}",
+                ownerUserId, LogSanitizer.safeExcerpt(question, 160), topK, resolvedTopK, candidateTopK, similarityThreshold);
+        try {
+            SearchRequest.Builder builder = SearchRequest.builder()
+                    .query(question)
+                    .topK(candidateTopK);
+            if (similarityThreshold > 0) {
+                builder.similarityThreshold(similarityThreshold);
+            } else {
+                builder.similarityThresholdAll();
             }
-            String chunkId = metadata == null ? document.getId() : String.valueOf(metadata.getOrDefault(MetadataKeys.CHUNK_ID, document.getId()));
-            int currentIndex = index++;
-            int chunkIndex = intMetadata(metadata, MetadataKeys.CHUNK_INDEX, currentIndex);
-            DocumentChunk chunk = new DocumentChunk(
-                    chunkId,
-                    sourceId,
-                    chunkIndex,
-                    document.getText(),
-                    metadata
-            );
-            Double vectorScore = document.getScore();
-            vectorChunks.add(new RetrievedChunk(chunk, vectorRankContribution(vectorScore, currentIndex, documents.size())));
-        }
+            List<Document> documents = vectorStore.similaritySearch(builder.build());
+            List<RetrievedChunk> vectorChunks = new ArrayList<>(documents.size());
+            FilterStats filterStats = new FilterStats();
+            int index = 0;
+            for (Document document : documents) {
+                Map<String, Object> metadata = document.getMetadata();
+                String sourceId = metadata == null ? null : String.valueOf(metadata.getOrDefault(MetadataKeys.SOURCE_ID, ""));
+                String metadataOwnerUserId = metadata == null ? null : String.valueOf(metadata.getOrDefault(MetadataKeys.OWNER_USER_ID, ""));
+                if (!ownerUserId.toString().equals(metadataOwnerUserId)) {
+                    filterStats.ownerMismatchCount++;
+                    continue;
+                }
+                if (sourceId == null || sourceId.isBlank()) {
+                    filterStats.invalidSourceCount++;
+                    continue;
+                }
+                if (!isIndexedDocument(ownerUserId, sourceId)) {
+                    filterStats.notIndexedCount++;
+                    continue;
+                }
+                String chunkId = metadata == null ? document.getId() : String.valueOf(metadata.getOrDefault(MetadataKeys.CHUNK_ID, document.getId()));
+                int currentIndex = index++;
+                int chunkIndex = intMetadata(metadata, MetadataKeys.CHUNK_INDEX, currentIndex);
+                DocumentChunk chunk = new DocumentChunk(
+                        chunkId,
+                        sourceId,
+                        chunkIndex,
+                        document.getText(),
+                        metadata
+                );
+                Double vectorScore = document.getScore();
+                vectorChunks.add(new RetrievedChunk(chunk, vectorRankContribution(vectorScore, currentIndex, documents.size())));
+            }
+            log.info("rag.retrieve.vector.done ownerUserId={} vectorRawCount={} vectorFilteredCount={} ownerMismatchCount={} invalidSourceCount={} notIndexedCount={} costMs={}",
+                    ownerUserId, documents.size(), vectorChunks.size(), filterStats.ownerMismatchCount, filterStats.invalidSourceCount, filterStats.notIndexedCount, elapsedMs(startNanos));
 
-        List<DocumentChunk> lexicalChunks = documentPersistenceService.searchChunks(ownerUserId, question, Math.max(resolvedTopK * 3, resolvedTopK));
-        Map<String, DocumentChunk> chunkById = new LinkedHashMap<>();
-        Map<String, Double> scoreById = new LinkedHashMap<>();
-        for (int lexicalIndex = 0; lexicalIndex < lexicalChunks.size(); lexicalIndex++) {
-            DocumentChunk chunk = lexicalChunks.get(lexicalIndex);
-            chunkById.put(chunk.chunkId(), chunk);
-            scoreById.merge(chunk.chunkId(), rankContribution(lexicalIndex, lexicalChunks.size()), Double::sum);
+            List<DocumentChunk> lexicalChunks = documentPersistenceService.searchChunks(ownerUserId, question, Math.max(resolvedTopK * 3, resolvedTopK));
+            log.info("rag.retrieve.lexical.done ownerUserId={} lexicalCount={} costMs={}", ownerUserId, lexicalChunks.size(), elapsedMs(startNanos));
+            Map<String, DocumentChunk> chunkById = new LinkedHashMap<>();
+            Map<String, Double> scoreById = new LinkedHashMap<>();
+            for (int lexicalIndex = 0; lexicalIndex < lexicalChunks.size(); lexicalIndex++) {
+                DocumentChunk chunk = lexicalChunks.get(lexicalIndex);
+                chunkById.put(chunk.chunkId(), chunk);
+                scoreById.merge(chunk.chunkId(), rankContribution(lexicalIndex, lexicalChunks.size()), Double::sum);
+            }
+            for (RetrievedChunk chunk : vectorChunks) {
+                String chunkId = chunk.chunk().chunkId();
+                chunkById.putIfAbsent(chunkId, chunk.chunk());
+                scoreById.merge(chunkId, chunk.rankScore(), Double::sum);
+            }
+            List<RetrievedChunk> fusionRankedCandidates = chunkById.entrySet().stream()
+                    .map(entry -> new RetrievedChunk(entry.getValue(), scoreById.getOrDefault(entry.getKey(), 0.0)))
+                    .sorted(Comparator.comparingDouble(RetrievedChunk::rankScore).reversed()
+                            .thenComparing(retrieved -> retrieved.chunk().sourceId(), Comparator.nullsLast(String::compareTo))
+                            .thenComparingInt(retrieved -> retrieved.chunk().chunkIndex()))
+                    .limit(candidateTopK)
+                    .toList();
+            log.info("rag.retrieve.fusion.done ownerUserId={} vectorCount={} lexicalCount={} fusionCount={} candidateTopK={} costMs={}",
+                    ownerUserId, vectorChunks.size(), lexicalChunks.size(), fusionRankedCandidates.size(), candidateTopK, elapsedMs(startNanos));
+            List<RetrievedChunk> reranked = rerankService.rerank(question, fusionRankedCandidates, resolvedTopK);
+            List<RetrievedChunk> finalChunks = reranked.stream()
+                    .limit(resolvedTopK)
+                    .toList();
+            log.info("rag.retrieve.done ownerUserId={} resolvedTopK={} vectorCount={} lexicalCount={} fusionCount={} rerankBeforeCount={} rerankAfterCount={} finalCount={} costMs={}",
+                    ownerUserId, resolvedTopK, vectorChunks.size(), lexicalChunks.size(), fusionRankedCandidates.size(), fusionRankedCandidates.size(), reranked.size(), finalChunks.size(), elapsedMs(startNanos));
+            logFinalChunks(finalChunks);
+            return finalChunks;
+        } catch (RuntimeException ex) {
+            log.error("rag.retrieve.failed ownerUserId={} queryExcerpt={} requestedTopK={} resolvedTopK={} candidateTopK={} costMs={}",
+                    ownerUserId, LogSanitizer.safeExcerpt(question, 160), topK, resolvedTopK, candidateTopK, elapsedMs(startNanos), ex);
+            throw ex;
         }
-        for (RetrievedChunk chunk : vectorChunks) {
-            String chunkId = chunk.chunk().chunkId();
-            chunkById.putIfAbsent(chunkId, chunk.chunk());
-            scoreById.merge(chunkId, chunk.rankScore(), Double::sum);
-        }
-        List<RetrievedChunk> fusionRankedCandidates = chunkById.entrySet().stream()
-                .map(entry -> new RetrievedChunk(entry.getValue(), scoreById.getOrDefault(entry.getKey(), 0.0)))
-                .sorted(Comparator.comparingDouble(RetrievedChunk::rankScore).reversed()
-                        .thenComparing(retrieved -> retrieved.chunk().sourceId(), Comparator.nullsLast(String::compareTo))
-                        .thenComparingInt(retrieved -> retrieved.chunk().chunkIndex()))
-                .limit(candidateTopK)
-                .toList();
-        return rerankService.rerank(question, fusionRankedCandidates, resolvedTopK).stream()
-                .limit(resolvedTopK)
-                .toList();
     }
 
     private int rerankCandidateTopK(int resolvedTopK) {
         int multiplier = ragProperties.rerank().candidateMultiplier();
         return Math.max(resolvedTopK * multiplier, resolvedTopK);
+    }
+
+    private void logFinalChunks(List<RetrievedChunk> chunks) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        for (RetrievedChunk retrieved : chunks) {
+            DocumentChunk chunk = retrieved.chunk();
+            Map<String, Object> metadata = chunk.metadata();
+            log.debug("rag.retrieve.finalChunk sourceId={} chunkId={} chunkIndex={} sectionTitle={} sectionType={} rankScore={} excerpt={}",
+                    chunk.sourceId(),
+                    chunk.chunkId(),
+                    chunk.chunkIndex(),
+                    stringMetadata(metadata, MetadataKeys.SECTION_TITLE),
+                    stringMetadata(metadata, MetadataKeys.SECTION_TYPE),
+                    retrieved.rankScore(),
+                    LogSanitizer.safeExcerpt(chunk.content(), 160));
+        }
+    }
+
+    private String stringMetadata(Map<String, Object> metadata, String key) {
+        if (metadata == null || !metadata.containsKey(key)) {
+            return null;
+        }
+        Object value = metadata.get(key);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
+    }
+
+    private static final class FilterStats {
+        private int ownerMismatchCount;
+        private int invalidSourceCount;
+        private int notIndexedCount;
     }
 
     /**

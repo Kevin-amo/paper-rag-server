@@ -5,6 +5,7 @@ import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
 import com.lqr.paperragserver.agent.service.AgentService;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,16 +22,20 @@ import java.io.IOException;
  */
 @RestController
 @RequestMapping("/agent")
+@RequiredArgsConstructor
 public class AgentController {
 
     private static final long STREAM_TIMEOUT_MILLIS = 240_000L;
 
     private final AgentService agentService;
 
-    public AgentController(AgentService agentService) {
-        this.agentService = agentService;
-    }
-
+    /**
+     * 接收用户问题并通过 SSE 持续返回智能体执行事件和回答增量。
+     *
+     * @param principal 当前认证用户
+     * @param request   智能体问答请求
+     * @return SSE 事件发射器
+     */
     @PostMapping(value = "/ask/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter askStream(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                 @Valid @RequestBody AgentAskRequest request) {
@@ -47,6 +52,12 @@ public class AgentController {
         return emitter;
     }
 
+    /**
+     * 将智能体流式事件写入 SSE 通道，写入失败时关闭当前连接。
+     *
+     * @param emitter SSE 事件发射器
+     * @param event   待发送的智能体事件
+     */
     private void sendEvent(SseEmitter emitter, AgentStreamEvent event) {
         try {
             emitter.send(SseEmitter.event()

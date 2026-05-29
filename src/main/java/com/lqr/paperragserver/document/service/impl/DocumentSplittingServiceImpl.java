@@ -1,11 +1,13 @@
 package com.lqr.paperragserver.document.service.impl;
 
+import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.rag.config.RagProperties;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.document.service.DocumentSplittingService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
  *
  * <p>按文档结构优先切分，再对超长结构块进行长度兜底切分，尽量保留标题、摘要、章节和参考文献等语义边界。</p>
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocumentSplittingServiceImpl implements DocumentSplittingService {
@@ -61,23 +64,54 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
     @Override
     public List<DocumentChunk> split(DocumentSource source, String fullText) {
         Objects.requireNonNull(source, "source 不能为空");
+        long startNanos = System.nanoTime();
+        log.info("document.split.start sourceId={} textLength={} chunkSize={} chunkOverlap={}",
+                source.sourceId(), textLength(fullText), ragProperties.chunkSize(), ragProperties.chunkOverlap());
         if (fullText == null || fullText.isBlank()) {
+            log.info("document.split.chunks.done sourceId={} textLength={} paragraphCount={} sectionCount={} chunkCount={} skippedEmptyCount={} skippedTitleOnlyCount={} skippedTooShortCount={} costMs={}",
+                    source.sourceId(), textLength(fullText), 0, 0, 0, 1, 0, 0, elapsedMs(startNanos));
             return List.of();
         }
 
         List<ParagraphBlock> paragraphs = extractParagraphs(fullText);
+        log.info("document.split.paragraphs.done sourceId={} textLength={} paragraphCount={} costMs={}",
+                source.sourceId(), fullText.length(), paragraphs.size(), elapsedMs(startNanos));
         if (paragraphs.isEmpty()) {
+            log.info("document.split.chunks.done sourceId={} textLength={} paragraphCount={} sectionCount={} chunkCount={} skippedEmptyCount={} skippedTitleOnlyCount={} skippedTooShortCount={} costMs={}",
+                    source.sourceId(), fullText.length(), 0, 0, 0, 1, 0, 0, elapsedMs(startNanos));
             return List.of();
         }
 
         List<SectionBlock> sections = buildSections(paragraphs);
+        log.info("document.split.sections.done sourceId={} paragraphCount={} sectionCount={} costMs={}",
+                source.sourceId(), paragraphs.size(), sections.size(), elapsedMs(startNanos));
+        logSections(source.sourceId(), sections);
         List<DocumentChunk> chunks = new ArrayList<>();
+        SplitSkipStats skipStats = new SplitSkipStats();
         int chunkIndex = 0;
         for (SectionBlock section : sections) {
             for (ChunkSlice slice : splitSection(section)) {
-                chunks.add(toDocumentChunk(source, chunkIndex++, slice));
+                String normalized = LogSanitizer.normalizeWhitespace(slice.content());
+                if (normalized.isBlank()) {
+                    skipStats.emptyCount++;
+                    continue;
+                }
+                if (normalized.length() <= 3) {
+                    skipStats.tooShortCount++;
+                    continue;
+                }
+                if (isTitleOnlyChunk(slice)) {
+                    skipStats.titleOnlyCount++;
+                    continue;
+                }
+                DocumentChunk chunk = toDocumentChunk(source, chunkIndex++, slice);
+                chunks.add(chunk);
+                log.debug("document.split.chunk sourceId={} chunkId={} chunkIndex={} sectionTitle={} sectionType={} chunkLength={} excerpt={}",
+                        source.sourceId(), chunk.chunkId(), chunk.chunkIndex(), slice.sectionTitle(), slice.sectionType(), slice.content().length(), LogSanitizer.safeExcerpt(slice.content(), 160));
             }
         }
+        log.info("document.split.chunks.done sourceId={} textLength={} paragraphCount={} sectionCount={} chunkCount={} skippedEmptyCount={} skippedTitleOnlyCount={} skippedTooShortCount={} costMs={}",
+                source.sourceId(), fullText.length(), paragraphs.size(), sections.size(), chunks.size(), skipStats.emptyCount, skipStats.titleOnlyCount, skipStats.tooShortCount, elapsedMs(startNanos));
         return chunks;
     }
 
@@ -457,7 +491,7 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
      */
     private List<ChunkSlice> splitSection(SectionBlock section) {
         if (section.type() == SectionType.CONTENTS) {
-            return section.paragraphs().isEmpty() ? List.of() : List.of(toChunkSlice(section, section.paragraphs()));
+            return section.paragraphs().isEmpty() ? List.of() : List.of(toChunkSlice(section, null, section.paragraphs()));
         }
         return splitParagraphUnits(section, section.paragraphs());
     }
@@ -467,23 +501,49 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
      */
     private List<ChunkSlice> splitParagraphUnits(SectionBlock section, List<ParagraphBlock> paragraphs) {
         List<ChunkSlice> chunks = new ArrayList<>();
+        if (paragraphs.isEmpty()) {
+            return chunks;
+        }
+
+        ParagraphBlock leadingHeading = standaloneSectionHeading(section, paragraphs.get(0)) ? paragraphs.get(0) : null;
+        List<ParagraphBlock> bodyParagraphs = leadingHeading == null ? paragraphs : paragraphs.subList(1, paragraphs.size());
+        if (bodyParagraphs.isEmpty()) {
+            return chunks;
+        }
+
         List<ParagraphBlock> buffer = new ArrayList<>();
         int bufferedLength = 0;
         int chunkSize = ragProperties.chunkSize();
+        boolean firstChunk = true;
 
-        for (ParagraphBlock paragraph : paragraphs) {
+        for (ParagraphBlock paragraph : bodyParagraphs) {
             String content = paragraph.content();
             if (content.isBlank()) {
                 continue;
             }
 
-            if (content.length() > chunkSize) {
+            int leadingHeadingLength = firstChunk && leadingHeading != null ? leadingHeading.content().length() + 2 : 0;
+            if (leadingHeadingLength + content.length() > chunkSize) {
                 if (!buffer.isEmpty()) {
-                    chunks.add(toChunkSlice(section, buffer));
+                    chunks.add(toChunkSlice(section, leadingHeadingFor(firstChunk, leadingHeading), buffer));
                     buffer.clear();
                     bufferedLength = 0;
+                    firstChunk = false;
                 }
-                chunks.addAll(splitLongParagraph(section, paragraph));
+                chunks.addAll(splitLongParagraph(section, paragraph, leadingHeadingFor(firstChunk, leadingHeading)));
+                firstChunk = false;
+                continue;
+            }
+
+            if (content.length() > chunkSize) {
+                if (!buffer.isEmpty()) {
+                    chunks.add(toChunkSlice(section, leadingHeadingFor(firstChunk, leadingHeading), buffer));
+                    buffer.clear();
+                    bufferedLength = 0;
+                    firstChunk = false;
+                }
+                chunks.addAll(splitLongParagraph(section, paragraph, leadingHeadingFor(firstChunk, leadingHeading)));
+                firstChunk = false;
                 continue;
             }
 
@@ -493,23 +553,42 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
                 continue;
             }
 
-            int candidateLength = bufferedLength + 2 + content.length();
+            int bodyCandidateLength = bufferedLength + 2 + content.length();
+            int candidateLength = bodyCandidateLength;
+            if (firstChunk && leadingHeading != null) {
+                candidateLength += leadingHeading.content().length() + 2;
+            }
             if (candidateLength > chunkSize) {
-                chunks.add(toChunkSlice(section, buffer));
+                chunks.add(toChunkSlice(section, leadingHeadingFor(firstChunk, leadingHeading), buffer));
                 buffer.clear();
                 buffer.add(paragraph);
                 bufferedLength = content.length();
+                firstChunk = false;
                 continue;
             }
 
             buffer.add(paragraph);
-            bufferedLength = candidateLength;
+            bufferedLength = bodyCandidateLength;
         }
 
         if (!buffer.isEmpty()) {
-            chunks.add(toChunkSlice(section, buffer));
+            chunks.add(toChunkSlice(section, leadingHeadingFor(firstChunk, leadingHeading), buffer));
         }
         return chunks;
+    }
+
+    private ParagraphBlock leadingHeadingFor(boolean firstChunk, ParagraphBlock leadingHeading) {
+        return firstChunk ? leadingHeading : null;
+    }
+
+    private boolean standaloneSectionHeading(SectionBlock section, ParagraphBlock paragraph) {
+        if (section.type() == SectionType.PREFACE || paragraph == null) {
+            return false;
+        }
+        String normalizedContent = normalizeWhitespace(paragraph.content());
+        String normalizedTitle = normalizeWhitespace(section.title());
+        return normalizedContent.equals(normalizedTitle)
+                || stripTrailingHeadingPunctuation(normalizedContent).equals(normalizedTitle);
     }
 
     /**
@@ -581,26 +660,32 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
      * @param paragraph 超长段落
      * @return 切分后的连续切片列表
      */
-    private List<ChunkSlice> splitLongParagraph(SectionBlock section, ParagraphBlock paragraph) {
+    private List<ChunkSlice> splitLongParagraph(SectionBlock section, ParagraphBlock paragraph, ParagraphBlock leadingHeading) {
         List<ChunkSlice> chunks = new ArrayList<>();
         String content = paragraph.content();
         int chunkSize = ragProperties.chunkSize();
         int overlap = Math.min(ragProperties.chunkOverlap(), Math.max(0, chunkSize - 1));
 
         int start = 0;
+        boolean firstSlice = true;
         while (start < content.length()) {
-            int end = Math.min(content.length(), start + chunkSize);
+            int headingLength = firstSlice && leadingHeading != null ? leadingHeading.content().length() + 2 : 0;
+            int end = Math.min(content.length(), start + Math.max(1, chunkSize - headingLength));
             String chunkContent = content.substring(start, end).strip();
             if (!chunkContent.isBlank()) {
+                if (firstSlice && leadingHeading != null) {
+                    chunkContent = leadingHeading.content() + "\n\n" + chunkContent;
+                }
                 chunks.add(new ChunkSlice(
                         chunkContent,
-                        paragraph.start() + start,
+                        firstSlice && leadingHeading != null ? leadingHeading.start() : paragraph.start() + start,
                         paragraph.start() + end,
                         section.title(),
                         section.type(),
                         section.level()
                 ));
             }
+            firstSlice = false;
             if (end >= content.length()) {
                 break;
             }
@@ -616,12 +701,17 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
      * @param paragraphs 连续段落列表
      * @return 聚合后的切片对象
      */
-    private ChunkSlice toChunkSlice(SectionBlock section, List<ParagraphBlock> paragraphs) {
-        String content = paragraphs.stream()
+    private ChunkSlice toChunkSlice(SectionBlock section, ParagraphBlock leadingHeading, List<ParagraphBlock> paragraphs) {
+        List<ParagraphBlock> contentParagraphs = new ArrayList<>();
+        if (leadingHeading != null) {
+            contentParagraphs.add(leadingHeading);
+        }
+        contentParagraphs.addAll(paragraphs);
+        String content = contentParagraphs.stream()
                 .map(ParagraphBlock::content)
                 .collect(Collectors.joining("\n\n"));
-        int start = paragraphs.get(0).start();
-        int end = paragraphs.get(paragraphs.size() - 1).end();
+        int start = contentParagraphs.get(0).start();
+        int end = contentParagraphs.get(contentParagraphs.size() - 1).end();
         return new ChunkSlice(content, start, end, section.title(), section.type(), section.level());
     }
 
@@ -706,6 +796,41 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         }
     }
 
+    private void logSections(String sourceId, List<SectionBlock> sections) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        for (int index = 0; index < sections.size(); index++) {
+            SectionBlock section = sections.get(index);
+            log.debug("document.split.section sourceId={} sectionIndex={} title={} type={} level={} paragraphCount={}",
+                    sourceId,
+                    index,
+                    LogSanitizer.safeExcerpt(section.title(), 120),
+                    section.type(),
+                    section.level(),
+                    section.paragraphs().size());
+        }
+    }
+
+    private boolean isTitleOnlyChunk(ChunkSlice slice) {
+        if (slice == null) {
+            return false;
+        }
+        String normalizedContent = LogSanitizer.normalizeWhitespace(slice.content());
+        String normalizedTitle = LogSanitizer.normalizeWhitespace(slice.sectionTitle());
+        return !normalizedTitle.isBlank()
+                && (normalizedContent.equals(normalizedTitle)
+                || stripTrailingHeadingPunctuation(normalizedContent).equals(normalizedTitle));
+    }
+
+    private int textLength(String text) {
+        return text == null ? 0 : text.length();
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
+    }
+
     /**
      * 归一化空白字符，便于标题识别和长度判断在不同换行/空格形式下保持一致。
      *
@@ -729,6 +854,12 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
     }
 
     private record SectionBlock(String title, SectionType type, int level, List<ParagraphBlock> paragraphs) {
+    }
+
+    private static final class SplitSkipStats {
+        private int emptyCount;
+        private int titleOnlyCount;
+        private int tooShortCount;
     }
 
     private static final class SectionBuilder {

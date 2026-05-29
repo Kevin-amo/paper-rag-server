@@ -1,11 +1,13 @@
 package com.lqr.paperragserver.literature.client;
 
+import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.literature.config.LiteratureSearchProperties;
 import com.lqr.paperragserver.literature.exception.LiteratureSearchException;
 import com.lqr.paperragserver.literature.model.LiteratureSearchRequest;
 import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -27,6 +29,7 @@ import java.util.Set;
 /**
  * OpenAlex 文献搜索客户端。
  */
+@Slf4j
 @Service
 public class OpenAlexLiteratureClient {
 
@@ -42,34 +45,52 @@ public class OpenAlexLiteratureClient {
 
     public List<LiteratureSearchResult> search(LiteratureSearchRequest request, int limit, String sortBy, LiteratureSearchProperties.OpenAlex properties) {
         if (!properties.isEnabled()) {
+            log.warn("literature.search.openalex.skipped queryExcerpt={} limit={} sortBy={} dateFrom={} reason=DISABLED",
+                    LogSanitizer.safeExcerpt(request.query(), 160), limit, sortBy, request.dateFrom());
             return List.of();
         }
+        long startNanos = System.nanoTime();
+        URI uri = openAlexUri(request, limit, sortBy, properties);
+        log.info("literature.search.openalex.request queryExcerpt={} limit={} sortBy={} dateFrom={} urlSummary={}",
+                LogSanitizer.safeExcerpt(request.query(), 160), limit, sortBy, request.dateFrom(), LogSanitizer.safeUriSummary(uri));
         try {
             JsonNode raw = client(properties.timeout())
                     .get()
-                    .uri(openAlexUri(request, limit, sortBy, properties))
+                    .uri(uri)
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .body(JsonNode.class);
+            int rawResultCount = rawResultCount(raw);
             List<LiteratureSearchResult> results = normalize(raw);
-            if (SORT_DATE.equals(sortBy)) {
-                return sortByDateDescending(results);
-            }
-            return results;
+            int parseFailedCount = Math.max(0, rawResultCount - results.size());
+            List<LiteratureSearchResult> finalResults = SORT_DATE.equals(sortBy) ? sortByDateDescending(results) : results;
+            log.info("literature.search.openalex.done queryExcerpt={} limit={} sortBy={} dateFrom={} rawResultCount={} parsedCount={} parseFailedCount={} costMs={}",
+                    LogSanitizer.safeExcerpt(request.query(), 160), limit, sortBy, request.dateFrom(), rawResultCount, finalResults.size(), parseFailedCount, elapsedMs(startNanos));
+            return finalResults;
         } catch (ResourceAccessException ex) {
             if (isTimeout(ex)) {
+                log.warn("literature.search.openalex.failed queryExcerpt={} limit={} sortBy={} dateFrom={} reason=OPENALEX_TIMEOUT costMs={}",
+                        LogSanitizer.safeExcerpt(request.query(), 160), limit, sortBy, request.dateFrom(), elapsedMs(startNanos), ex);
                 throw new LiteratureSearchException(HttpStatus.GATEWAY_TIMEOUT, "OPENALEX_TIMEOUT", "OpenAlex 调用超时", ex);
             }
+            log.warn("literature.search.openalex.failed queryExcerpt={} limit={} sortBy={} dateFrom={} reason=OPENALEX_CONNECTION_FAILED costMs={}",
+                    LogSanitizer.safeExcerpt(request.query(), 160), limit, sortBy, request.dateFrom(), elapsedMs(startNanos), ex);
             throw new LiteratureSearchException(HttpStatus.BAD_GATEWAY, "OPENALEX_CONNECTION_FAILED", "无法连接 OpenAlex 文献服务", ex);
         } catch (RestClientException ex) {
             if (isTimeout(ex)) {
+                log.warn("literature.search.openalex.failed queryExcerpt={} limit={} sortBy={} dateFrom={} reason=OPENALEX_TIMEOUT costMs={}",
+                        LogSanitizer.safeExcerpt(request.query(), 160), limit, sortBy, request.dateFrom(), elapsedMs(startNanos), ex);
                 throw new LiteratureSearchException(HttpStatus.GATEWAY_TIMEOUT, "OPENALEX_TIMEOUT", "OpenAlex 调用超时", ex);
             }
+            log.warn("literature.search.openalex.failed queryExcerpt={} limit={} sortBy={} dateFrom={} reason=OPENALEX_FAILED costMs={}",
+                    LogSanitizer.safeExcerpt(request.query(), 160), limit, sortBy, request.dateFrom(), elapsedMs(startNanos), ex);
             throw new LiteratureSearchException(HttpStatus.BAD_GATEWAY, "OPENALEX_FAILED", "OpenAlex 文献服务调用失败", ex);
         } catch (RuntimeException ex) {
             if (ex instanceof LiteratureSearchException literatureSearchException) {
                 throw literatureSearchException;
             }
+            log.warn("literature.search.openalex.parse.failed queryExcerpt={} limit={} sortBy={} dateFrom={} reason=OPENALEX_RESPONSE_INVALID costMs={}",
+                    LogSanitizer.safeExcerpt(request.query(), 160), limit, sortBy, request.dateFrom(), elapsedMs(startNanos), ex);
             throw new LiteratureSearchException(HttpStatus.BAD_GATEWAY, "OPENALEX_RESPONSE_INVALID", "OpenAlex 文献服务响应无法解析", ex);
         }
     }
@@ -261,6 +282,18 @@ public class OpenAlexLiteratureClient {
                 .requestFactory(requestFactory)
                 .messageConverters(converters -> converters.add(0, new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(objectMapper)))
                 .build();
+    }
+
+    private int rawResultCount(JsonNode raw) {
+        if (raw == null || raw.isNull() || raw.isMissingNode()) {
+            return 0;
+        }
+        JsonNode results = raw.path("results");
+        return results.isArray() ? results.size() : 0;
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
     private boolean isTimeout(Throwable ex) {

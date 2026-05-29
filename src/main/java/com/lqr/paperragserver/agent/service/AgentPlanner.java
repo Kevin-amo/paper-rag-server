@@ -8,9 +8,11 @@ import com.lqr.paperragserver.agent.model.AgentStepTrace;
 import com.lqr.paperragserver.agent.tool.AgentToolRegistry;
 import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
+import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.conversation.service.ConversationService;
 import com.lqr.paperragserver.literature.support.LiteratureSearchIntentParser;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -21,6 +23,7 @@ import java.util.Map;
 /**
  * 论文智能体的决策与回答规划组件，负责根据用户目标、会话历史和工具观察选择下一步动作或组织最终回复。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AgentPlanner {
@@ -30,44 +33,109 @@ public class AgentPlanner {
     private final AgentToolRegistry toolRegistry;
     private final LiteratureSearchIntentParser intentParser;
 
+    /**
+     * 根据用户目标、历史消息和已有工具观察选择下一步动作，异常时回退到规则决策。
+     *
+     * @param question     用户本轮问题
+     * @param history      最近会话历史
+     * @param steps        已执行步骤轨迹
+     * @param observations 已收集的工具观察
+     * @param topK         本地检索片段数量配置
+     * @return 下一步智能体决策
+     */
     public AgentDecision decide(String question,
                                 List<ConversationService.MessageView> history,
                                 List<AgentStepTrace> steps,
                                 List<String> observations,
                                 Integer topK) {
+        long startNanos = System.nanoTime();
+        log.info("agent.plan.start questionLength={} questionExcerpt={} historyCount={} stepsCount={} observationsCount={} topK={}",
+                textLength(question), LogSanitizer.safeExcerpt(question, 160), size(history), size(steps), size(observations), topK);
         try {
-            String content = llmService.generate(buildDecisionPrompt(question, history, steps, observations, topK));
-            return parseDecision(content, question, topK);
+            PromptConstructionService.Prompt prompt = buildDecisionPrompt(question, history, steps, observations, topK);
+            log.debug("agent.plan.prompt questionExcerpt={} promptSystemExcerpt={} promptUserExcerpt={}",
+                    LogSanitizer.safeExcerpt(question, 160), LogSanitizer.safeExcerpt(prompt.systemMessage(), 500), LogSanitizer.safeExcerpt(prompt.userMessage(), 500));
+            String content = llmService.generate(prompt);
+            AgentDecision decision = parseDecision(content, question, topK);
+            log.info("agent.plan.done action={} finish={} actionInputSummary={} costMs={}",
+                    decision.action(), decision.finish(), LogSanitizer.safeActionInput(decision.actionInput()), elapsedMs(startNanos));
+            log.debug("agent.plan.response action={} finish={} answerExcerpt={}",
+                    decision.action(), decision.finish(), LogSanitizer.safeExcerpt(decision.answer(), 500));
+            return decision;
         } catch (RuntimeException ex) {
+            log.warn("agent.plan.fallback questionLength={} observationsCount={} topK={} reason=RUNTIME_EXCEPTION costMs={}",
+                    textLength(question), size(observations), topK, elapsedMs(startNanos), ex);
             return fallbackDecision(question, observations, topK);
         } catch (Exception ex) {
+            log.warn("agent.plan.fallback questionLength={} observationsCount={} topK={} reason=PARSE_EXCEPTION costMs={}",
+                    textLength(question), size(observations), topK, elapsedMs(startNanos), ex);
             return fallbackDecision(question, observations, topK);
         }
     }
 
+    /**
+     * 基于工具观察生成非流式最终回答，模型不可用或空回答时返回兜底内容。
+     *
+     * @param question     用户本轮问题
+     * @param history      最近会话历史
+     * @param steps        执行步骤轨迹
+     * @param observations 工具观察证据
+     * @return 最终回答文本
+     */
     public String finalAnswer(String question,
                               List<ConversationService.MessageView> history,
                               List<AgentStepTrace> steps,
                               List<String> observations) {
+        long startNanos = System.nanoTime();
         try {
-            String answer = llmService.generate(buildFinalAnswerPrompt(question, history, steps, observations));
+            PromptConstructionService.Prompt prompt = buildFinalAnswerPrompt(question, history, steps, observations);
+            log.debug("agent.answer.prompt questionExcerpt={} promptSystemExcerpt={} promptUserExcerpt={}",
+                    LogSanitizer.safeExcerpt(question, 160), LogSanitizer.safeExcerpt(prompt.systemMessage(), 500), LogSanitizer.safeExcerpt(prompt.userMessage(), 500));
+            String answer = llmService.generate(prompt);
             if (answer == null || answer.isBlank()) {
+                log.warn("agent.answer.fallback reason=EMPTY_ANSWER observationsCount={} costMs={}", size(observations), elapsedMs(startNanos));
                 return fallbackAnswerFromObservations(observations);
             }
+            log.info("agent.answer.done answerLength={} stepsCount={} observationsCount={} costMs={}",
+                    answer.trim().length(), size(steps), size(observations), elapsedMs(startNanos));
+            log.debug("agent.answer.response answerExcerpt={}", LogSanitizer.safeExcerpt(answer, 500));
             return answer.trim();
         } catch (RuntimeException ex) {
+            log.warn("agent.answer.fallback reason=RUNTIME_EXCEPTION observationsCount={} costMs={}", size(observations), elapsedMs(startNanos), ex);
             return fallbackAnswerFromObservations(observations);
         }
     }
 
+    /**
+     * 基于工具观察生成流式最终回答，输出模型返回的非空增量片段。
+     *
+     * @param question     用户本轮问题
+     * @param history      最近会话历史
+     * @param steps        执行步骤轨迹
+     * @param observations 工具观察证据
+     * @return 最终回答增量流
+     */
     public Flux<String> finalAnswerStream(String question,
                                           List<ConversationService.MessageView> history,
                                           List<AgentStepTrace> steps,
                                           List<String> observations) {
-        return llmService.streamGenerate(buildFinalAnswerPrompt(question, history, steps, observations))
+        PromptConstructionService.Prompt prompt = buildFinalAnswerPrompt(question, history, steps, observations);
+        log.debug("agent.answer.stream.prompt questionExcerpt={} promptSystemExcerpt={} promptUserExcerpt={}",
+                LogSanitizer.safeExcerpt(question, 160), LogSanitizer.safeExcerpt(prompt.systemMessage(), 500), LogSanitizer.safeExcerpt(prompt.userMessage(), 500));
+        return llmService.streamGenerate(prompt)
                 .filter(delta -> delta != null && !delta.isEmpty());
     }
 
+    /**
+     * 构造 ReAct 决策提示词，约束模型只输出下一步动作 JSON。
+     *
+     * @param question     用户本轮问题
+     * @param history      最近会话历史
+     * @param steps        已执行步骤轨迹
+     * @param observations 已收集工具观察
+     * @param topK         本地检索片段数量配置
+     * @return 决策阶段提示词
+     */
     private PromptConstructionService.Prompt buildDecisionPrompt(String question,
                                                                  List<ConversationService.MessageView> history,
                                                                  List<AgentStepTrace> steps,
@@ -98,6 +166,15 @@ public class AgentPlanner {
         return new PromptConstructionService.Prompt(system, user);
     }
 
+    /**
+     * 构造最终回答提示词，要求模型仅基于工具观察组织用户可读回复。
+     *
+     * @param question     用户本轮问题
+     * @param history      最近会话历史
+     * @param steps        执行步骤轨迹
+     * @param observations 工具观察证据
+     * @return 最终回答阶段提示词
+     */
     private PromptConstructionService.Prompt buildFinalAnswerPrompt(String question,
                                                                     List<ConversationService.MessageView> history,
                                                                     List<AgentStepTrace> steps,
@@ -116,6 +193,15 @@ public class AgentPlanner {
         return new PromptConstructionService.Prompt(system, user);
     }
 
+    /**
+     * 解析模型返回的决策 JSON，并补齐工具输入中的确定性参数。
+     *
+     * @param content 模型原始响应
+     * @param question 用户本轮问题
+     * @param topK    本地检索片段数量配置
+     * @return 规范化后的智能体决策
+     * @throws Exception JSON 解析或字段转换失败时抛出
+     */
     private AgentDecision parseDecision(String content, String question, Integer topK) throws Exception {
         JsonNode root = objectMapper.readTree(jsonObject(content));
         String thought = text(root, "thoughtSummary", "我会根据目标选择下一步工具。");
@@ -136,6 +222,14 @@ public class AgentPlanner {
         return new AgentDecision(thought, action, input, finish || action == AgentActionType.FINISH, answer);
     }
 
+    /**
+     * 在模型规划失败时使用规则生成下一步决策，已有观察则直接结束。
+     *
+     * @param question     用户本轮问题
+     * @param observations 已收集工具观察
+     * @param topK         本地检索片段数量配置
+     * @return 兜底智能体决策
+     */
     private AgentDecision fallbackDecision(String question,
                                            List<String> observations,
                                            Integer topK) {
@@ -154,6 +248,12 @@ public class AgentPlanner {
         return new AgentDecision("这是本地论文分析类目标，我会先检索知识库。", AgentActionType.LOCAL_PAPER_RETRIEVAL, input, false, null);
     }
 
+    /**
+     * 在最终回答模型不可用时，将已有观察整理为可读的兜底回答。
+     *
+     * @param observations 工具观察证据
+     * @return 兜底回答文本
+     */
     private String fallbackAnswerFromObservations(List<String> observations) {
         if (observations == null || observations.isEmpty()) {
             return "当前模型暂不可用，且还没有可用于回答的检索结果。请稍后重试，或先补充更具体的检索目标。";
@@ -165,14 +265,54 @@ public class AgentPlanner {
         return "已完成检索。当前模型暂不可用，先返回工具检索到的原始结果：\n\n" + cut(evidence, 6000);
     }
 
+    /**
+     * 截断长文本并保留安全摘要，避免兜底回答过长。
+     *
+     * @param content   待截断文本
+     * @param maxLength 最大长度
+     * @return 截断后的文本
+     */
     private String cut(String content, int maxLength) {
-        if (content == null) {
-            return "";
-        }
-        String normalized = content.trim();
-        return normalized.length() <= maxLength ? normalized : normalized.substring(0, maxLength) + "...";
+        return LogSanitizer.safeExcerpt(content, maxLength);
     }
 
+    /**
+     * 计算列表大小，空列表按 0 处理。
+     *
+     * @param items 待统计列表
+     * @return 列表大小
+     */
+    private int size(List<?> items) {
+        return items == null ? 0 : items.size();
+    }
+
+    /**
+     * 计算文本长度，空文本按 0 处理。
+     *
+     * @param text 待统计文本
+     * @return 文本长度
+     */
+    private int textLength(String text) {
+        return text == null ? 0 : text.length();
+    }
+
+    /**
+     * 将纳秒起点换算为毫秒耗时，用于日志记录。
+     *
+     * @param startNanos 起始纳秒时间
+     * @return 已经过的毫秒数
+     */
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
+    }
+
+    /**
+     * 按动作类型处理 topK 参数，本地检索保留，外部文献搜索移除。
+     *
+     * @param action 当前动作类型
+     * @param input  工具输入参数
+     * @param topK   本地检索片段数量配置
+     */
     private void applyTopK(AgentActionType action, Map<String, Object> input, Integer topK) {
         if (action == AgentActionType.LOCAL_PAPER_RETRIEVAL) {
             if (topK != null) {
@@ -183,6 +323,13 @@ public class AgentPlanner {
         input.remove("topK");
     }
 
+    /**
+     * 为外部文献搜索补充可确定的查询词、数量和排序提示。
+     *
+     * @param action   当前动作类型
+     * @param input    工具输入参数
+     * @param question 用户本轮问题
+     */
     private void applyDeterministicLiteratureHints(AgentActionType action, Map<String, Object> input, String question) {
         if (action != AgentActionType.LITERATURE_SEARCH) {
             return;
@@ -199,6 +346,12 @@ public class AgentPlanner {
         }
     }
 
+    /**
+     * 基于关键词判断用户目标是否更像外部文献搜索。
+     *
+     * @param question 用户本轮问题
+     * @return 命中文献搜索意图时返回 true
+     */
     private boolean looksLikeLiteratureSearch(String question) {
         if (question == null) {
             return false;
@@ -215,6 +368,12 @@ public class AgentPlanner {
                 || value.contains("latest");
     }
 
+    /**
+     * 将最近会话历史格式化为提示词片段。
+     *
+     * @param history 最近会话历史
+     * @return 可放入提示词的历史文本
+     */
     private String formatHistory(List<ConversationService.MessageView> history) {
         if (history == null || history.isEmpty()) {
             return "(无历史)";
@@ -225,6 +384,12 @@ public class AgentPlanner {
                 .orElse("(无历史)");
     }
 
+    /**
+     * 将步骤轨迹格式化为提示词片段，用于让模型理解已有执行过程。
+     *
+     * @param steps 已执行步骤轨迹
+     * @return 可放入提示词的步骤文本
+     */
     private String formatSteps(List<AgentStepTrace> steps) {
         if (steps == null || steps.isEmpty()) {
             return "(尚未执行)";
@@ -235,6 +400,12 @@ public class AgentPlanner {
                 .orElse("(尚未执行)");
     }
 
+    /**
+     * 将工具观察列表格式化为提示词证据片段。
+     *
+     * @param observations 工具观察证据
+     * @return 可放入提示词的观察文本
+     */
     private String formatObservations(List<String> observations) {
         if (observations == null || observations.isEmpty()) {
             return "(暂无观察)";
@@ -242,6 +413,14 @@ public class AgentPlanner {
         return String.join("\n\n", observations);
     }
 
+    /**
+     * 从 JSON 节点中读取文本字段，缺失或空白时使用兜底值。
+     *
+     * @param root     JSON 根节点
+     * @param field    字段名称
+     * @param fallback 兜底文本
+     * @return 规范化后的字段文本
+     */
     private String text(JsonNode root, String field, String fallback) {
         JsonNode node = root.path(field);
         if (node.isMissingNode() || node.isNull()) {
@@ -251,6 +430,12 @@ public class AgentPlanner {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    /**
+     * 从模型响应中提取 JSON 对象部分，兼容模型附带额外文本的情况。
+     *
+     * @param content 模型原始响应
+     * @return JSON 对象字符串或原始响应
+     */
     private String jsonObject(String content) {
         if (content == null || content.isBlank()) {
             return "{}";

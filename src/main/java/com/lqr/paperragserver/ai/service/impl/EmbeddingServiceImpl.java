@@ -3,16 +3,19 @@ package com.lqr.paperragserver.ai.service.impl;
 import com.lqr.paperragserver.ai.service.EmbeddingService;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 基于 Spring AI EmbeddingModel 的向量计算实现。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmbeddingServiceImpl implements EmbeddingService {
@@ -28,13 +31,36 @@ public class EmbeddingServiceImpl implements EmbeddingService {
     @Override
     public List<EmbeddingVector> embed(List<DocumentChunk> chunks) {
         if (chunks == null || chunks.isEmpty()) {
+            log.info("embedding.start chunkCount={} sourceIdDistribution={} totalChars={}", 0, Map.of(), 0);
+            log.info("embedding.done chunkCount={} vectorCount={} sourceIdDistribution={} totalChars={} costMs={}", 0, 0, Map.of(), 0, 0);
             return List.of();
         }
-        List<EmbeddingVector> vectors = new ArrayList<>(chunks.size());
-        for (DocumentChunk chunk : chunks) {
-            float[] vector = embeddingModel.embed(chunk.content());
-            vectors.add(new EmbeddingVector(chunk, vector, chunk.metadata() == null ? Map.of() : chunk.metadata()));
+        long startNanos = System.nanoTime();
+        Map<String, Long> sourceDistribution = sourceDistribution(chunks);
+        int totalChars = chunks.stream().mapToInt(chunk -> chunk.content() == null ? 0 : chunk.content().length()).sum();
+        log.info("embedding.start chunkCount={} sourceIdDistribution={} totalChars={}", chunks.size(), sourceDistribution, totalChars);
+        try {
+            List<EmbeddingVector> vectors = new ArrayList<>(chunks.size());
+            for (DocumentChunk chunk : chunks) {
+                float[] vector = embeddingModel.embed(chunk.content());
+                vectors.add(new EmbeddingVector(chunk, vector, chunk.metadata() == null ? Map.of() : chunk.metadata()));
+            }
+            log.info("embedding.done chunkCount={} vectorCount={} sourceIdDistribution={} totalChars={} costMs={}",
+                    chunks.size(), vectors.size(), sourceDistribution, totalChars, elapsedMs(startNanos));
+            return vectors;
+        } catch (RuntimeException ex) {
+            log.error("embedding.failed chunkCount={} sourceIdDistribution={} totalChars={} costMs={}",
+                    chunks.size(), sourceDistribution, totalChars, elapsedMs(startNanos), ex);
+            throw ex;
         }
-        return vectors;
+    }
+
+    private Map<String, Long> sourceDistribution(List<DocumentChunk> chunks) {
+        return chunks.stream()
+                .collect(Collectors.groupingBy(DocumentChunk::sourceId, Collectors.counting()));
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 }
