@@ -2,7 +2,6 @@ package com.lqr.paperragserver.common.exception;
 
 import com.lqr.paperragserver.common.api.ApiErrorResponse;
 import com.lqr.paperragserver.literature.exception.LiteratureSearchException;
-import com.lqr.paperragserver.mcp.McpException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,11 +37,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(LiteratureSearchException.class)
     public ResponseEntity<ApiErrorResponse> handleLiteratureSearchException(LiteratureSearchException ex, HttpServletRequest request) {
-        return build(ex.status(), ex.code(), ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(McpException.class)
-    public ResponseEntity<ApiErrorResponse> handleMcpException(McpException ex, HttpServletRequest request) {
         return build(ex.status(), ex.code(), ex.getMessage(), request);
     }
 

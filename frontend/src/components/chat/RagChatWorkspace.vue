@@ -48,18 +48,42 @@ function handleExample(question: string) {
 .rag-workspace {
   position: relative;
   min-width: 0;
-  height: 100vh;
+  height: calc(100vh - 36px);
   display: flex;
   flex: 1;
   flex-direction: column;
   overflow: hidden;
-  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow:
+    0 28px 70px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(26px) saturate(175%);
+  -webkit-backdrop-filter: blur(26px) saturate(175%);
+}
+
+.rag-workspace::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 8% 0, rgba(0, 122, 255, 0.07), transparent 24rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.28));
+  content: '';
+  pointer-events: none;
+}
+
+.rag-workspace > * {
+  position: relative;
+  z-index: 1;
 }
 
 @media (max-width: 900px) {
   .rag-workspace {
     height: auto;
-    min-height: 100vh;
+    min-height: 70vh;
+    border-radius: 28px;
   }
 }
 </style>
