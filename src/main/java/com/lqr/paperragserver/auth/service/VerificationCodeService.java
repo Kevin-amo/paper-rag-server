@@ -12,6 +12,8 @@ public interface VerificationCodeService {
      */
     void createRegisterEmailCode(String email, String clientIp);
 
+    void createChangeEmailCode(String email, String clientIp);
+
     /**
      * 校验邮箱注册验证码
      *
@@ -21,10 +23,14 @@ public interface VerificationCodeService {
      */
     void requireRegisterEmailCodeMatches(String email, String code);
 
+    void requireChangeEmailCodeMatches(String email, String code);
+
     /**
      * 删除邮箱注册验证码
      *
      * @param email 邮箱地址
      */
     void deleteRegisterEmailCode(String email);
+
+    void deleteChangeEmailCode(String email);
 }

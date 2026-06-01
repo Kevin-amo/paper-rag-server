@@ -95,6 +95,18 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         }
     }
 
+    public void evictUserDetails(String username) {
+        SecurityProperties.UserDetailsCache config = securityProperties.userDetailsCache();
+        if (!config.enabled() || username == null || username.isBlank()) {
+            return;
+        }
+        try {
+            redisTemplate.delete(userDetailsKey(username));
+        } catch (RuntimeException ex) {
+            // 缓存清理失败不阻断账号资料更新。
+        }
+    }
+
     private String userDetailsKey(String username) {
         return USER_DETAILS_KEY_PREFIX + username;
     }

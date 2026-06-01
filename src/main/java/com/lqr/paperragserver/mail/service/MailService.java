@@ -8,4 +8,6 @@ import java.time.Duration;
 public interface MailService {
 
     void sendRegisterEmailCode(String to, String code, Duration ttl);
+
+    void sendChangeEmailCode(String to, String code, Duration ttl);
 }

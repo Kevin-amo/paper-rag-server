@@ -3,6 +3,7 @@ package com.lqr.paperragserver.auth.service.impl;
 import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.mapper.SysRoleMapper;
 import com.lqr.paperragserver.auth.mapper.SysUserMapper;
+import com.lqr.paperragserver.auth.security.DatabaseUserDetailsService;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.auth.service.AuthService;
 import com.lqr.paperragserver.auth.service.UserAvatarService;
@@ -42,6 +43,7 @@ public class UserAvatarServiceImpl implements UserAvatarService {
     private final ObjectStorageService objectStorageService;
     private final OssProperties ossProperties;
     private final Tika tika;
+    private final DatabaseUserDetailsService userDetailsService;
 
     @Override
     @Transactional
@@ -73,6 +75,7 @@ public class UserAvatarServiceImpl implements UserAvatarService {
         }
 
         userMapper.updateAvatar(user.getId(), objectKey);
+        userDetailsService.evictUserDetails(user.getUsername());
         deleteOldAvatarQuietly(oldObjectKey, objectKey);
 
         SysUser updated = userMapper.selectById(user.getId());

@@ -24,6 +24,7 @@ public class ResendMailService implements MailService {
 
     private static final String PROVIDER = "resend";
     private static final String REGISTER_EMAIL_CODE_SUBJECT = "PaperRAG 注册验证码";
+    private static final String CHANGE_EMAIL_CODE_SUBJECT = "PaperRAG 换绑邮箱验证码";
 
     private final RestClient.Builder restClientBuilder;
     private final ResendProperties properties;
@@ -35,6 +36,15 @@ public class ResendMailService implements MailService {
 
     @Override
     public void sendRegisterEmailCode(String to, String code, Duration ttl) {
+        sendEmailCode(to, registerEmailCodeRequest(to, code, ttl));
+    }
+
+    @Override
+    public void sendChangeEmailCode(String to, String code, Duration ttl) {
+        sendEmailCode(to, changeEmailCodeRequest(to, code, ttl));
+    }
+
+    private void sendEmailCode(String to, ResendEmailRequest request) {
         requireConfigured();
         long startNanos = System.nanoTime();
         try {
@@ -44,7 +54,7 @@ public class ResendMailService implements MailService {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.apiKey().trim())
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
-                    .body(registerEmailCodeRequest(to, code, ttl))
+                    .body(request)
                     .retrieve()
                     .toBodilessEntity();
             log.info("mail.send provider={} result=success email={} costMs={}", PROVIDER, to, elapsedMs(startNanos));
@@ -85,6 +95,33 @@ public class ResendMailService implements MailService {
                 properties.from(),
                 List.of(to),
                 REGISTER_EMAIL_CODE_SUBJECT,
+                html,
+                text
+        );
+    }
+
+    ResendEmailRequest changeEmailCodeRequest(String to, String code, Duration ttl) {
+        String ttlText = ttlText(ttl);
+        String html = """
+                <div style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;\">
+                  <p>您好，</p>
+                  <p>您正在为 PaperRAG 账号换绑邮箱，验证码为：</p>
+                  <p style=\"font-size: 28px; font-weight: 700; letter-spacing: 6px; color: #2563eb;\">%s</p>
+                  <p>验证码有效期为 %s，请在有效期内完成邮箱换绑。</p>
+                  <p>如果这不是您本人操作，请忽略这封邮件并尽快检查账号安全。</p>
+                </div>
+                """.formatted(code, ttlText);
+        String text = """
+                您好，
+
+                您正在为 PaperRAG 账号换绑邮箱，验证码为：%s
+                验证码有效期为 %s，请在有效期内完成邮箱换绑。
+                如果这不是您本人操作，请忽略这封邮件并尽快检查账号安全。
+                """.formatted(code, ttlText);
+        return new ResendEmailRequest(
+                properties.from(),
+                List.of(to),
+                CHANGE_EMAIL_CODE_SUBJECT,
                 html,
                 text
         );
