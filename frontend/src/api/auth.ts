@@ -1,5 +1,15 @@
 import { http, uploadHttp } from './http';
-import type { AuthUser, LoginPayload, LoginResponse, RegisterEmailCodePayload, RegisterPayload } from '../types';
+import type {
+  AuthUser,
+  ChangeDisplayNamePayload,
+  ChangeEmailCodePayload,
+  ChangeEmailPayload,
+  ChangePasswordPayload,
+  LoginPayload,
+  LoginResponse,
+  RegisterEmailCodePayload,
+  RegisterPayload,
+} from '../types';
 
 export async function login(payload: LoginPayload) {
   const { data } = await http.post<LoginResponse>('/auth/login', payload);
@@ -29,6 +39,25 @@ export async function uploadAvatar(file: File) {
       'Content-Type': 'multipart/form-data',
     },
   });
+  return data;
+}
+
+export async function changePassword(payload: ChangePasswordPayload) {
+  const { data } = await http.post<AuthUser>('/auth/me/password', payload);
+  return data;
+}
+
+export async function changeDisplayName(payload: ChangeDisplayNamePayload) {
+  const { data } = await http.post<AuthUser>('/auth/me/display-name', payload);
+  return data;
+}
+
+export async function requestChangeEmailCode(payload: ChangeEmailCodePayload) {
+  await http.post('/auth/me/email-code', payload);
+}
+
+export async function changeEmail(payload: ChangeEmailPayload) {
+  const { data } = await http.post<AuthUser>('/auth/me/email', payload);
   return data;
 }
 

@@ -7,9 +7,10 @@ import RagChatWorkspace from '../components/chat/RagChatWorkspace.vue';
 import DocumentLibraryDrawer from '../components/documents/DocumentLibraryDrawer.vue';
 import UploadDocumentDialog from '../components/documents/UploadDocumentDialog.vue';
 import DocumentDetailDrawer from '../components/documents/DocumentDetailDrawer.vue';
-import AvatarUploadDialog from '../components/user/AvatarUploadDialog.vue';
+import AccountManagementDialog from '../components/user/AccountManagementDialog.vue';
 import { getErrorMessage } from '../api/http';
 import { useAuth } from '../composables/useAuth';
+import { clearAuthSession } from '../composables/authState';
 import { useDocuments } from '../composables/useDocuments';
 import { useConversations } from '../composables/useConversations';
 import { useAgentChat } from '../composables/useAgentChat';
@@ -21,8 +22,12 @@ const documentsState = useDocuments();
 const conversationsState = useConversations();
 const documentLibraryVisible = ref(false);
 const uploadVisible = ref(false);
-const avatarUploadVisible = ref(false);
+const accountManagementVisible = ref(false);
 const avatarUploading = ref(false);
+const displayNameChanging = ref(false);
+const passwordChanging = ref(false);
+const emailCodeSending = ref(false);
+const emailChanging = ref(false);
 const avatarRefreshVersion = ref(0);
 
 const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '当前用户');
@@ -90,12 +95,61 @@ async function handleAvatarUpload(file: File) {
   try {
     await auth.uploadAvatar(file);
     avatarRefreshVersion.value = Date.now();
-    avatarUploadVisible.value = false;
     ElMessage.success('头像已更新');
   } catch (error) {
     ElMessage.error(getErrorMessage(error));
   } finally {
     avatarUploading.value = false;
+  }
+}
+
+async function handleChangeDisplayName(displayName: string) {
+  displayNameChanging.value = true;
+  try {
+    await auth.changeDisplayName(displayName);
+    ElMessage.success('昵称已更新');
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error));
+  } finally {
+    displayNameChanging.value = false;
+  }
+}
+
+async function handleChangePassword(payload: { currentPassword: string; newPassword: string }) {
+  passwordChanging.value = true;
+  try {
+    await auth.changePassword(payload.currentPassword, payload.newPassword);
+    clearAuthSession();
+    await router.replace('/login');
+    ElMessage.success('密码已更新，请重新登录');
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error));
+  } finally {
+    passwordChanging.value = false;
+  }
+}
+
+async function handleRequestEmailCode(email: string) {
+  emailCodeSending.value = true;
+  try {
+    await auth.requestChangeEmailCode(email);
+    ElMessage.success('验证码已发送');
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error));
+  } finally {
+    emailCodeSending.value = false;
+  }
+}
+
+async function handleChangeEmail(payload: { email: string; emailCode: string }) {
+  emailChanging.value = true;
+  try {
+    await auth.changeEmail(payload.email, payload.emailCode);
+    ElMessage.success('邮箱已换绑');
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error));
+  } finally {
+    emailChanging.value = false;
   }
 }
 
@@ -141,7 +195,7 @@ onMounted(async () => {
       @rename-conversation="conversationsState.renameConversation"
       @open-documents="documentLibraryVisible = true"
       @go-admin="router.push('/admin')"
-      @open-avatar-upload="avatarUploadVisible = true"
+      @open-account-management="accountManagementVisible = true"
       @logout="handleLogout"
     />
 
@@ -182,11 +236,20 @@ onMounted(async () => {
       @submit="handleUpload"
     />
 
-    <AvatarUploadDialog
-      v-model="avatarUploadVisible"
-      :loading="avatarUploading"
-      :current-avatar-url="currentUserAvatarUrl"
-      @submit="handleAvatarUpload"
+    <AccountManagementDialog
+      v-model="accountManagementVisible"
+      :user="auth.state.user"
+      :avatar-url="currentUserAvatarUrl"
+      :avatar-loading="avatarUploading"
+      :display-name-loading="displayNameChanging"
+      :password-loading="passwordChanging"
+      :email-code-loading="emailCodeSending"
+      :email-loading="emailChanging"
+      @upload-avatar="handleAvatarUpload"
+      @change-display-name="handleChangeDisplayName"
+      @change-password="handleChangePassword"
+      @request-email-code="handleRequestEmailCode"
+      @change-email="handleChangeEmail"
     />
 
     <DocumentDetailDrawer

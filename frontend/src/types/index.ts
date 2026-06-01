@@ -266,6 +266,24 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ChangeDisplayNamePayload {
+  displayName: string;
+}
+
+export interface ChangeEmailCodePayload {
+  email: string;
+}
+
+export interface ChangeEmailPayload {
+  email: string;
+  emailCode: string;
+}
+
 export interface RegisterEmailCodePayload {
   email: string;
 }

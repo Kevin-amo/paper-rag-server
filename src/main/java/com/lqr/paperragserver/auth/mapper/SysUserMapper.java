@@ -36,4 +36,25 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             where id = #{id}
             """)
     int updateAvatar(@Param("id") UUID id, @Param("avatarObjectKey") String avatarObjectKey);
+
+    @Update("""
+            update public.sys_user
+            set password_hash = #{passwordHash}, updated_at = now()
+            where id = #{id}
+            """)
+    int updatePassword(@Param("id") UUID id, @Param("passwordHash") String passwordHash);
+
+    @Update("""
+            update public.sys_user
+            set display_name = #{displayName}, updated_at = now()
+            where id = #{id}
+            """)
+    int updateDisplayName(@Param("id") UUID id, @Param("displayName") String displayName);
+
+    @Update("""
+            update public.sys_user
+            set email = #{email}, updated_at = now()
+            where id = #{id}
+            """)
+    int updateEmail(@Param("id") UUID id, @Param("email") String email);
 }

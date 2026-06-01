@@ -148,6 +148,54 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
+    @Override
+    @Transactional
+    public CurrentUser changePassword(SecurityUserPrincipal principal, String currentPassword, String newPassword) {
+        SysUser user = requireUser(principal.getId());
+        String normalizedCurrentPassword = requireText(currentPassword, "当前密码不能为空");
+        String normalizedNewPassword = requireText(newPassword, "新密码不能为空");
+        if (!passwordEncoder.matches(normalizedCurrentPassword, user.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "当前密码不正确");
+        }
+        if (passwordEncoder.matches(normalizedNewPassword, user.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "新密码不能与当前密码相同");
+        }
+        userMapper.updatePassword(user.getId(), passwordEncoder.encode(normalizedNewPassword));
+        userDetailsService.evictUserDetails(user.getUsername());
+        return toCurrentUser(userMapper.selectById(user.getId()));
+    }
+
+    @Override
+    @Transactional
+    public CurrentUser changeDisplayName(SecurityUserPrincipal principal, String displayName) {
+        SysUser user = requireUser(principal.getId());
+        String normalizedDisplayName = requireText(displayName, "昵称不能为空");
+        userMapper.updateDisplayName(user.getId(), normalizedDisplayName);
+        userDetailsService.evictUserDetails(user.getUsername());
+        return toCurrentUser(userMapper.selectById(user.getId()));
+    }
+
+    @Override
+    public void createChangeEmailCode(SecurityUserPrincipal principal, String email, String clientIp) {
+        SysUser user = requireUser(principal.getId());
+        String normalizedEmail = normalizeEmail(email);
+        ensureEmailAvailable(user, normalizedEmail);
+        verificationCodeService.createChangeEmailCode(normalizedEmail, clientIp);
+    }
+
+    @Override
+    @Transactional
+    public CurrentUser changeEmail(SecurityUserPrincipal principal, String email, String emailCode) {
+        SysUser user = requireUser(principal.getId());
+        String normalizedEmail = normalizeEmail(email);
+        ensureEmailAvailable(user, normalizedEmail);
+        verificationCodeService.requireChangeEmailCodeMatches(normalizedEmail, requireText(emailCode, "验证码不能为空"));
+        userMapper.updateEmail(user.getId(), normalizedEmail);
+        verificationCodeService.deleteChangeEmailCode(normalizedEmail);
+        userDetailsService.evictUserDetails(user.getUsername());
+        return toCurrentUser(userMapper.selectById(user.getId()));
+    }
+
     private LoginResult createLoginResult(SecurityUserPrincipal principal) {
         return new LoginResult(
                 jwtTokenService.createAccessToken(principal),
@@ -155,6 +203,37 @@ public class AuthServiceImpl implements AuthService {
                 jwtTokenService.accessTokenExpiresInSeconds(),
                 currentUser(principal)
         );
+    }
+
+    private CurrentUser toCurrentUser(SysUser user) {
+        List<String> roles = roleMapper.selectRoleCodesByUserId(user.getId());
+        return new CurrentUser(
+                user.getId().toString(),
+                user.getUsername(),
+                user.getDisplayName(),
+                user.getEmail(),
+                objectStorageService.publicUrl(user.getAvatarObjectKey()),
+                roles
+        );
+    }
+
+    private SysUser requireUser(UUID id) {
+        SysUser user = userMapper.selectById(id);
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在");
+        }
+        return user;
+    }
+
+    private void ensureEmailAvailable(SysUser currentUser, String normalizedEmail) {
+        if (currentUser.getEmail() != null
+                && normalizedEmail.equals(currentUser.getEmail().trim().toLowerCase(Locale.ROOT))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "新邮箱不能与当前邮箱相同");
+        }
+        SysUser existing = userMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getEmail, normalizedEmail));
+        if (existing != null && !existing.getId().equals(currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "邮箱已被注册");
+        }
     }
 
     private String requireText(String value, String message) {
