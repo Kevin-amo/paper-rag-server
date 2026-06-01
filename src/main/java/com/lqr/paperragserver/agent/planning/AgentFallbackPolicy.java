@@ -18,6 +18,15 @@ public class AgentFallbackPolicy {
 
     private final LiteratureFollowUpPolicy literatureFollowUpPolicy;
 
+    /**
+     * 在模型不可用或决策失败时，根据问题类型选择可执行的兜底动作。
+     *
+     * @param question              用户当前问题
+     * @param observations          当前已有观察结果
+     * @param lastLiteratureContext 最近一次文献搜索上下文
+     * @param topK                  本地检索片段数量配置
+     * @return 兜底智能体决策
+     */
     public AgentDecision decision(String question,
                                   List<String> observations,
                                   LiteratureSearchContext lastLiteratureContext,
@@ -37,6 +46,12 @@ public class AgentFallbackPolicy {
         return new AgentDecision("这是本地论文分析类目标，我会先检索知识库。", AgentActionType.LOCAL_PAPER_RETRIEVAL, input, false, null);
     }
 
+    /**
+     * 在最终回答模型不可用时，将工具观察结果整理为可展示的兜底回答。
+     *
+     * @param observations 工具观察结果
+     * @return 兜底回答文本
+     */
     public String answerFromObservations(List<String> observations) {
         if (observations == null || observations.isEmpty()) {
             return "当前模型暂不可用，且还没有可用于回答的检索结果。请稍后重试，或先补充更具体的检索目标。";
@@ -48,6 +63,12 @@ public class AgentFallbackPolicy {
         return "已完成检索。当前模型暂不可用，先返回工具检索到的原始结果：\n\n" + LogSanitizer.safeExcerpt(evidence, 6000);
     }
 
+    /**
+     * 粗略判断用户问题是否更适合走外部文献搜索。
+     *
+     * @param question 用户当前问题
+     * @return 是否像文献搜索请求
+     */
     private boolean looksLikeLiteratureSearch(String question) {
         if (question == null) {
             return false;

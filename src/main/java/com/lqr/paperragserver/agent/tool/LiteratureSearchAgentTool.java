@@ -154,6 +154,12 @@ public class LiteratureSearchAgentTool implements AgentTool {
         }
     }
 
+    /**
+     * 将输入值转换为字符串列表，并过滤空白项和重复项。
+     *
+     * @param value 输入值
+     * @return 字符串列表
+     */
     private List<String> stringList(Object value) {
         if (!(value instanceof List<?> values) || values.isEmpty()) {
             return List.of();

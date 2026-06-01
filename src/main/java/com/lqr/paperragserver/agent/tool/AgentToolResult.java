@@ -11,6 +11,9 @@ public record AgentToolResult(
         List<AnswerCitation> citations,
         Map<String, Object> metadata
 ) {
+    /**
+     * 规范化工具执行结果，确保文本和集合字段都有安全默认值。
+     */
     public AgentToolResult {
         citations = citations == null ? List.of() : citations;
         metadata = metadata == null ? Map.of() : metadata;

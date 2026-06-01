@@ -28,6 +28,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AgentPlannerTest {
 
+    /**
+     * 验证显式文献数量和最新排序意图会覆盖模型原始参数。
+     */
     @Test
     void decideShouldPreferExplicitLiteratureLimitAndDateSort() {
         AgentPlanner planner = planner(
@@ -42,6 +45,9 @@ class AgentPlannerTest {
         assertThat(decision.actionInput()).containsEntry("sortBy", "date");
     }
 
+    /**
+     * 验证外部文献搜索动作不会携带本地检索 topK 参数。
+     */
     @Test
     void decideShouldNotApplyTopKToLiteratureSearch() {
         AgentPlanner planner = planner(
@@ -55,6 +61,9 @@ class AgentPlannerTest {
         assertThat(decision.actionInput()).containsEntry("limit", 5);
     }
 
+    /**
+     * 验证 topK 只会应用到本地论文检索动作。
+     */
     @Test
     void decideShouldApplyTopKOnlyToLocalPaperRetrieval() {
         AgentPlanner planner = planner(
@@ -67,6 +76,9 @@ class AgentPlannerTest {
         assertThat(decision.actionInput()).containsEntry("topK", 3);
     }
 
+    /**
+     * 验证请求参数中的 topK 会覆盖模型输出里的本地检索 topK。
+     */
     @Test
     void decideShouldPreferRequestTopKOverModelLocalTopK() {
         AgentPlanner planner = planner(
@@ -79,6 +91,9 @@ class AgentPlannerTest {
         assertThat(decision.actionInput()).containsEntry("topK", 10);
     }
 
+    /**
+     * 验证规划模型失败时，文献搜索兜底决策不会携带 topK。
+     */
     @Test
     void fallbackLiteratureSearchShouldNotCarryTopK() {
         AgentPlanner planner = planner(
@@ -94,6 +109,9 @@ class AgentPlannerTest {
         assertThat(decision.actionInput()).containsEntry("limit", 5);
     }
 
+    /**
+     * 验证规划模型失败时，本地检索兜底决策会携带 topK。
+     */
     @Test
     void fallbackLocalRetrievalShouldCarryTopK() {
         AgentPlanner planner = planner(
@@ -108,6 +126,9 @@ class AgentPlannerTest {
         assertThat(decision.actionInput()).containsEntry("topK", 3);
     }
 
+    /**
+     * 验证已有工具观察且模型失败时，会直接生成结束决策。
+     */
     @Test
     void decideShouldFinishWithExistingObservationsWhenModelFails() {
         AgentPlanner planner = planner(
@@ -123,6 +144,9 @@ class AgentPlannerTest {
         assertThat(decision.answer()).contains("MCP paper");
     }
 
+    /**
+     * 验证最终回答模型失败时，会回退到工具观察内容。
+     */
     @Test
     void finalAnswerShouldFallbackToObservationsWhenModelFails() {
         AgentPlanner planner = planner(
@@ -136,15 +160,30 @@ class AgentPlannerTest {
         assertThat(answer).contains("MCP paper");
     }
 
+    /**
+     * 验证流式最终回答会透传模型输出的增量文本。
+     */
     @Test
     void finalAnswerStreamShouldReturnModelDeltas() {
         AgentPlanner planner = planner(
                 new StubLlmService() {
+                    /**
+                     * 返回同步模型固定输出。
+                     *
+                     * @param prompt 提示词
+                     * @return 模型输出文本
+                     */
                     @Override
                     public String generate(PromptConstructionService.Prompt prompt) {
                         return "sync answer";
                     }
 
+                    /**
+                     * 返回测试指定的流式模型增量。
+                     *
+                     * @param prompt 提示词
+                     * @return 模型输出增量流
+                     */
                     @Override
                     public Flux<String> streamGenerate(PromptConstructionService.Prompt prompt) {
                         return Flux.just("hello ", "world");
@@ -159,6 +198,9 @@ class AgentPlannerTest {
         assertThat(deltas).containsExactly("hello ", "world");
     }
 
+    /**
+     * 验证年份追问会继承上一轮文献搜索 query，并补齐年份过滤条件。
+     */
     @Test
     void decideShouldInheritLiteratureQueryForYearFollowUp() {
         AgentPlanner planner = planner(
@@ -175,6 +217,9 @@ class AgentPlannerTest {
         assertThat(decision.actionInput()).containsEntry("dateTo", "2026-12-31");
     }
 
+    /**
+     * 验证“最新的”这类追问会继承上一轮文献搜索 query 并切换为日期排序。
+     */
     @Test
     void decideShouldInheritLiteratureQueryForLatestFollowUp() {
         AgentPlanner planner = planner(
@@ -187,6 +232,9 @@ class AgentPlannerTest {
         assertThat(decision.actionInput()).containsEntry("sortBy", "date");
     }
 
+    /**
+     * 验证“再找几篇”这类追问会继承 query 并覆盖结果数量。
+     */
     @Test
     void decideShouldInheritLiteratureQueryAndOverrideLimitForMoreResults() {
         AgentPlanner planner = planner(
@@ -199,6 +247,9 @@ class AgentPlannerTest {
         assertThat(decision.actionInput()).containsEntry("limit", 3);
     }
 
+    /**
+     * 验证上一轮文献结果已经满足年份筛选时，会直接结束而不再调用模型。
+     */
     @Test
     void decideShouldFinishWhenPreviousLiteratureItemsMatchYearFilter() {
         AgentPlanner planner = planner(
@@ -216,6 +267,12 @@ class AgentPlannerTest {
         assertThat(decision.answer()).contains("RAG 2026").doesNotContain("RAG 2025");
     }
 
+    /**
+     * 构造带固定模型服务的规划器测试对象。
+     *
+     * @param llmService 测试用模型服务
+     * @return 规划器实例
+     */
     private AgentPlanner planner(StubLlmService llmService) {
         LiteratureSearchIntentParser intentParser = new LiteratureSearchIntentParser();
         LiteratureContextPolicy contextPolicy = new LiteratureContextPolicy(intentParser);
@@ -228,6 +285,14 @@ class AgentPlannerTest {
         );
     }
 
+    /**
+     * 构造最近一次文献搜索上下文。
+     *
+     * @param query 搜索 query
+     * @param limit 结果数量上限
+     * @param items 文献结果列表
+     * @return 文献搜索上下文
+     */
     private LiteratureSearchContext literatureContext(String query, int limit, List<LiteratureSearchResult> items) {
         return new LiteratureSearchContext(
                 query,
@@ -243,6 +308,14 @@ class AgentPlannerTest {
         );
     }
 
+    /**
+     * 构造测试用文献搜索结果。
+     *
+     * @param title         文献标题
+     * @param year          发布年份
+     * @param publishedDate 发布日期
+     * @return 文献搜索结果
+     */
     private LiteratureSearchResult literatureResult(String title, int year, String publishedDate) {
         return new LiteratureSearchResult(
                 title,
@@ -265,19 +338,43 @@ class AgentPlannerTest {
      * 测试用 LLM 服务契约，用于以固定输出替代真实模型调用。
      */
     private interface StubLlmService extends LlmService {
+        /**
+         * 返回同步模型固定输出。
+         *
+         * @param prompt 提示词
+         * @return 模型输出文本
+         */
         @Override
         String generate(PromptConstructionService.Prompt prompt);
 
+        /**
+         * 返回空的流式模型输出，测试需要时可由匿名类覆盖。
+         *
+         * @param prompt 提示词
+         * @return 空增量流
+         */
         @Override
         default Flux<String> streamGenerate(PromptConstructionService.Prompt prompt) {
             return Flux.empty();
         }
 
+        /**
+         * 复用同步模型固定输出作为带工具模型输出。
+         *
+         * @param prompt 提示词
+         * @return 模型输出文本
+         */
         @Override
         default String generateWithTools(PromptConstructionService.Prompt prompt) {
             return generate(prompt);
         }
 
+        /**
+         * 返回空的带工具流式模型输出。
+         *
+         * @param prompt 提示词
+         * @return 空增量流
+         */
         @Override
         default Flux<String> streamGenerateWithTools(PromptConstructionService.Prompt prompt) {
             return Flux.empty();

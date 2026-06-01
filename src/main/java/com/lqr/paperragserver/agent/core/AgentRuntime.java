@@ -31,6 +31,18 @@ public class AgentRuntime {
     private final AgentToolRegistry toolRegistry;
     private final CitationNormalizer citationNormalizer;
 
+    /**
+     * 执行完整 ReAct 循环，按规划决策调用工具并累计步骤、观察、引用和元数据。
+     *
+     * @param ownerUserId           当前用户标识
+     * @param conversationId        当前会话标识
+     * @param question              用户当前问题
+     * @param topK                  本地检索片段数量配置
+     * @param history               最近会话历史
+     * @param lastLiteratureContext 最近一次文献搜索上下文
+     * @param sink                  运行时事件消费者
+     * @return 智能体运行结果
+     */
     public AgentRuntimeResult run(UUID ownerUserId,
                                   UUID conversationId,
                                   String question,
@@ -108,10 +120,28 @@ public class AgentRuntime {
         return result(null, citations, topK, metadata, steps, observations);
     }
 
+    /**
+     * 合并标准执行轨迹元数据和工具返回的额外元数据。
+     *
+     * @param steps         已执行步骤
+     * @param extraMetadata 工具返回的额外元数据
+     * @return 智能体结果元数据
+     */
     private Map<String, Object> metadata(List<AgentStep> steps, Map<String, Object> extraMetadata) {
         return new LinkedHashMap<>(AgentStep.metadata(steps, extraMetadata));
     }
 
+    /**
+     * 创建运行结果，并在返回前完成引用归一化。
+     *
+     * @param draftAnswer  回答草稿
+     * @param citations    原始引用列表
+     * @param topK         本地检索片段数量配置
+     * @param metadata     结果元数据
+     * @param steps        已执行步骤
+     * @param observations 工具观察结果
+     * @return 智能体运行结果
+     */
     private AgentRuntimeResult result(String draftAnswer,
                                       List<AnswerCitation> citations,
                                       Integer topK,
@@ -121,6 +151,14 @@ public class AgentRuntime {
         return new AgentRuntimeResult(draftAnswer, citationNormalizer.normalize(citations, topK), metadata, steps, observations);
     }
 
+    /**
+     * 调用指定工具，并在工具异常时转换为可被后续流程消费的失败结果。
+     *
+     * @param ownerUserId 当前用户标识
+     * @param tool        待调用工具
+     * @param actionInput 工具输入参数
+     * @return 工具执行结果
+     */
     private AgentToolResult executeTool(UUID ownerUserId, AgentTool tool, Map<String, Object> actionInput) {
         try {
             return tool.execute(ownerUserId, actionInput);
@@ -137,10 +175,22 @@ public class AgentRuntime {
         }
     }
 
+    /**
+     * 判断工具结果元数据是否标记为暂不可用。
+     *
+     * @param metadata 工具结果元数据
+     * @return 是否暂不可用
+     */
     private boolean isToolUnavailable(Map<String, Object> metadata) {
         return metadata != null && Boolean.TRUE.equals(metadata.get("toolUnavailable"));
     }
 
+    /**
+     * 提取可直接展示给用户的工具异常信息。
+     *
+     * @param ex 工具执行异常
+     * @return 用户可读错误信息
+     */
     private String userSafeMessage(RuntimeException ex) {
         if (ex == null || ex.getMessage() == null || ex.getMessage().isBlank()) {
             return "服务暂不可用，请稍后重试";
@@ -148,6 +198,14 @@ public class AgentRuntime {
         return ex.getMessage().trim();
     }
 
+    /**
+     * 判断当前动作是否与历史步骤重复，避免工具调用在同一输入上循环。
+     *
+     * @param steps       已执行步骤
+     * @param action      当前工具动作
+     * @param actionInput 当前工具输入
+     * @return 是否重复调用
+     */
     private boolean hasRepeatedAction(List<AgentStep> steps, String action, Map<String, Object> actionInput) {
         if (steps == null || steps.isEmpty()) {
             return false;
@@ -159,6 +217,12 @@ public class AgentRuntime {
         return steps.stream().anyMatch(step -> action.equals(step.action()) && step.actionInput().equals(actionInput));
     }
 
+    /**
+     * 将工具元数据合并到本轮累计元数据中。
+     *
+     * @param target 累计元数据
+     * @param source 工具返回元数据
+     */
     private void mergeMetadata(Map<String, Object> target, Map<String, Object> source) {
         if (source == null || source.isEmpty()) {
             return;
@@ -166,22 +230,52 @@ public class AgentRuntime {
         target.putAll(source);
     }
 
+    /**
+     * 计算文本长度，空文本引用按 0 处理。
+     *
+     * @param text 待统计文本
+     * @return 文本长度
+     */
     private int textLength(String text) {
         return text == null ? 0 : text.length();
     }
 
+    /**
+     * 计算列表大小，空列表引用按 0 处理。
+     *
+     * @param items 待统计列表
+     * @return 列表大小
+     */
     private int size(List<?> items) {
         return items == null ? 0 : items.size();
     }
 
+    /**
+     * 提取元数据键集合，用于结构化日志输出。
+     *
+     * @param metadata 元数据
+     * @return 排序后的元数据键集合
+     */
     private java.util.Set<String> metadataKeys(Map<String, Object> metadata) {
         return metadata == null ? java.util.Set.of() : new java.util.TreeSet<>(metadata.keySet());
     }
 
+    /**
+     * 将纳秒起点换算为毫秒耗时，用于日志记录。
+     *
+     * @param startNanos 起始纳秒时间
+     * @return 已经过的毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
+    /**
+     * 根据动作类型生成稳定的可展示思考摘要，避免暴露模型隐私思维链。
+     *
+     * @param action 智能体动作类型
+     * @return 可展示思考摘要
+     */
     private String deterministicThoughtSummary(AgentActionType action) {
         return switch (action) {
             case LITERATURE_SEARCH -> "用户需要搜索外部文献，我将调用外部文献搜索。";
@@ -197,6 +291,9 @@ public class AgentRuntime {
             List<AgentStep> steps,
             List<String> observations
     ) {
+        /**
+         * 规范化智能体运行结果，确保集合字段对下游只读且非空。
+         */
         public AgentRuntimeResult {
             citations = citations == null ? List.of() : List.copyOf(citations);
             metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
@@ -213,22 +310,54 @@ public class AgentRuntime {
             Map<String, Object> actionInput,
             String observationSummary
     ) {
+        /**
+         * 规范化运行时事件输入参数，避免事件消费者收到空 Map。
+         */
         public AgentRuntimeEvent {
             actionInput = actionInput == null ? Map.of() : actionInput;
         }
 
+        /**
+         * 创建步骤开始事件。
+         *
+         * @param step 步骤序号
+         * @return 步骤开始事件
+         */
         static AgentRuntimeEvent step(int step) {
             return new AgentRuntimeEvent(Type.STEP, step, null, null, Map.of(), null);
         }
 
+        /**
+         * 创建思考摘要事件。
+         *
+         * @param step           步骤序号
+         * @param thoughtSummary 可展示思考摘要
+         * @return 思考摘要事件
+         */
         static AgentRuntimeEvent thought(int step, String thoughtSummary) {
             return new AgentRuntimeEvent(Type.THOUGHT, step, thoughtSummary, null, Map.of(), null);
         }
 
+        /**
+         * 创建工具调用事件。
+         *
+         * @param step        步骤序号
+         * @param toolName    工具名称
+         * @param actionInput 工具输入参数
+         * @return 工具调用事件
+         */
         static AgentRuntimeEvent toolCall(int step, String toolName, Map<String, Object> actionInput) {
             return new AgentRuntimeEvent(Type.TOOL_CALL, step, null, toolName, actionInput, null);
         }
 
+        /**
+         * 创建工具结果事件。
+         *
+         * @param step               步骤序号
+         * @param toolName           工具名称
+         * @param observationSummary 工具观察摘要
+         * @return 工具结果事件
+         */
         static AgentRuntimeEvent toolResult(int step, String toolName, String observationSummary) {
             return new AgentRuntimeEvent(Type.TOOL_RESULT, step, null, toolName, Map.of(), observationSummary);
         }
