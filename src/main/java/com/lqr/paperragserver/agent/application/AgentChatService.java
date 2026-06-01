@@ -28,6 +28,13 @@ public class AgentChatService {
     private final AgentPlanner planner;
     private final LiteratureSearchContextResolver literatureSearchContextResolver;
 
+    /**
+     * 以流式事件形式执行一次智能体问答，并负责会话创建、消息持久化和最终回答落库。
+     *
+     * @param ownerUserId 当前用户标识
+     * @param request     智能体问答请求
+     * @return 智能体流式事件
+     */
     public Flux<AgentStreamEvent> streamAnswer(UUID ownerUserId, AgentAskRequest request) {
         return Flux.<AgentStreamEvent>create(sink -> {
             UUID activeConversationId = request.conversationId();
@@ -79,6 +86,14 @@ public class AgentChatService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 获取本轮问答使用的会话；未传会话时创建新会话。
+     *
+     * @param ownerUserId    当前用户标识
+     * @param conversationId 请求中的会话标识
+     * @param question       用户当前问题
+     * @return 本轮问答绑定的会话
+     */
     private ConversationService.ConversationView resolveConversation(UUID ownerUserId, UUID conversationId, String question) {
         if (conversationId == null) {
             return conversationService.createConversation(ownerUserId, question);
@@ -86,6 +101,16 @@ public class AgentChatService {
         return conversationService.requireConversation(ownerUserId, conversationId);
     }
 
+    /**
+     * 流式生成最终回答，模型无输出时回退到工具观察结果。
+     *
+     * @param conversationId 当前会话标识
+     * @param question       用户当前问题
+     * @param history        最近会话历史
+     * @param result         智能体执行结果
+     * @param sink           事件消费者
+     * @return 完整最终回答文本
+     */
     private String streamFinalAnswer(UUID conversationId,
                                      String question,
                                      List<ConversationService.MessageView> history,
@@ -118,6 +143,14 @@ public class AgentChatService {
         return answerBuffer.toString();
     }
 
+    /**
+     * 发送回答增量事件，并同步写入完整回答缓冲区。
+     *
+     * @param conversationId 当前会话标识
+     * @param delta          回答增量文本
+     * @param answerBuffer   完整回答缓冲区
+     * @param sink           事件消费者
+     */
     private void emitAnswerDelta(UUID conversationId,
                                  String delta,
                                  StringBuilder answerBuffer,
@@ -129,6 +162,14 @@ public class AgentChatService {
         sink.accept(AgentStreamEvent.delta(conversationId, delta));
     }
 
+    /**
+     * 生成最终回答兜底文本，优先使用规划器回答，再使用执行结果中的草稿。
+     *
+     * @param question 用户当前问题
+     * @param history  最近会话历史
+     * @param result   智能体执行结果
+     * @return 兜底最终回答
+     */
     private String fallbackFinalAnswer(String question,
                                        List<ConversationService.MessageView> history,
                                        AgentLoop.AgentLoopResult result) {
@@ -142,14 +183,32 @@ public class AgentChatService {
         return answer;
     }
 
+    /**
+     * 将纳秒起点换算为毫秒耗时，用于日志记录。
+     *
+     * @param startNanos 起始纳秒时间
+     * @return 已经过的毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
+    /**
+     * 计算文本长度，空文本引用按 0 处理。
+     *
+     * @param text 待统计文本
+     * @return 文本长度
+     */
     private int textLength(String text) {
         return text == null ? 0 : text.length();
     }
 
+    /**
+     * 提取可直接展示给用户的错误信息。
+     *
+     * @param ex 运行时异常
+     * @return 用户可读错误信息
+     */
     private String userSafeMessage(RuntimeException ex) {
         if (ex == null || ex.getMessage() == null || ex.getMessage().isBlank()) {
             return "智能体执行失败";
