@@ -20,6 +20,9 @@ class LiteratureSearchAgentToolTest {
     private final LiteratureSearchService literatureSearchService = mock(LiteratureSearchService.class);
     private final LiteratureSearchAgentTool tool = new LiteratureSearchAgentTool(literatureSearchService);
 
+    /**
+     * 验证文献工具返回轻量证据文本，同时在元数据中保留完整摘要。
+     */
     @Test
     void executeShouldReturnLightweightEvidenceAndKeepFullAbstractInMetadata() {
         String fullAbstract = "This is a complete abstract that should remain available for the detail dialog.";
@@ -50,6 +53,9 @@ class LiteratureSearchAgentToolTest {
         assertThat(items.get(0).abstractText()).isEqualTo(fullAbstract);
     }
 
+    /**
+     * 验证主分类为空时，会使用分类列表中的第一个有效分类。
+     */
     @Test
     void executeShouldUseFirstCategoryWhenPrimaryCategoryIsBlank() {
         LiteratureSearchResult result = result(
@@ -66,6 +72,9 @@ class LiteratureSearchAgentToolTest {
         assertThat(output.evidenceText()).contains("分类：Machine Learning");
     }
 
+    /**
+     * 验证分类字段都为空时，证据文本使用未知分类兜底。
+     */
     @Test
     void executeShouldUseUnknownCategoryWhenCategoryFieldsAreEmpty() {
         LiteratureSearchResult result = result(
@@ -82,6 +91,9 @@ class LiteratureSearchAgentToolTest {
         assertThat(output.evidenceText()).contains("分类：分类未知");
     }
 
+    /**
+     * 验证日期、排序和分类参数会传给文献服务，并保留在元数据中。
+     */
     @Test
     void executeShouldPassDateToAndKeepParamsInMetadata() {
         LiteratureSearchResult result = result(
@@ -119,6 +131,16 @@ class LiteratureSearchAgentToolTest {
         assertThat((List<LiteratureSearchResult>) literature.get("items")).containsExactly(result);
     }
 
+    /**
+     * 构造测试用文献搜索结果。
+     *
+     * @param title           文献标题
+     * @param authors         作者列表
+     * @param abstractText    摘要文本
+     * @param categories      分类列表
+     * @param primaryCategory 主分类
+     * @return 文献搜索结果
+     */
     private LiteratureSearchResult result(
             String title,
             List<String> authors,

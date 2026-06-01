@@ -46,6 +46,7 @@ const emit = defineEmits<{
 
 const pinnedConversationIds = ref<string[]>(loadPinnedConversationIds());
 const deleteDialogVisible = ref(false);
+const logoutDialogVisible = ref(false);
 const operatingConversation = ref<Conversation | null>(null);
 const editingConversationId = ref<string | null>(null);
 const renameTitle = ref('');
@@ -171,6 +172,11 @@ function closeOperationDialog() {
   operatingConversation.value = null;
 }
 
+function confirmLogout() {
+  logoutDialogVisible.value = false;
+  emit('logout');
+}
+
 function conversationTitle(conversation: Conversation) {
   return conversation.title?.trim() || '新的论文问答';
 }
@@ -281,8 +287,26 @@ function conversationTitle(conversation: Conversation) {
       <div class="user-meta">
         <strong>{{ props.currentUserName }}</strong>
       </div>
-      <el-button circle text :icon="SwitchButton" title="退出登录" @click="emit('logout')" />
+      <el-button circle text :icon="SwitchButton" title="退出登录" @click="logoutDialogVisible = true" />
     </footer>
+
+    <el-dialog
+      v-model="logoutDialogVisible"
+      title="退出登录"
+      width="400px"
+      class="conversation-dialog logout-dialog"
+      append-to-body
+      align-center
+    >
+      <div class="conversation-dialog-body logout-dialog-body">
+        <strong>确认退出当前账号吗？</strong>
+        <span class="dialog-caption">退出后需要重新登录，才能继续使用论文助手。</span>
+      </div>
+      <template #footer>
+        <el-button @click="logoutDialogVisible = false">取消</el-button>
+        <el-button class="logout-confirm-button" type="danger" @click="confirmLogout">确认退出</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog
       v-model="deleteDialogVisible"
@@ -617,12 +641,15 @@ function conversationTitle(conversation: Conversation) {
   border-radius: 12px;
 }
 
-:global(.danger-dialog .delete-confirm-button) {
+:global(.danger-dialog .delete-confirm-button),
+:global(.logout-dialog .logout-confirm-button) {
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
 :global(.danger-dialog .delete-confirm-button:hover),
-:global(.danger-dialog .delete-confirm-button:focus) {
+:global(.danger-dialog .delete-confirm-button:focus),
+:global(.logout-dialog .logout-confirm-button:hover),
+:global(.logout-dialog .logout-confirm-button:focus) {
   background: var(--el-color-danger);
   border-color: var(--el-color-danger);
   color: #ffffff;

@@ -37,6 +37,9 @@ class AgentLoopTest {
     private final UUID ownerUserId = UUID.randomUUID();
     private final UUID conversationId = UUID.randomUUID();
 
+    /**
+     * 验证智能体循环会调用工具、累计观察结果并返回结束型草稿回答。
+     */
     @Test
     void runShouldExecuteToolAndReturnFinalAnswer() {
         AgentPlanner planner = mock(AgentPlanner.class);
@@ -71,6 +74,9 @@ class AgentLoopTest {
         verify(planner, never()).finalAnswer(eq("问题"), anyList(), anyList(), anyList());
     }
 
+    /**
+     * 验证单次本地检索产生的引用会按 topK 限制数量并按分数排序。
+     */
     @Test
     void runShouldLimitSingleLocalRetrievalCitationsByTopK() {
         AgentPlanner planner = mock(AgentPlanner.class);
@@ -100,6 +106,9 @@ class AgentLoopTest {
         assertThat(result.citations()).isSortedAccordingTo((left, right) -> Double.compare(right.rankScore(), left.rankScore()));
     }
 
+    /**
+     * 验证连续调用同一工具时会触发重复动作拦截，即使输入参数不同。
+     */
     @Test
     void runShouldStopConsecutiveSameToolWithDifferentInputs() {
         AgentPlanner planner = mock(AgentPlanner.class);
@@ -135,6 +144,9 @@ class AgentLoopTest {
         verify(tool, times(1)).execute(eq(ownerUserId), any());
     }
 
+    /**
+     * 验证重复引用会保留排序分数更高的一条。
+     */
     @Test
     void runShouldDeduplicateCitationsAndKeepHigherRankScore() {
         AgentPlanner planner = mock(AgentPlanner.class);
@@ -160,6 +172,9 @@ class AgentLoopTest {
         assertThat(result.citations()).containsExactly(higher);
     }
 
+    /**
+     * 验证外部文献搜索结果只进入元数据，不会生成本地论文引用。
+     */
     @Test
     void runShouldKeepLiteratureResultsInMetadataWithoutAddingCitations() {
         AgentPlanner planner = mock(AgentPlanner.class);
@@ -195,6 +210,9 @@ class AgentLoopTest {
         assertThat((List<?>) literature.get("items")).hasSize(12);
     }
 
+    /**
+     * 验证未传 topK 时会使用 RAG 默认引用数量上限。
+     */
     @Test
     void runShouldUseDefaultTopKWhenTopKIsNull() {
         AgentPlanner planner = mock(AgentPlanner.class);
@@ -221,6 +239,9 @@ class AgentLoopTest {
         assertThat(result.citations()).hasSize(3);
     }
 
+    /**
+     * 验证文献搜索动作的展示思考摘要会被替换为稳定文案。
+     */
     @Test
     void runShouldOverrideUnsupportedLiteratureThoughtSummary() {
         AgentPlanner planner = mock(AgentPlanner.class);
@@ -258,6 +279,9 @@ class AgentLoopTest {
         verify(tool).execute(eq(ownerUserId), any());
     }
 
+    /**
+     * 验证重复动作停止时会保留已得到的观察结果，并标记停止原因。
+     */
     @Test
     void runShouldStopRepeatedActionAndReturnFallbackAnswer() {
         AgentPlanner planner = mock(AgentPlanner.class);
@@ -288,6 +312,9 @@ class AgentLoopTest {
         verify(tool, times(1)).execute(eq(ownerUserId), any());
     }
 
+    /**
+     * 验证工具抛出暂不可用异常时会转成工具结果事件并停止循环。
+     */
     @Test
     void runShouldReturnAnswerWhenToolThrowsUnavailableError() {
         AgentPlanner planner = mock(AgentPlanner.class);
@@ -316,6 +343,14 @@ class AgentLoopTest {
         verify(tool, times(1)).execute(eq(ownerUserId), any());
     }
 
+    /**
+     * 构造按名称返回固定结果的测试工具。
+     *
+     * @param name        工具名称
+     * @param result      首次执行结果
+     * @param nextResults 后续执行结果
+     * @return 测试工具实例
+     */
     private AgentTool mockTool(String name, AgentToolResult result, AgentToolResult... nextResults) {
         AgentTool tool = mock(AgentTool.class);
         when(tool.name()).thenReturn(name);
@@ -324,6 +359,14 @@ class AgentLoopTest {
         return tool;
     }
 
+    /**
+     * 构造指定数量和分数基线的测试引用列表。
+     *
+     * @param prefix    引用标识前缀
+     * @param count     引用数量
+     * @param baseScore 分数基线
+     * @return 测试引用列表
+     */
     private List<AnswerCitation> citations(String prefix, int count, double baseScore) {
         List<AnswerCitation> citations = new ArrayList<>();
         for (int index = 0; index < count; index++) {
@@ -339,6 +382,12 @@ class AgentLoopTest {
         return citations;
     }
 
+    /**
+     * 构造指定数量的测试文献元数据条目。
+     *
+     * @param count 条目数量
+     * @return 测试文献条目列表
+     */
     private List<Map<String, Object>> literatureItems(int count) {
         List<Map<String, Object>> items = new ArrayList<>();
         for (int index = 0; index < count; index++) {
@@ -347,6 +396,11 @@ class AgentLoopTest {
         return items;
     }
 
+    /**
+     * 构造测试用 RAG 配置。
+     *
+     * @return RAG 配置
+     */
     private RagProperties ragProperties() {
         return new RagProperties(800, 120, 3, 0);
     }

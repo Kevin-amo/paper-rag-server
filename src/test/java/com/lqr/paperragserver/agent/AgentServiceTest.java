@@ -40,6 +40,9 @@ class AgentServiceTest {
     private final LiteratureSearchContextResolver literatureSearchContextResolver = mock(LiteratureSearchContextResolver.class);
     private final AgentChatService service = new AgentChatService(conversationService, agentLoop, planner, literatureSearchContextResolver);
 
+    /**
+     * 验证流式问答会输出实时事件、拼接最终回答并持久化助手消息。
+     */
     @Test
     void streamAnswerShouldEmitLiveDeltasAndPersistFinalAnswer() {
         List<ConversationService.MessageView> history = List.of();
@@ -90,6 +93,9 @@ class AgentServiceTest {
         verify(conversationService).appendAssistantMessage(ownerUserId, conversationId, "hello world", citations, metadata);
     }
 
+    /**
+     * 验证最终回答流已输出部分内容后失败时，会返回错误事件且不持久化助手消息。
+     */
     @Test
     void streamAnswerShouldEmitErrorWhenFinalStreamFailsAfterDelta() {
         List<ConversationService.MessageView> history = List.of();
@@ -113,6 +119,9 @@ class AgentServiceTest {
         verify(conversationService, never()).appendAssistantMessage(eq(ownerUserId), eq(conversationId), any(), any(), any());
     }
 
+    /**
+     * 验证纯外部文献搜索结果仍会进入最终回答生成流程。
+     */
     @Test
     void streamAnswerShouldUseFinalGenerationForPureLiteratureSearch() {
         List<ConversationService.MessageView> history = List.of();
@@ -151,6 +160,11 @@ class AgentServiceTest {
         verify(conversationService).appendAssistantMessage(ownerUserId, conversationId, "LLM 输出的轻量文献列表", List.of(), metadata);
     }
 
+    /**
+     * 构造会话服务的基础桩数据，模拟新会话创建和历史消息读取。
+     *
+     * @param history 待返回的历史消息
+     */
     private void mockConversation(List<ConversationService.MessageView> history) {
         when(conversationService.createConversation(ownerUserId, "stream question"))
                 .thenReturn(new ConversationService.ConversationView(

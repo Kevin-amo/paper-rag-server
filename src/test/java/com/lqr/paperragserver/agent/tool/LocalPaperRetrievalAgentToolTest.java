@@ -27,6 +27,9 @@ class LocalPaperRetrievalAgentToolTest {
             new CitationFilter()
     );
 
+    /**
+     * 验证本地论文检索工具会过滤纯章节标题，只保留可展示正文片段作为引用。
+     */
     @Test
     void executeShouldFilterStandaloneSectionTitlesFromCitations() {
         UUID ownerUserId = UUID.randomUUID();
@@ -45,6 +48,15 @@ class LocalPaperRetrievalAgentToolTest {
                 .containsExactly("Retrieval augmented generation is widely used in information retrieval.");
     }
 
+    /**
+     * 构造测试用召回片段。
+     *
+     * @param chunkId   片段标识
+     * @param index     片段序号
+     * @param content   片段内容
+     * @param rankScore 排序分数
+     * @return 测试用召回片段
+     */
     private RetrievedChunk retrieved(String chunkId, int index, String content, double rankScore) {
         return new RetrievedChunk(
                 new DocumentChunk(chunkId, "source-1", index, content, Map.of("title", "Paper A")),

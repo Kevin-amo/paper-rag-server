@@ -131,7 +131,7 @@ app:
     jwt:
       issuer: ${JWT_ISSUER:paper-rag-server}
       secret: ${JWT_SECRET:paper-rag-server-local-development-secret-change-before-production}
-      access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:2h}
+      access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:12h}
     register-email-code:
       code-ttl: ${REGISTER_EMAIL_CODE_TTL:5m}
       email-cooldown: ${REGISTER_EMAIL_CODE_EMAIL_COOLDOWN:60s}
