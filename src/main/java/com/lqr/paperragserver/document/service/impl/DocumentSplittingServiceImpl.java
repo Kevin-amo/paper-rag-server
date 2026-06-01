@@ -40,6 +40,7 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
     private static final Pattern CONTENTS_ENTRY_WITH_TRAILING_PAGE = Pattern.compile("^.+?(?:\\.{2,}|…{2,}|\\s{2,}|\\t+)\\s*(?:\\d+|[ivxlcdmIVXLCDM]+)\\s*$");
     private static final Pattern CONTENTS_NUMBERED_ENTRY = Pattern.compile("^(?:\\d+(?:\\.\\d+){0,4}|第[一二三四五六七八九十百千0-9]+[章节篇部分]|[一二三四五六七八九十]+[、．.\\)])\\s+.+?\\s+(?:\\d+|[ivxlcdmIVXLCDM]+)\\s*$");
     private static final Pattern CONTENTS_NUMBERED_ENTRY_WITH_ATTACHED_PAGE = Pattern.compile("^\\d+(?:\\.\\d+){0,4}\\s+.+?\\d+$");
+    private static final int VISUAL_ARTIFACT_RUN_MIN_LINES = 4;
 
     private static final Set<String> ABSTRACT_HEADINGS = Set.of("摘要", "abstract");
     private static final Set<String> CONTENTS_HEADINGS = Set.of("目录", "目次", "contents", "table of contents");
@@ -91,7 +92,8 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         int chunkIndex = 0;
         for (SectionBlock section : sections) {
             for (ChunkSlice slice : splitSection(section)) {
-                String normalized = LogSanitizer.normalizeWhitespace(slice.content());
+                ChunkSlice cleanedSlice = removeVisualArtifactLineRuns(slice);
+                String normalized = LogSanitizer.normalizeWhitespace(cleanedSlice.content());
                 if (normalized.isBlank()) {
                     skipStats.emptyCount++;
                     continue;
@@ -100,14 +102,14 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
                     skipStats.tooShortCount++;
                     continue;
                 }
-                if (isTitleOnlyChunk(slice)) {
+                if (isTitleOnlyChunk(cleanedSlice)) {
                     skipStats.titleOnlyCount++;
                     continue;
                 }
-                DocumentChunk chunk = toDocumentChunk(source, chunkIndex++, slice);
+                DocumentChunk chunk = toDocumentChunk(source, chunkIndex++, cleanedSlice);
                 chunks.add(chunk);
                 log.debug("document.split.chunk sourceId={} chunkId={} chunkIndex={} sectionTitle={} sectionType={} chunkLength={} excerpt={}",
-                        source.sourceId(), chunk.chunkId(), chunk.chunkIndex(), slice.sectionTitle(), slice.sectionType(), slice.content().length(), LogSanitizer.safeExcerpt(slice.content(), 160));
+                        source.sourceId(), chunk.chunkId(), chunk.chunkIndex(), cleanedSlice.sectionTitle(), cleanedSlice.sectionType(), cleanedSlice.content().length(), LogSanitizer.safeExcerpt(cleanedSlice.content(), 160));
             }
         }
         log.info("document.split.chunks.done sourceId={} textLength={} paragraphCount={} sectionCount={} chunkCount={} skippedEmptyCount={} skippedTitleOnlyCount={} skippedTooShortCount={} costMs={}",
@@ -794,6 +796,89 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    /**
+     * 移除连续的视觉识别噪声块，避免 PDF 图形标注被当作可检索正文。
+     */
+    private ChunkSlice removeVisualArtifactLineRuns(ChunkSlice slice) {
+        if (slice == null || slice.content() == null || slice.content().isBlank()) {
+            return slice;
+        }
+        List<LineBlock> lines = extractLines(slice.content());
+        if (lines.size() < VISUAL_ARTIFACT_RUN_MIN_LINES) {
+            return slice;
+        }
+        List<LineBlock> keptLines = new ArrayList<>(lines.size());
+        List<LineBlock> pendingArtifacts = new ArrayList<>();
+        boolean removedAny = false;
+        for (LineBlock line : lines) {
+            if (line.content().isBlank()) {
+                if (pendingArtifacts.isEmpty()) {
+                    keptLines.add(line);
+                } else {
+                    pendingArtifacts.add(line);
+                }
+                continue;
+            }
+            if (isVisualArtifactLine(line.content())) {
+                pendingArtifacts.add(line);
+                continue;
+            }
+            removedAny = flushVisualArtifactRun(keptLines, pendingArtifacts) || removedAny;
+            keptLines.add(line);
+        }
+        removedAny = flushVisualArtifactRun(keptLines, pendingArtifacts) || removedAny;
+        if (!removedAny) {
+            return slice;
+        }
+        String cleanedContent = keptLines.stream()
+                .map(LineBlock::content)
+                .collect(Collectors.joining("\n"))
+                .strip();
+        return new ChunkSlice(cleanedContent, slice.start(), slice.end(), slice.sectionTitle(), slice.sectionType(), slice.sectionLevel());
+    }
+
+    /**
+     * 只有噪声行数量达到阈值时才丢弃；空行只作为噪声块内部间隔，不计数。
+     */
+    private boolean flushVisualArtifactRun(List<LineBlock> keptLines, List<LineBlock> pendingArtifacts) {
+        if (pendingArtifacts.isEmpty()) {
+            return false;
+        }
+        long artifactLineCount = pendingArtifacts.stream()
+                .filter(line -> !line.content().isBlank())
+                .count();
+        if (artifactLineCount >= VISUAL_ARTIFACT_RUN_MIN_LINES) {
+            pendingArtifacts.clear();
+            return true;
+        }
+        keptLines.addAll(pendingArtifacts);
+        pendingArtifacts.clear();
+        return false;
+    }
+
+    /**
+     * 判断单行是否像 PDF 图片 OCR 后产生的低信息碎片。
+     */
+    private boolean isVisualArtifactLine(String text) {
+        String normalized = normalizeWhitespace(text);
+        if (normalized.isBlank()) {
+            return false;
+        }
+        String compact = normalized.replace(" ", "");
+        if (compact.length() > 4) {
+            return false;
+        }
+        long lettersOrDigits = compact.chars().filter(Character::isLetterOrDigit).count();
+        if (lettersOrDigits == 0) {
+            return true;
+        }
+        if (lettersOrDigits <= 2) {
+            return true;
+        }
+        boolean digitsOnly = compact.chars().allMatch(Character::isDigit);
+        return digitsOnly || lettersOrDigits < compact.length();
     }
 
     private void logSections(String sourceId, List<SectionBlock> sections) {

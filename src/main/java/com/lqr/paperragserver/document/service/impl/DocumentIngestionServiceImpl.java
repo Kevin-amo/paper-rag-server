@@ -205,4 +205,10 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         vectorWriteService.deleteBySourceId(ownerUserId, sourceId);
         documentPersistenceService.markDeleted(ownerUserId, sourceId);
     }
+
+    @Override
+    public void deleteAll(UUID ownerUserId) {
+        vectorWriteService.deleteByOwnerUserId(ownerUserId);
+        documentPersistenceService.markAllDeleted(ownerUserId);
+    }
 }

@@ -14,6 +14,15 @@ class LiteratureSearchIntentParserTest {
     private final LiteratureSearchIntentParser parser = new LiteratureSearchIntentParser();
 
     @Test
+    void parseShouldTrimCompositeKnowledgeBaseSuffix() {
+        LiteratureSearchIntentParser.Intent intent = parser.parse("帮我找 Graph RAG 最新论文，并结合我的知识库总结趋势");
+
+        assertThat(intent.query()).isEqualTo("Graph RAG");
+        assertThat(intent.sortBy()).isEqualTo("date");
+        assertThat(intent.limit()).isEqualTo(5);
+    }
+
+    @Test
     void parseShouldInheritQueryAndBuildYearRangeForFollowUp() {
         LiteratureSearchContext context = context("RAG", 1);
 

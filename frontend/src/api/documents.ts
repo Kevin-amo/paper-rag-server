@@ -111,3 +111,7 @@ export function getDocumentAssetContentUrl(sourceId: string, assetId: string) {
 export async function deleteDocument(sourceId: string) {
   await http.delete(`/documents/${sourceId}`);
 }
+
+export async function deleteAllDocuments() {
+  await http.delete('/documents');
+}

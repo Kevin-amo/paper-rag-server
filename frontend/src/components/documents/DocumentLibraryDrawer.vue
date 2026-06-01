@@ -18,6 +18,7 @@ const props = defineProps<{
   size: number;
   total: number;
   deletingSourceId: string | null;
+  deletingAllDocuments: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -27,6 +28,7 @@ const emit = defineEmits<{
   rowClick: [document: DocumentSummary];
   refresh: [];
   delete: [document: DocumentSummary];
+  deleteAll: [];
   upload: [];
 }>();
 
@@ -54,11 +56,13 @@ const visible = computed({
       :size="props.size"
       :total="props.total"
       :deleting-source-id="props.deletingSourceId"
+      :deleting-all-documents="props.deletingAllDocuments"
       @search="emit('search', $event)"
       @page-change="emit('pageChange', $event)"
       @row-click="emit('rowClick', $event)"
       @refresh="emit('refresh')"
       @delete="emit('delete', $event)"
+      @delete-all="emit('deleteAll')"
       @upload="emit('upload')"
     />
   </el-drawer>

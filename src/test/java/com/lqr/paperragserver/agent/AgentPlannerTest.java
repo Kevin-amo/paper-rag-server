@@ -3,10 +3,12 @@ package com.lqr.paperragserver.agent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.agent.core.AgentActionType;
 import com.lqr.paperragserver.agent.core.AgentDecision;
+import com.lqr.paperragserver.agent.core.AgentStep;
 import com.lqr.paperragserver.agent.paper.LiteratureContextPolicy;
 import com.lqr.paperragserver.agent.paper.LiteratureFollowUpPolicy;
 import com.lqr.paperragserver.agent.planning.AgentDecisionParser;
 import com.lqr.paperragserver.agent.planning.AgentFallbackPolicy;
+import com.lqr.paperragserver.agent.planning.AgentHybridTaskPolicy;
 import com.lqr.paperragserver.agent.planning.AgentPlanner;
 import com.lqr.paperragserver.agent.planning.AgentPromptFactory;
 import com.lqr.paperragserver.agent.tool.AgentToolRegistry;
@@ -268,6 +270,35 @@ class AgentPlannerTest {
     }
 
     /**
+     * 验证复合任务会跳过模型自由决策，按外部文献、本地知识库、结束的顺序执行。
+     */
+    @Test
+    void decideShouldUseDeterministicHybridSequence() {
+        AgentPlanner planner = planner(
+                (StubLlmService) prompt -> {
+                    throw new AssertionError("复合任务不应依赖模型决策");
+                }
+        );
+        String question = "帮我找 Graph RAG 最新论文，并结合我的知识库总结趋势";
+
+        AgentDecision literatureDecision = planner.decide(question, List.of(), List.of(), List.of(), 7);
+        AgentStep literatureStep = new AgentStep(1, "搜索外部文献", "literature_search", literatureDecision.actionInput(), "找到 0 篇论文。");
+        AgentDecision localDecision = planner.decide(question, List.of(), List.of(literatureStep), List.of("未找到外部文献结果。"), 7);
+        AgentStep localStep = new AgentStep(2, "检索本地知识库", "local_paper_retrieval", localDecision.actionInput(), "找到 2 个相关片段。");
+        AgentDecision finishDecision = planner.decide(question, List.of(), List.of(literatureStep, localStep), List.of("未找到外部文献结果。", "本地论文证据"), 7);
+
+        assertThat(literatureDecision.action()).isEqualTo(AgentActionType.LITERATURE_SEARCH);
+        assertThat(literatureDecision.actionInput()).containsEntry("query", "Graph RAG");
+        assertThat(literatureDecision.actionInput()).containsEntry("sortBy", "date");
+        assertThat(literatureDecision.actionInput()).containsEntry("limit", 5);
+        assertThat(localDecision.action()).isEqualTo(AgentActionType.LOCAL_PAPER_RETRIEVAL);
+        assertThat(localDecision.actionInput()).containsEntry("query", "Graph RAG 研究趋势");
+        assertThat(localDecision.actionInput()).containsEntry("topK", 7);
+        assertThat(finishDecision.finish()).isTrue();
+        assertThat(finishDecision.action()).isEqualTo(AgentActionType.FINISH);
+    }
+
+    /**
      * 构造带固定模型服务的规划器测试对象。
      *
      * @param llmService 测试用模型服务
@@ -280,8 +311,9 @@ class AgentPlannerTest {
                 llmService,
                 new AgentPromptFactory(new AgentToolRegistry(List.of())),
                 new AgentDecisionParser(new ObjectMapper(), contextPolicy),
-                new AgentFallbackPolicy(new LiteratureFollowUpPolicy(contextPolicy)),
-                contextPolicy
+                new AgentFallbackPolicy(new LiteratureFollowUpPolicy(contextPolicy), new AgentHybridTaskPolicy(intentParser)),
+                contextPolicy,
+                new AgentHybridTaskPolicy(intentParser)
         );
     }
 

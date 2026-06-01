@@ -1,6 +1,7 @@
 import { onUnmounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
+  deleteAllDocuments,
   deleteDocument,
   getDocumentChunks,
   getDocumentDetail,
@@ -22,6 +23,7 @@ export function useDocuments() {
   const detailLoading = ref(false);
   const chunkLoading = ref(false);
   const deletingSourceId = ref<string | null>(null);
+  const deletingAllDocuments = ref(false);
 
   const keyword = ref('');
   const documents = ref<DocumentSummary[]>([]);
@@ -180,6 +182,21 @@ export function useDocuments() {
     }
   }
 
+  async function removeAllDocuments() {
+    deletingAllDocuments.value = true;
+    stopUploadRefreshPolling();
+    try {
+      await deleteAllDocuments();
+      ElMessage.success('文档库已清空');
+      closeDetail();
+      await loadDocuments(0);
+    } catch (error) {
+      ElMessage.error(getErrorMessage(error));
+    } finally {
+      deletingAllDocuments.value = false;
+    }
+  }
+
   async function openDetail(document: DocumentSummary) {
     detailVisible.value = true;
     detail.value = null;
@@ -224,6 +241,7 @@ export function useDocuments() {
     detailLoading,
     chunkLoading,
     deletingSourceId,
+    deletingAllDocuments,
     keyword,
     documents,
     detail,
@@ -240,6 +258,7 @@ export function useDocuments() {
     uploadBatch,
     removeUploadedSource,
     removeDocument,
+    removeAllDocuments,
     openDetail,
     closeDetail,
     changeChunkPage,

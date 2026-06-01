@@ -41,14 +41,16 @@ public class AgentPromptFactory {
                 + "\n3. 用户问综述、研究现状、趋势、对比分析时，先判断资料范围：若目标指向已上传论文、本地知识库、当前文档或本文内容，只能 action=local_paper_retrieval；只有用户明确要求找新论文、搜外部文献、补充外部资料或最新研究时，才可 action=literature_search。"
                 + "\n4. local_paper_retrieval 的 topK 只表示本地 RAG 检索时最多返回的片段数量配置，不代表本地库数量、论文数量或已检索结果。"
                 + "\n5. literature_search 不使用 topK；外部文献数量只由用户明确说的“几篇/limit”决定，未明确时默认 limit=5。"
-                + "\n6. 已有观察后，当前观察可用于回答时必须输出 finish=true；不要连续选择上一步相同 action。"
-                + "\n7. 文献搜索追问规则：如果用户当前问题是“有吗 / 有没有 / 这些里面 / 再找几篇 / 最新的 / 2026 年的 / 换成某方向”等追问，优先继承最近一次文献搜索状态里的 query。"
-                + "\n8. 如果当前问题只是年份、数量、排序、筛选条件，不要把当前问题本身当 query。"
-                + "\n9. 如果用户明确提出新主题，才覆盖最近一次文献搜索 query。"
-                + "\n10. literature_search 的 actionInput 必须输出合并后的 query、limit、sortBy、dateFrom、dateTo、categories。"
-                + "\n11. 如果最近一次文献搜索状态的 items 已能直接筛选回答，允许 action=finish 且 finish=true，不必重复搜索。"
-                + "\n12. thoughtSummary 只能是可展示的简短思考摘要，不要输出完整隐私思维链。"
-                + "\n13. 只输出 JSON，不要 Markdown，不要解释。";
+                + "\n6. 普通单工具任务已有观察且当前观察可用于回答时应输出 finish=true；不要连续选择上一步相同 action。"
+                + "\n7. 如果用户同时要求外部文献搜索和结合本地知识库，这是复合任务：必须先 literature_search，再 local_paper_retrieval，两类证据都完成后才能 finish。"
+                + "\n8. 复合任务中的 literature_search query 只能保留检索主题，不要包含“结合我的知识库、总结趋势”等综合任务描述。"
+                + "\n9. 文献搜索追问规则：如果用户当前问题是“有吗 / 有没有 / 这些里面 / 再找几篇 / 最新的 / 2026 年的 / 换成某方向”等追问，优先继承最近一次文献搜索状态里的 query。"
+                + "\n10. 如果当前问题只是年份、数量、排序、筛选条件，不要把当前问题本身当 query。"
+                + "\n11. 如果用户明确提出新主题，才覆盖最近一次文献搜索 query。"
+                + "\n12. literature_search 的 actionInput 必须输出合并后的 query、limit、sortBy、dateFrom、dateTo、categories。"
+                + "\n13. 如果最近一次文献搜索状态的 items 已能直接筛选回答，允许 action=finish 且 finish=true，不必重复搜索。"
+                + "\n14. thoughtSummary 只能是可展示的简短思考摘要，不要输出完整隐私思维链。"
+                + "\n15. 只输出 JSON，不要 Markdown，不要解释。";
         String user = "用户目标：\n" + question
                 + "\n\n本地 RAG 片段数配置 topK：" + (topK == null ? "默认" : topK)
                 + "（仅 local_paper_retrieval 使用；这是配置参数，不代表本地库数量、论文数量或检索结果，禁止用于 literature_search）"
@@ -82,7 +84,8 @@ public class AgentPromptFactory {
                 + "\n1. 不编造未被观察结果支持的事实。"
                 + "\n2. 区分本地知识库证据和外部文献搜索结果。"
                 + "\n3. 如果证据不足，明确说明不足并给出下一步建议。"
-                + "\n4. 用清晰的小标题和要点回答。";
+                + "\n4. 如果外部文献搜索不可用或没有结果，要明确说明外部文献证据的限制，仍基于本地知识库证据回答。"
+                + "\n5. 用清晰的小标题和要点回答。";
         String user = "用户目标：\n" + question
                 + "\n\n最近会话：\n" + formatHistory(history)
                 + "\n\n执行步骤：\n" + formatSteps(steps)

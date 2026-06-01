@@ -25,4 +25,9 @@ public interface VectorWriteService {
      * @param sourceId 文档来源标识
      */
     void deleteBySourceId(UUID ownerUserId, String sourceId);
+
+    /**
+     * 删除当前用户的全部向量记录。
+     */
+    void deleteByOwnerUserId(UUID ownerUserId);
 }
