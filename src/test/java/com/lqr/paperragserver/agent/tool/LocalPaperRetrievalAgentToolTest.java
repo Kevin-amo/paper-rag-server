@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.agent.tool;
 
-import com.lqr.paperragserver.agent.model.AgentToolResult;
+import com.lqr.paperragserver.agent.paper.CitationFilter;
 import com.lqr.paperragserver.common.model.AnswerCitation;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.RetrievedChunk;
@@ -23,7 +23,8 @@ class LocalPaperRetrievalAgentToolTest {
     private final RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
     private final LocalPaperRetrievalAgentTool tool = new LocalPaperRetrievalAgentTool(
             ragRetrievalService,
-            new RagProperties(800, 120, 8, 0)
+            new RagProperties(800, 120, 8, 0),
+            new CitationFilter()
     );
 
     @Test

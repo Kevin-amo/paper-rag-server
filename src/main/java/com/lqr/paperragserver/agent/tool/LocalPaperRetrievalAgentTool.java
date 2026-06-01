@@ -1,6 +1,6 @@
 package com.lqr.paperragserver.agent.tool;
 
-import com.lqr.paperragserver.agent.model.AgentToolResult;
+import com.lqr.paperragserver.agent.paper.CitationFilter;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.common.model.AnswerCitation;
@@ -14,9 +14,7 @@ import org.springframework.stereotype.Component;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Locale;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 /**
  * 本地论文检索工具，负责从当前用户已入库的论文知识库中召回片段并生成引用信息。
@@ -27,11 +25,10 @@ import java.util.regex.Pattern;
 public class LocalPaperRetrievalAgentTool implements AgentTool {
 
     private static final int MAX_EXCERPT_LENGTH = 220;
-    private static final Pattern NUMBERED_TITLE_PATTERN = Pattern.compile("^\\d+(?:\\.\\d+){0,4}(?:\\s*[.．、)]\\s*|\\s+)(?:abstract|introduction|related work|related works|methods?|experiments?|results?|discussion|conclusions?|references|bibliography)\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern CONTENTS_ENTRY_PATTERN = Pattern.compile("^.+?(?:\\.{2,}|…{2,}|\\s{2,}|\\t+)\\s*(?:\\d+|[ivxlcdm]+)\\s*$", Pattern.CASE_INSENSITIVE);
 
     private final RagRetrievalService ragRetrievalService;
     private final RagProperties ragProperties;
+    private final CitationFilter citationFilter;
 
     /**
      * 返回本地论文检索工具的注册名称。
@@ -104,11 +101,11 @@ public class LocalPaperRetrievalAgentTool implements AgentTool {
      * @return 可展示的引用列表
      */
     private List<AnswerCitation> buildCitations(List<RetrievedChunk> chunks) {
-        CitationFilterStats stats = new CitationFilterStats();
+        CitationFilter.Stats stats = new CitationFilter.Stats();
         List<AnswerCitation> citations = chunks.stream()
                 .filter(chunk -> {
-                    CitationFilterReason reason = citationFilterReason(chunk.chunk().content());
-                    if (reason != CitationFilterReason.DISPLAYABLE) {
+                    CitationFilter.Reason reason = citationFilter.reason(chunk.chunk().content());
+                    if (reason != CitationFilter.Reason.DISPLAYABLE) {
                         stats.increment(reason);
                         log.debug("citation.filter sourceId={} chunkId={} chunkIndex={} reason={} excerpt={}",
                                 chunk.chunk().sourceId(), chunk.chunk().chunkId(), chunk.chunk().chunkIndex(), reason, LogSanitizer.safeExcerpt(chunk.chunk().content(), 160));
@@ -130,84 +127,8 @@ public class LocalPaperRetrievalAgentTool implements AgentTool {
                 })
                 .toList();
         log.info("citation.build.done rawCount={} finalCount={} emptyCount={} tooShortCount={} titleOnlyCount={} contentsEntryCount={}",
-                chunks.size(), citations.size(), stats.emptyCount, stats.tooShortCount, stats.titleOnlyCount, stats.contentsEntryCount);
+                chunks.size(), citations.size(), stats.emptyCount(), stats.tooShortCount(), stats.titleOnlyCount(), stats.contentsEntryCount());
         return citations;
-    }
-
-    /**
-     * 判断片段内容是否适合作为用户可见引用摘录。
-     *
-     * @param content 片段内容
-     * @return 适合展示时返回 true
-     */
-    private boolean isDisplayableCitationExcerpt(String content) {
-        return citationFilterReason(content) == CitationFilterReason.DISPLAYABLE;
-    }
-
-    /**
-     * 识别引用摘录被过滤的原因，用于稳定统计和调试日志。
-     *
-     * @param content 片段内容
-     * @return 引用过滤原因
-     */
-    private CitationFilterReason citationFilterReason(String content) {
-        String normalized = normalizeWhitespace(content);
-        if (normalized.isBlank()) {
-            return CitationFilterReason.EMPTY;
-        }
-        if (normalized.length() <= 3) {
-            return CitationFilterReason.TOO_SHORT;
-        }
-        String canonical = stripTrailingHeadingPunctuation(normalized).toLowerCase(Locale.ROOT);
-        if (canonical.equals("abstract")
-                || canonical.equals("摘要")
-                || canonical.equals("introduction")
-                || canonical.equals("related work")
-                || canonical.equals("related works")
-                || canonical.equals("methods")
-                || canonical.equals("method")
-                || canonical.equals("experiments")
-                || canonical.equals("experiment")
-                || canonical.equals("results")
-                || canonical.equals("result")
-                || canonical.equals("discussion")
-                || canonical.equals("conclusion")
-                || canonical.equals("conclusions")
-                || canonical.equals("references")
-                || canonical.equals("bibliography")) {
-            return CitationFilterReason.TITLE_ONLY;
-        }
-        if (NUMBERED_TITLE_PATTERN.matcher(normalized).matches()) {
-            return CitationFilterReason.TITLE_ONLY;
-        }
-        if (CONTENTS_ENTRY_PATTERN.matcher(normalized).matches()) {
-            return CitationFilterReason.CONTENTS_ENTRY;
-        }
-        return CitationFilterReason.DISPLAYABLE;
-    }
-
-    /**
-     * 归一化片段空白字符，便于后续标题和目录项判断。
-     *
-     * @param content 片段内容
-     * @return 空白归一化后的文本
-     */
-    private String normalizeWhitespace(String content) {
-        return LogSanitizer.normalizeWhitespace(content);
-    }
-
-    /**
-     * 移除标题末尾的中英文冒号，降低纯标题判断的误差。
-     *
-     * @param content 片段内容
-     * @return 去除末尾标题标点后的文本
-     */
-    private String stripTrailingHeadingPunctuation(String content) {
-        String normalized = normalizeWhitespace(content);
-        while (normalized.endsWith(":") || normalized.endsWith("：")) {
-            normalized = normalized.substring(0, normalized.length() - 1).strip();
-        }
-        return normalized;
     }
 
     /**
@@ -286,42 +207,5 @@ public class LocalPaperRetrievalAgentTool implements AgentTool {
      */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
-    }
-
-    /**
-     * 引用摘录过滤原因，用于统计不可展示片段的类型。
-     */
-    private enum CitationFilterReason {
-        DISPLAYABLE,
-        EMPTY,
-        TOO_SHORT,
-        TITLE_ONLY,
-        CONTENTS_ENTRY
-    }
-
-    /**
-     * 引用过滤统计信息，记录各类不可展示片段的数量。
-     */
-    private static final class CitationFilterStats {
-        private int emptyCount;
-        private int tooShortCount;
-        private int titleOnlyCount;
-        private int contentsEntryCount;
-
-        /**
-         * 根据过滤原因累加对应计数，展示型片段不计入过滤统计。
-         *
-         * @param reason 过滤原因
-         */
-        private void increment(CitationFilterReason reason) {
-            switch (reason) {
-                case EMPTY -> emptyCount++;
-                case TOO_SHORT -> tooShortCount++;
-                case TITLE_ONLY -> titleOnlyCount++;
-                case CONTENTS_ENTRY -> contentsEntryCount++;
-                case DISPLAYABLE -> {
-                }
-            }
-        }
     }
 }

@@ -1,6 +1,5 @@
 package com.lqr.paperragserver.agent.tool;
 
-import com.lqr.paperragserver.agent.model.AgentToolResult;
 import com.lqr.paperragserver.literature.model.LiteratureSearchResponse;
 import com.lqr.paperragserver.literature.model.LiteratureSearchResult;
 import com.lqr.paperragserver.literature.service.LiteratureSearchService;

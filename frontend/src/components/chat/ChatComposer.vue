@@ -22,7 +22,7 @@ const advancedVisible = ref(false);
 const topKOptions = Array.from({ length: 10 }, (_, index) => index + 1);
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !props.loading);
-const placeholder = computed(() => '告诉我你的研究目标，例如：帮我找 Graph RAG 最新论文并结合我的知识库总结趋势，按 Enter 发送，Shift + Enter 换行');
+const placeholder = computed(() => '告诉我你的研究目标，按 Enter 发送，Shift + Enter 换行');
 
 function submitQuestion() {
   const content = question.value.trim();

@@ -1,8 +1,8 @@
 package com.lqr.paperragserver.agent.web;
 
+import com.lqr.paperragserver.agent.application.AgentChatService;
 import com.lqr.paperragserver.agent.dto.AgentAskRequest;
 import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
-import com.lqr.paperragserver.agent.service.AgentService;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,7 @@ public class AgentController {
 
     private static final long STREAM_TIMEOUT_MILLIS = 240_000L;
 
-    private final AgentService agentService;
+    private final AgentChatService agentChatService;
 
     /**
      * 接收用户问题并通过 SSE 持续返回智能体执行事件和回答增量。
@@ -40,7 +40,7 @@ public class AgentController {
     public SseEmitter askStream(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                 @Valid @RequestBody AgentAskRequest request) {
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
-        Disposable subscription = agentService.streamAnswer(principal.getId(), request)
+        Disposable subscription = agentChatService.streamAnswer(principal.getId(), request)
                 .subscribe(
                         event -> sendEvent(emitter, event),
                         emitter::completeWithError,

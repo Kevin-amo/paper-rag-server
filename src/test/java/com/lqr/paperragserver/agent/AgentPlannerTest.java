@@ -1,9 +1,14 @@
 package com.lqr.paperragserver.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lqr.paperragserver.agent.model.AgentActionType;
-import com.lqr.paperragserver.agent.model.AgentDecision;
-import com.lqr.paperragserver.agent.service.AgentPlanner;
+import com.lqr.paperragserver.agent.core.AgentActionType;
+import com.lqr.paperragserver.agent.core.AgentDecision;
+import com.lqr.paperragserver.agent.paper.LiteratureContextPolicy;
+import com.lqr.paperragserver.agent.paper.LiteratureFollowUpPolicy;
+import com.lqr.paperragserver.agent.planning.AgentDecisionParser;
+import com.lqr.paperragserver.agent.planning.AgentFallbackPolicy;
+import com.lqr.paperragserver.agent.planning.AgentPlanner;
+import com.lqr.paperragserver.agent.planning.AgentPromptFactory;
 import com.lqr.paperragserver.agent.tool.AgentToolRegistry;
 import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
@@ -25,11 +30,8 @@ class AgentPlannerTest {
 
     @Test
     void decideShouldPreferExplicitLiteratureLimitAndDateSort() {
-        AgentPlanner planner = new AgentPlanner(
-                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"RAG\",\"limit\":5,\"sortBy\":\"relevance\"},\"finish\":false,\"answer\":null}",
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+        AgentPlanner planner = planner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"RAG\",\"limit\":5,\"sortBy\":\"relevance\"},\"finish\":false,\"answer\":null}"
         );
 
         AgentDecision decision = planner.decide("搜索最近的1篇关于RAG的文献", List.of(), List.of(), List.of(), null);
@@ -42,11 +44,8 @@ class AgentPlannerTest {
 
     @Test
     void decideShouldNotApplyTopKToLiteratureSearch() {
-        AgentPlanner planner = new AgentPlanner(
-                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"RAG\",\"topK\":3,\"limit\":5},\"finish\":false,\"answer\":null}",
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+        AgentPlanner planner = planner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"RAG\",\"topK\":3,\"limit\":5},\"finish\":false,\"answer\":null}"
         );
 
         AgentDecision decision = planner.decide("搜索关于RAG的最新文献", List.of(), List.of(), List.of(), 3);
@@ -58,11 +57,8 @@ class AgentPlannerTest {
 
     @Test
     void decideShouldApplyTopKOnlyToLocalPaperRetrieval() {
-        AgentPlanner planner = new AgentPlanner(
-                (StubLlmService) prompt -> "{\"thoughtSummary\":\"检索本地论文。\",\"action\":\"local_paper_retrieval\",\"actionInput\":{\"query\":\"RAG\"},\"finish\":false,\"answer\":null}",
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+        AgentPlanner planner = planner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"检索本地论文。\",\"action\":\"local_paper_retrieval\",\"actionInput\":{\"query\":\"RAG\"},\"finish\":false,\"answer\":null}"
         );
 
         AgentDecision decision = planner.decide("总结我上传的RAG论文", List.of(), List.of(), List.of(), 3);
@@ -73,11 +69,8 @@ class AgentPlannerTest {
 
     @Test
     void decideShouldPreferRequestTopKOverModelLocalTopK() {
-        AgentPlanner planner = new AgentPlanner(
-                (StubLlmService) prompt -> "{\"thoughtSummary\":\"检索本地论文。\",\"action\":\"local_paper_retrieval\",\"actionInput\":{\"query\":\"RAG\",\"topK\":5},\"finish\":false,\"answer\":null}",
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+        AgentPlanner planner = planner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"检索本地论文。\",\"action\":\"local_paper_retrieval\",\"actionInput\":{\"query\":\"RAG\",\"topK\":5},\"finish\":false,\"answer\":null}"
         );
 
         AgentDecision decision = planner.decide("总结我上传的RAG论文", List.of(), List.of(), List.of(), 10);
@@ -88,13 +81,10 @@ class AgentPlannerTest {
 
     @Test
     void fallbackLiteratureSearchShouldNotCarryTopK() {
-        AgentPlanner planner = new AgentPlanner(
+        AgentPlanner planner = planner(
                 (StubLlmService) prompt -> {
                     throw new RuntimeException("quota exhausted");
-                },
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+                }
         );
 
         AgentDecision decision = planner.decide("搜索关于RAG的最新文献", List.of(), List.of(), List.of(), 3);
@@ -106,13 +96,10 @@ class AgentPlannerTest {
 
     @Test
     void fallbackLocalRetrievalShouldCarryTopK() {
-        AgentPlanner planner = new AgentPlanner(
+        AgentPlanner planner = planner(
                 (StubLlmService) prompt -> {
                     throw new RuntimeException("quota exhausted");
-                },
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+                }
         );
 
         AgentDecision decision = planner.decide("总结我上传的RAG论文", List.of(), List.of(), List.of(), 3);
@@ -123,13 +110,10 @@ class AgentPlannerTest {
 
     @Test
     void decideShouldFinishWithExistingObservationsWhenModelFails() {
-        AgentPlanner planner = new AgentPlanner(
+        AgentPlanner planner = planner(
                 (StubLlmService) prompt -> {
                     throw new RuntimeException("quota exhausted");
-                },
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+                }
         );
 
         AgentDecision decision = planner.decide("搜索 MCP 文献", List.of(), List.of(), List.of("[外部文献] MCP paper"), null);
@@ -141,13 +125,10 @@ class AgentPlannerTest {
 
     @Test
     void finalAnswerShouldFallbackToObservationsWhenModelFails() {
-        AgentPlanner planner = new AgentPlanner(
+        AgentPlanner planner = planner(
                 (StubLlmService) prompt -> {
                     throw new RuntimeException("quota exhausted");
-                },
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+                }
         );
 
         String answer = planner.finalAnswer("搜索 MCP 文献", List.of(), List.of(), List.of("[外部文献] MCP paper"));
@@ -157,7 +138,7 @@ class AgentPlannerTest {
 
     @Test
     void finalAnswerStreamShouldReturnModelDeltas() {
-        AgentPlanner planner = new AgentPlanner(
+        AgentPlanner planner = planner(
                 new StubLlmService() {
                     @Override
                     public String generate(PromptConstructionService.Prompt prompt) {
@@ -168,10 +149,7 @@ class AgentPlannerTest {
                     public Flux<String> streamGenerate(PromptConstructionService.Prompt prompt) {
                         return Flux.just("hello ", "world");
                     }
-                },
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+                }
         );
 
         List<String> deltas = planner.finalAnswerStream("问题", List.of(), List.of(), List.of("证据"))
@@ -183,11 +161,8 @@ class AgentPlannerTest {
 
     @Test
     void decideShouldInheritLiteratureQueryForYearFollowUp() {
-        AgentPlanner planner = new AgentPlanner(
-                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"有没 2026 年的\",\"limit\":5},\"finish\":false,\"answer\":null}",
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+        AgentPlanner planner = planner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"有没 2026 年的\",\"limit\":5},\"finish\":false,\"answer\":null}"
         );
 
         AgentDecision decision = planner.decide("有没 2026 年的", List.of(), literatureContext("RAG", 1, List.of()), List.of(), List.of(), null);
@@ -202,11 +177,8 @@ class AgentPlannerTest {
 
     @Test
     void decideShouldInheritLiteratureQueryForLatestFollowUp() {
-        AgentPlanner planner = new AgentPlanner(
-                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"最新的\"},\"finish\":false,\"answer\":null}",
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+        AgentPlanner planner = planner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"最新的\"},\"finish\":false,\"answer\":null}"
         );
 
         AgentDecision decision = planner.decide("最新的", List.of(), literatureContext("RAG", 5, List.of()), List.of(), List.of(), null);
@@ -217,11 +189,8 @@ class AgentPlannerTest {
 
     @Test
     void decideShouldInheritLiteratureQueryAndOverrideLimitForMoreResults() {
-        AgentPlanner planner = new AgentPlanner(
-                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"再找 3 篇\",\"limit\":5},\"finish\":false,\"answer\":null}",
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+        AgentPlanner planner = planner(
+                (StubLlmService) prompt -> "{\"thoughtSummary\":\"搜索外部文献。\",\"action\":\"literature_search\",\"actionInput\":{\"query\":\"再找 3 篇\",\"limit\":5},\"finish\":false,\"answer\":null}"
         );
 
         AgentDecision decision = planner.decide("再找 3 篇", List.of(), literatureContext("RAG", 5, List.of()), List.of(), List.of(), null);
@@ -232,13 +201,10 @@ class AgentPlannerTest {
 
     @Test
     void decideShouldFinishWhenPreviousLiteratureItemsMatchYearFilter() {
-        AgentPlanner planner = new AgentPlanner(
+        AgentPlanner planner = planner(
                 (StubLlmService) prompt -> {
                     throw new AssertionError("不应调用模型");
-                },
-                new ObjectMapper(),
-                new AgentToolRegistry(List.of()),
-                new LiteratureSearchIntentParser()
+                }
         );
         LiteratureSearchResult matching = literatureResult("RAG 2026", 2026, "2026-03-01");
         LiteratureSearchResult other = literatureResult("RAG 2025", 2025, "2025-03-01");
@@ -248,6 +214,18 @@ class AgentPlannerTest {
         assertThat(decision.finish()).isTrue();
         assertThat(decision.action()).isEqualTo(AgentActionType.FINISH);
         assertThat(decision.answer()).contains("RAG 2026").doesNotContain("RAG 2025");
+    }
+
+    private AgentPlanner planner(StubLlmService llmService) {
+        LiteratureSearchIntentParser intentParser = new LiteratureSearchIntentParser();
+        LiteratureContextPolicy contextPolicy = new LiteratureContextPolicy(intentParser);
+        return new AgentPlanner(
+                llmService,
+                new AgentPromptFactory(new AgentToolRegistry(List.of())),
+                new AgentDecisionParser(new ObjectMapper(), contextPolicy),
+                new AgentFallbackPolicy(new LiteratureFollowUpPolicy(contextPolicy)),
+                contextPolicy
+        );
     }
 
     private LiteratureSearchContext literatureContext(String query, int limit, List<LiteratureSearchResult> items) {

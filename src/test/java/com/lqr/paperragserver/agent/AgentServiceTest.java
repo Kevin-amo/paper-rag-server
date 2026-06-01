@@ -2,10 +2,10 @@ package com.lqr.paperragserver.agent;
 
 import com.lqr.paperragserver.agent.dto.AgentAskRequest;
 import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
-import com.lqr.paperragserver.agent.model.AgentStepTrace;
+import com.lqr.paperragserver.agent.application.AgentChatService;
+import com.lqr.paperragserver.agent.core.AgentStep;
 import com.lqr.paperragserver.agent.service.AgentLoop;
-import com.lqr.paperragserver.agent.service.AgentPlanner;
-import com.lqr.paperragserver.agent.service.AgentService;
+import com.lqr.paperragserver.agent.planning.AgentPlanner;
 import com.lqr.paperragserver.common.model.AnswerCitation;
 import com.lqr.paperragserver.conversation.service.ConversationService;
 import com.lqr.paperragserver.literature.support.LiteratureSearchContextResolver;
@@ -28,7 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * AgentService 的流式问答测试，覆盖事件输出、最终回答持久化和异常事件处理。
+ * AgentChatService 的流式问答测试，覆盖事件输出、最终回答持久化和异常事件处理。
  */
 class AgentServiceTest {
 
@@ -38,12 +38,12 @@ class AgentServiceTest {
     private final AgentLoop agentLoop = mock(AgentLoop.class);
     private final AgentPlanner planner = mock(AgentPlanner.class);
     private final LiteratureSearchContextResolver literatureSearchContextResolver = mock(LiteratureSearchContextResolver.class);
-    private final AgentService service = new AgentService(conversationService, agentLoop, planner, literatureSearchContextResolver);
+    private final AgentChatService service = new AgentChatService(conversationService, agentLoop, planner, literatureSearchContextResolver);
 
     @Test
     void streamAnswerShouldEmitLiveDeltasAndPersistFinalAnswer() {
         List<ConversationService.MessageView> history = List.of();
-        List<AgentStepTrace> steps = List.of(new AgentStepTrace(
+        List<AgentStep> steps = List.of(new AgentStep(
                 1,
                 "先检索本地论文。",
                 "local_paper_retrieval",
@@ -93,7 +93,7 @@ class AgentServiceTest {
     @Test
     void streamAnswerShouldEmitErrorWhenFinalStreamFailsAfterDelta() {
         List<ConversationService.MessageView> history = List.of();
-        List<AgentStepTrace> steps = List.of();
+        List<AgentStep> steps = List.of();
         List<String> observations = List.of("本地论文证据");
         AgentLoop.AgentLoopResult loopResult = new AgentLoop.AgentLoopResult(null, List.of(), Map.of(), steps, observations);
         mockConversation(history);
@@ -116,7 +116,7 @@ class AgentServiceTest {
     @Test
     void streamAnswerShouldUseFinalGenerationForPureLiteratureSearch() {
         List<ConversationService.MessageView> history = List.of();
-        List<AgentStepTrace> steps = List.of(new AgentStepTrace(
+        List<AgentStep> steps = List.of(new AgentStep(
                 1,
                 "用户需要搜索外部文献，我将调用外部文献搜索。",
                 "literature_search",

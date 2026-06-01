@@ -1,11 +1,13 @@
 package com.lqr.paperragserver.agent;
 
-import com.lqr.paperragserver.agent.model.AgentActionType;
-import com.lqr.paperragserver.agent.model.AgentDecision;
+import com.lqr.paperragserver.agent.core.AgentActionType;
+import com.lqr.paperragserver.agent.core.AgentDecision;
+import com.lqr.paperragserver.agent.core.AgentRuntime;
 import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
-import com.lqr.paperragserver.agent.model.AgentToolResult;
+import com.lqr.paperragserver.agent.paper.CitationNormalizer;
+import com.lqr.paperragserver.agent.tool.AgentToolResult;
 import com.lqr.paperragserver.agent.service.AgentLoop;
-import com.lqr.paperragserver.agent.service.AgentPlanner;
+import com.lqr.paperragserver.agent.planning.AgentPlanner;
 import com.lqr.paperragserver.agent.tool.AgentTool;
 import com.lqr.paperragserver.agent.tool.AgentToolRegistry;
 import com.lqr.paperragserver.common.model.AnswerCitation;
@@ -44,7 +46,7 @@ class AgentLoopTest {
                 List.of(new AnswerCitation("source-1", "chunk-1", 1, "Paper A", "excerpt", 0.9)),
                 Map.of("localPaperChunks", List.of(Map.of("chunkId", "chunk-1")))
         ));
-        AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(3)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
@@ -78,7 +80,7 @@ class AgentLoopTest {
                 citations("single", 10, 0.1),
                 Map.of("localPaperChunks", List.of())
         ));
-        AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(8)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
@@ -105,7 +107,7 @@ class AgentLoopTest {
                 new AgentToolResult("第一次找到 8 个相关片段。", "第一次本地论文证据", citations("first", 8, 0.1), Map.of()),
                 new AgentToolResult("第二次找到 8 个相关片段。", "第二次本地论文证据", citations("second", 8, 10.1), Map.of())
         );
-        AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(8)))
                 .thenReturn(new AgentDecision(
                         "先检索一个角度。",
@@ -141,7 +143,7 @@ class AgentLoopTest {
         AgentTool tool = mockTool("local_paper_retrieval",
                 new AgentToolResult("找到 2 个相关片段。", "本地论文证据", List.of(lower, higher), Map.of())
         );
-        AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(8)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
@@ -172,7 +174,7 @@ class AgentLoopTest {
                         "items", literatureItems
                 ))
         ));
-        AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(3)))
                 .thenReturn(new AgentDecision(
                         "搜索外部文献。",
@@ -202,7 +204,7 @@ class AgentLoopTest {
                 citations("default", 5, 0.1),
                 Map.of()
         ));
-        AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(null)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
@@ -232,7 +234,7 @@ class AgentLoopTest {
                         "items", List.of(Map.of("title", "RAG Paper"))
                 ))
         ));
-        AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
         when(planner.decide(eq("给我搜一篇关于 RAG 的文献，要最新的"), anyList(), any(), anyList(), anyList(), eq(3)))
                 .thenReturn(new AgentDecision(
                         "虽然本地知识库有3篇相关论文，但用户需要最新文献",
@@ -265,7 +267,7 @@ class AgentLoopTest {
                 List.of(),
                 Map.of("literature", Map.of("type", "LITERATURE_SEARCH_RESULT", "query", "问题", "items", List.of()))
         ));
-        AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(null)))
                 .thenReturn(new AgentDecision(
                         "继续搜索。",
@@ -293,7 +295,7 @@ class AgentLoopTest {
         when(tool.name()).thenReturn("literature_search");
         when(tool.description()).thenReturn("literature_search description");
         when(tool.execute(any(), any())).thenThrow(new RuntimeException("外部文献服务暂不可用，请稍后重试"));
-        AgentLoop loop = new AgentLoop(planner, new AgentToolRegistry(List.of(tool)), ragProperties());
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(null)))
                 .thenReturn(new AgentDecision(
                         "先搜索外部文献。",

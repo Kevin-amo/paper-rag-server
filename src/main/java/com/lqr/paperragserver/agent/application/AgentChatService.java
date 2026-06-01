@@ -1,7 +1,9 @@
-package com.lqr.paperragserver.agent.service;
+package com.lqr.paperragserver.agent.application;
 
 import com.lqr.paperragserver.agent.dto.AgentAskRequest;
 import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
+import com.lqr.paperragserver.agent.planning.AgentPlanner;
+import com.lqr.paperragserver.agent.service.AgentLoop;
 import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.conversation.service.ConversationService;
 import com.lqr.paperragserver.literature.model.LiteratureSearchContext;
@@ -16,26 +18,16 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-/**
- * 论文智能体对话服务，负责创建或接续会话、驱动执行循环，并以流式事件输出回答过程。
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AgentService {
+public class AgentChatService {
 
     private final ConversationService conversationService;
     private final AgentLoop agentLoop;
     private final AgentPlanner planner;
     private final LiteratureSearchContextResolver literatureSearchContextResolver;
 
-    /**
-     * 处理一次智能体流式问答，负责会话解析、执行循环、最终回答生成和消息持久化。
-     *
-     * @param ownerUserId 当前用户标识
-     * @param request     智能体问答请求
-     * @return 按执行阶段输出的流式事件序列
-     */
     public Flux<AgentStreamEvent> streamAnswer(UUID ownerUserId, AgentAskRequest request) {
         return Flux.<AgentStreamEvent>create(sink -> {
             UUID activeConversationId = request.conversationId();
@@ -43,27 +35,20 @@ public class AgentService {
             log.info("agent.ask.start ownerUserId={} conversationId={} questionLength={} questionExcerpt={} topK={}",
                     ownerUserId, activeConversationId, textLength(request.question()), LogSanitizer.safeExcerpt(request.question(), 160), request.topK());
             try {
-                // 解析对话上下文
                 ConversationService.ConversationView conversation = resolveConversation(ownerUserId, activeConversationId, request.question());
-                // 更新对话标识符
                 UUID resolvedConversationId = conversation.id();
                 activeConversationId = resolvedConversationId;
-                // 发送流式响应开始事件
                 sink.next(AgentStreamEvent.start(resolvedConversationId));
-                // 保存用户提问
                 conversationService.appendUserMessage(ownerUserId, resolvedConversationId, request.question());
-                // 获取最近会话历史
                 List<ConversationService.MessageView> history = conversationService.recentMessages(
                         ownerUserId,
                         resolvedConversationId,
                         ConversationService.DEFAULT_HISTORY_MESSAGE_LIMIT
                 );
-                // 获取最近 Literature 搜索上下文
                 LiteratureSearchContext lastLiteratureContext = literatureSearchContextResolver.resolve(history).orElse(null);
                 log.info("agent.ask.context ownerUserId={} conversationId={} historyCount={} topK={} hasLiteratureContext={}",
                         ownerUserId, resolvedConversationId, history.size(), request.topK(), lastLiteratureContext != null);
 
-                // 执行 agent loop
                 AgentLoop.AgentLoopResult result = agentLoop.run(
                         ownerUserId,
                         resolvedConversationId,
@@ -73,9 +58,7 @@ public class AgentService {
                         lastLiteratureContext,
                         sink::next
                 );
-                // 生成最终回答
                 String answer = streamFinalAnswer(resolvedConversationId, request.question(), history, result, sink::next);
-                // 持久化到数据库
                 conversationService.appendAssistantMessage(
                         ownerUserId,
                         resolvedConversationId,
@@ -96,14 +79,6 @@ public class AgentService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    /**
-     * 根据请求中的会话标识决定创建新会话或加载已有会话。
-     *
-     * @param ownerUserId    当前用户标识
-     * @param conversationId 请求携带的会话标识；为空时创建新会话
-     * @param question       用户本轮问题，用于新会话标题或初始上下文
-     * @return 可继续写入消息的会话视图
-     */
     private ConversationService.ConversationView resolveConversation(UUID ownerUserId, UUID conversationId, String question) {
         if (conversationId == null) {
             return conversationService.createConversation(ownerUserId, question);
@@ -111,16 +86,6 @@ public class AgentService {
         return conversationService.requireConversation(ownerUserId, conversationId);
     }
 
-    /**
-     * 使用最终回答生成器输出回答增量，并在空流时回退到非流式回答。
-     *
-     * @param conversationId 当前会话标识
-     * @param question       用户本轮问题
-     * @param history        最近会话历史
-     * @param result         智能体执行循环结果
-     * @param sink           流式事件消费者
-     * @return 完整最终回答文本
-     */
     private String streamFinalAnswer(UUID conversationId,
                                      String question,
                                      List<ConversationService.MessageView> history,
@@ -153,14 +118,6 @@ public class AgentService {
         return answerBuffer.toString();
     }
 
-    /**
-     * 追加并发送回答增量，忽略空片段以保持事件流紧凑。
-     *
-     * @param conversationId 当前会话标识
-     * @param delta          模型返回的增量文本
-     * @param answerBuffer   已累计的回答内容
-     * @param sink           流式事件消费者
-     */
     private void emitAnswerDelta(UUID conversationId,
                                  String delta,
                                  StringBuilder answerBuffer,
@@ -172,14 +129,6 @@ public class AgentService {
         sink.accept(AgentStreamEvent.delta(conversationId, delta));
     }
 
-    /**
-     * 生成最终回答的兜底内容，优先使用规划器回答，其次使用执行循环草稿。
-     *
-     * @param question 用户本轮问题
-     * @param history  最近会话历史
-     * @param result   智能体执行循环结果
-     * @return 可展示的最终回答文本
-     */
     private String fallbackFinalAnswer(String question,
                                        List<ConversationService.MessageView> history,
                                        AgentLoop.AgentLoopResult result) {
@@ -193,32 +142,14 @@ public class AgentService {
         return answer;
     }
 
-    /**
-     * 将纳秒起点换算为毫秒耗时，用于日志记录。
-     *
-     * @param startNanos 起始纳秒时间
-     * @return 已经过的毫秒数
-     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
-    /**
-     * 计算文本长度，空文本按 0 处理。
-     *
-     * @param text 待统计文本
-     * @return 文本长度
-     */
     private int textLength(String text) {
         return text == null ? 0 : text.length();
     }
 
-    /**
-     * 提取可返回给用户的安全错误信息。
-     *
-     * @param ex 执行异常
-     * @return 用户可见的错误提示
-     */
     private String userSafeMessage(RuntimeException ex) {
         if (ex == null || ex.getMessage() == null || ex.getMessage().isBlank()) {
             return "智能体执行失败";
