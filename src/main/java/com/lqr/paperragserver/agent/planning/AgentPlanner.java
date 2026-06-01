@@ -26,6 +26,16 @@ public class AgentPlanner {
     private final AgentFallbackPolicy fallbackPolicy;
     private final LiteratureContextPolicy literatureContextPolicy;
 
+    /**
+     * 基于用户目标和当前执行状态生成下一步智能体决策。
+     *
+     * @param question     用户当前目标
+     * @param history      最近会话历史
+     * @param steps        已执行步骤
+     * @param observations 工具观察结果
+     * @param topK         本地检索片段数量配置
+     * @return 智能体下一步决策
+     */
     public AgentDecision decide(String question,
                                 List<ConversationService.MessageView> history,
                                 List<AgentStep> steps,
@@ -34,6 +44,17 @@ public class AgentPlanner {
         return decide(question, history, null, steps, observations, topK);
     }
 
+    /**
+     * 基于用户目标、历史和文献上下文生成下一步智能体决策。
+     *
+     * @param question              用户当前目标
+     * @param history               最近会话历史
+     * @param lastLiteratureContext 最近一次文献搜索上下文
+     * @param steps                 已执行步骤
+     * @param observations          工具观察结果
+     * @param topK                  本地检索片段数量配置
+     * @return 智能体下一步决策
+     */
     public AgentDecision decide(String question,
                                 List<ConversationService.MessageView> history,
                                 LiteratureSearchContext lastLiteratureContext,
@@ -67,6 +88,15 @@ public class AgentPlanner {
         }
     }
 
+    /**
+     * 基于工具观察生成非流式最终回答。
+     *
+     * @param question     用户当前目标
+     * @param history      最近会话历史
+     * @param steps        已执行步骤
+     * @param observations 工具观察结果
+     * @return 最终回答文本
+     */
     public String finalAnswer(String question,
                               List<ConversationService.MessageView> history,
                               List<AgentStep> steps,
@@ -91,6 +121,15 @@ public class AgentPlanner {
         }
     }
 
+    /**
+     * 基于工具观察生成流式最终回答。
+     *
+     * @param question     用户当前目标
+     * @param history      最近会话历史
+     * @param steps        已执行步骤
+     * @param observations 工具观察结果
+     * @return 回答文本增量流
+     */
     public Flux<String> finalAnswerStream(String question,
                                           List<ConversationService.MessageView> history,
                                           List<AgentStep> steps,
@@ -102,14 +141,32 @@ public class AgentPlanner {
                 .filter(delta -> delta != null && !delta.isEmpty());
     }
 
+    /**
+     * 计算列表大小，空列表引用按 0 处理。
+     *
+     * @param items 待统计列表
+     * @return 列表大小
+     */
     private int size(List<?> items) {
         return items == null ? 0 : items.size();
     }
 
+    /**
+     * 计算文本长度，空文本引用按 0 处理。
+     *
+     * @param text 待统计文本
+     * @return 文本长度
+     */
     private int textLength(String text) {
         return text == null ? 0 : text.length();
     }
 
+    /**
+     * 将纳秒起点换算为毫秒耗时，用于日志记录。
+     *
+     * @param startNanos 起始纳秒时间
+     * @return 已经过的毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }

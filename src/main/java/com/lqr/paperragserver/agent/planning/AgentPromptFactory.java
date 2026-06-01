@@ -16,6 +16,17 @@ public class AgentPromptFactory {
 
     private final AgentToolRegistry toolRegistry;
 
+    /**
+     * 构造智能体决策提示词，汇总用户目标、历史消息、文献上下文、已执行步骤和工具观察。
+     *
+     * @param question              用户当前目标
+     * @param history               最近会话历史
+     * @param lastLiteratureContext 最近一次文献搜索上下文
+     * @param steps                 已执行步骤
+     * @param observations          工具观察结果
+     * @param topK                  本地检索片段数量配置
+     * @return 决策阶段提示词
+     */
     public PromptConstructionService.Prompt decisionPrompt(String question,
                                                            List<ConversationService.MessageView> history,
                                                            LiteratureSearchContext lastLiteratureContext,
@@ -53,6 +64,15 @@ public class AgentPromptFactory {
         return new PromptConstructionService.Prompt(system, user);
     }
 
+    /**
+     * 构造最终回答提示词，要求模型基于工具观察生成面向用户的回答。
+     *
+     * @param question     用户当前目标
+     * @param history      最近会话历史
+     * @param steps        已执行步骤
+     * @param observations 工具观察结果
+     * @return 最终回答阶段提示词
+     */
     public PromptConstructionService.Prompt finalAnswerPrompt(String question,
                                                               List<ConversationService.MessageView> history,
                                                               List<AgentStep> steps,
@@ -71,6 +91,12 @@ public class AgentPromptFactory {
         return new PromptConstructionService.Prompt(system, user);
     }
 
+    /**
+     * 将最近会话历史格式化为提示词中的上下文文本。
+     *
+     * @param history 最近会话历史
+     * @return 历史上下文文本
+     */
     private String formatHistory(List<ConversationService.MessageView> history) {
         if (history == null || history.isEmpty()) {
             return "(无历史)";
@@ -81,6 +107,12 @@ public class AgentPromptFactory {
                 .orElse("(无历史)");
     }
 
+    /**
+     * 将最近一次文献搜索状态格式化为提示词上下文。
+     *
+     * @param context 文献搜索上下文
+     * @return 文献搜索状态文本
+     */
     private String formatLiteratureContext(LiteratureSearchContext context) {
         if (context == null) {
             return "(无文献搜索状态)";
@@ -105,6 +137,12 @@ public class AgentPromptFactory {
         return builder.toString();
     }
 
+    /**
+     * 将已执行步骤格式化为提示词中的轨迹文本。
+     *
+     * @param steps 已执行步骤
+     * @return 步骤轨迹文本
+     */
     private String formatSteps(List<AgentStep> steps) {
         if (steps == null || steps.isEmpty()) {
             return "(尚未执行)";
@@ -115,6 +153,12 @@ public class AgentPromptFactory {
                 .orElse("(尚未执行)");
     }
 
+    /**
+     * 将工具观察结果格式化为提示词证据文本。
+     *
+     * @param observations 工具观察结果
+     * @return 观察结果文本
+     */
     private String formatObservations(List<String> observations) {
         if (observations == null || observations.isEmpty()) {
             return "(暂无观察)";

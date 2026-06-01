@@ -18,6 +18,13 @@ public class CitationNormalizer {
 
     private final RagProperties ragProperties;
 
+    /**
+     * 对召回引用去重、排序并裁剪到目标数量。
+     *
+     * @param citations 原始引用列表
+     * @param topK      本地检索片段数量配置
+     * @return 归一化后的引用列表
+     */
     public List<AnswerCitation> normalize(List<AnswerCitation> citations, Integer topK) {
         if (citations == null || citations.isEmpty()) {
             log.info("citation.normalize.done rawCount={} dedupCount={} citationLimit={} finalCount={} duplicateDroppedCount={} truncatedCount={}",
@@ -54,6 +61,12 @@ public class CitationNormalizer {
         return finalCitations;
     }
 
+    /**
+     * 计算引用展示数量上限，优先使用本轮 topK 配置。
+     *
+     * @param topK 本地检索片段数量配置
+     * @return 引用数量上限
+     */
     private int citationLimit(Integer topK) {
         if (topK != null && topK > 0) {
             return topK;
@@ -61,6 +74,11 @@ public class CitationNormalizer {
         return Math.max(1, ragProperties.defaultTopK());
     }
 
+    /**
+     * 在调试日志开启时输出最终引用的安全摘要。
+     *
+     * @param citations 最终引用列表
+     */
     private void logDebugCitations(List<AnswerCitation> citations) {
         if (!log.isDebugEnabled()) {
             return;
@@ -75,6 +93,12 @@ public class CitationNormalizer {
         }
     }
 
+    /**
+     * 为引用生成去重键，优先使用片段标识，缺失时退回到来源和片段序号。
+     *
+     * @param citation 引用信息
+     * @return 引用去重键
+     */
     private String citationKey(AnswerCitation citation) {
         if (hasText(citation.chunkId())) {
             return "chunk:" + citation.chunkId();
@@ -82,10 +106,22 @@ public class CitationNormalizer {
         return "source-chunk:" + nullToEmpty(citation.sourceId()) + ':' + citation.chunkIndex();
     }
 
+    /**
+     * 判断文本是否包含非空白内容。
+     *
+     * @param value 待判断文本
+     * @return 是否存在有效文本
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * 将空值转换为空字符串，便于构建引用去重键。
+     *
+     * @param value 输入文本
+     * @return 非空文本或空字符串
+     */
     private String nullToEmpty(String value) {
         return value == null ? "" : value;
     }
