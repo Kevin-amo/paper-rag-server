@@ -1,5 +1,9 @@
 package com.lqr.paperragserver.auth.web;
 
+import com.lqr.paperragserver.auth.dto.ChangeDisplayNameRequest;
+import com.lqr.paperragserver.auth.dto.ChangeEmailCodeRequest;
+import com.lqr.paperragserver.auth.dto.ChangeEmailRequest;
+import com.lqr.paperragserver.auth.dto.ChangePasswordRequest;
 import com.lqr.paperragserver.auth.dto.LoginRequest;
 import com.lqr.paperragserver.auth.dto.RegisterEmailCodeRequest;
 import com.lqr.paperragserver.auth.dto.RegisterRequest;
@@ -54,6 +58,31 @@ public class AuthController {
     public AuthService.CurrentUser uploadAvatar(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                 @RequestParam("file") MultipartFile file) {
         return userAvatarService.uploadAvatar(principal, file);
+    }
+
+    @PostMapping("/me/password")
+    public AuthService.CurrentUser changePassword(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                  @Valid @RequestBody ChangePasswordRequest request) {
+        return authService.changePassword(principal, request.currentPassword(), request.newPassword());
+    }
+
+    @PostMapping("/me/display-name")
+    public AuthService.CurrentUser changeDisplayName(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                     @Valid @RequestBody ChangeDisplayNameRequest request) {
+        return authService.changeDisplayName(principal, request.displayName());
+    }
+
+    @PostMapping("/me/email-code")
+    public void createChangeEmailCode(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                      @Valid @RequestBody ChangeEmailCodeRequest request,
+                                      HttpServletRequest httpRequest) {
+        authService.createChangeEmailCode(principal, request.email(), clientIp(httpRequest));
+    }
+
+    @PostMapping("/me/email")
+    public AuthService.CurrentUser changeEmail(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                               @Valid @RequestBody ChangeEmailRequest request) {
+        return authService.changeEmail(principal, request.email(), request.emailCode());
     }
 
     @PostMapping("/logout")

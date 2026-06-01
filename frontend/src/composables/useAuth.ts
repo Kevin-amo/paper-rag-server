@@ -1,9 +1,13 @@
 import { computed } from 'vue';
 import {
+  changeDisplayName as changeDisplayNameRequest,
+  changeEmail as changeEmailRequest,
+  changePassword as changePasswordRequest,
   getCurrentUser,
   login as loginRequest,
   logout as logoutRequest,
   register as registerRequest,
+  requestChangeEmailCode as requestChangeEmailCodeRequest,
   requestRegisterEmailCode as requestRegisterEmailCodeRequest,
   uploadAvatar as uploadAvatarRequest,
 } from '../api/auth';
@@ -45,6 +49,28 @@ export function useAuth() {
     return user;
   }
 
+  async function changePassword(currentPassword: string, newPassword: string) {
+    const user = await changePasswordRequest({ currentPassword, newPassword });
+    updateCurrentUser(user);
+    return user;
+  }
+
+  async function changeDisplayName(displayName: string) {
+    const user = await changeDisplayNameRequest({ displayName });
+    updateCurrentUser(user);
+    return user;
+  }
+
+  async function requestChangeEmailCode(email: string) {
+    await requestChangeEmailCodeRequest({ email });
+  }
+
+  async function changeEmail(email: string, emailCode: string) {
+    const user = await changeEmailRequest({ email, emailCode });
+    updateCurrentUser(user);
+    return user;
+  }
+
   async function logout() {
     try {
       if (getAccessToken()) {
@@ -67,6 +93,10 @@ export function useAuth() {
     requestRegisterEmailCode,
     register,
     uploadAvatar,
+    changePassword,
+    changeDisplayName,
+    requestChangeEmailCode,
+    changeEmail,
     logout,
     hydrateCurrentUser,
     hasRole,

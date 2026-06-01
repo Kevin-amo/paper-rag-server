@@ -17,6 +17,14 @@ public interface AuthService {
 
     CurrentUser currentUser(SecurityUserPrincipal principal);
 
+    CurrentUser changePassword(SecurityUserPrincipal principal, String currentPassword, String newPassword);
+
+    CurrentUser changeDisplayName(SecurityUserPrincipal principal, String displayName);
+
+    void createChangeEmailCode(SecurityUserPrincipal principal, String email, String clientIp);
+
+    CurrentUser changeEmail(SecurityUserPrincipal principal, String email, String emailCode);
+
     /**
      * 登录成功响应，包含访问令牌和当前用户摘要。
      */

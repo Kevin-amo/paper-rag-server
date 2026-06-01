@@ -40,7 +40,7 @@ const emit = defineEmits<{
   renameConversation: [conversationId: string, title: string];
   openDocuments: [];
   goAdmin: [];
-  openAvatarUpload: [];
+  openAccountManagement: [];
   logout: [];
 }>();
 
@@ -280,7 +280,7 @@ function conversationTitle(conversation: Conversation) {
     </section>
 
     <footer class="user-footer">
-      <button class="user-avatar" type="button" title="更换头像" @click="emit('openAvatarUpload')">
+      <button class="user-avatar" type="button" title="账号管理" @click="emit('openAccountManagement')">
         <img v-if="props.currentUserAvatarUrl" :src="props.currentUserAvatarUrl" alt="用户头像">
         <el-icon v-else><User /></el-icon>
       </button>
