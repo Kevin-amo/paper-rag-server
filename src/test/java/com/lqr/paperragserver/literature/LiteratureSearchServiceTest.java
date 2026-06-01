@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.literature;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.literature.client.OpenAlexLiteratureClient;
 import com.lqr.paperragserver.literature.config.LiteratureSearchProperties;
 import com.lqr.paperragserver.literature.exception.LiteratureSearchException;
@@ -10,16 +11,21 @@ import com.lqr.paperragserver.literature.service.LiteratureSearchService;
 import com.lqr.paperragserver.literature.support.LiteratureSearchCache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -33,7 +39,7 @@ class LiteratureSearchServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new LiteratureSearchService(searchProperties(true, true), openAlexLiteratureClient, new LiteratureSearchCache());
+        service = new LiteratureSearchService(searchProperties(true, true), openAlexLiteratureClient, testCache());
     }
 
     @Test
@@ -144,7 +150,7 @@ class LiteratureSearchServiceTest {
 
     @Test
     void searchShouldFailClearlyWhenOpenAlexDisabled() {
-        LiteratureSearchService disabledService = new LiteratureSearchService(searchProperties(false, true), openAlexLiteratureClient, new LiteratureSearchCache());
+        LiteratureSearchService disabledService = new LiteratureSearchService(searchProperties(false, true), openAlexLiteratureClient, testCache());
 
         assertThatThrownBy(() -> disabledService.search(new LiteratureSearchRequest("Graph RAG", null, null, null, null)))
                 .isInstanceOf(LiteratureSearchException.class)
@@ -234,6 +240,19 @@ class LiteratureSearchServiceTest {
                 new LiteratureSearchProperties.OpenAlex(openAlexEnabled, "https://api.openalex.org/works", Duration.ofSeconds(10), null),
                 new LiteratureSearchProperties.Cache(cacheEnabled, Duration.ofMinutes(20))
         );
+    }
+
+    private LiteratureSearchCache testCache() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
+        Map<String, String> store = new HashMap<>();
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(anyString())).thenAnswer(invocation -> store.get(invocation.getArgument(0)));
+        doAnswer(invocation -> {
+            store.put(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(valueOperations).set(anyString(), anyString(), any(Duration.class));
+        return new LiteratureSearchCache(redisTemplate, new ObjectMapper());
     }
 
     private LiteratureSearchResult openAlexResult(String title) {
