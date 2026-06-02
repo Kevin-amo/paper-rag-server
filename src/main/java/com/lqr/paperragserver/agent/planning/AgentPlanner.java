@@ -25,6 +25,7 @@ public class AgentPlanner {
     private final AgentDecisionParser decisionParser;
     private final AgentFallbackPolicy fallbackPolicy;
     private final LiteratureContextPolicy literatureContextPolicy;
+    private final AgentHybridTaskPolicy hybridTaskPolicy;
 
     /**
      * 基于用户目标和当前执行状态生成下一步智能体决策。
@@ -65,6 +66,12 @@ public class AgentPlanner {
         log.info("agent.plan.start questionLength={} questionExcerpt={} historyCount={} stepsCount={} observationsCount={} topK={}",
                 textLength(question), LogSanitizer.safeExcerpt(question, 160), size(history), size(steps), size(observations), topK);
         try {
+            AgentDecision hybridDecision = hybridTaskPolicy.decide(question, steps, topK);
+            if (hybridDecision != null) {
+                log.info("agent.plan.done action={} finish={} actionInputSummary={} reason=HYBRID_TASK costMs={}",
+                        hybridDecision.action(), hybridDecision.finish(), LogSanitizer.safeActionInput(hybridDecision.actionInput()), elapsedMs(startNanos));
+                return hybridDecision;
+            }
             PromptConstructionService.Prompt prompt = promptFactory.decisionPrompt(question, history, lastLiteratureContext, steps, observations, topK);
             log.debug("agent.plan.prompt questionExcerpt={} promptSystemExcerpt={} promptUserExcerpt={}",
                     LogSanitizer.safeExcerpt(question, 160), LogSanitizer.safeExcerpt(prompt.systemMessage(), 500), LogSanitizer.safeExcerpt(prompt.userMessage(), 500));
@@ -84,7 +91,7 @@ public class AgentPlanner {
         } catch (RuntimeException ex) {
             log.warn("agent.plan.fallback questionLength={} observationsCount={} topK={} reason=RUNTIME_EXCEPTION costMs={}",
                     textLength(question), size(observations), topK, elapsedMs(startNanos), ex);
-            return fallbackPolicy.decision(question, observations, lastLiteratureContext, topK);
+            return fallbackPolicy.decision(question, steps, observations, lastLiteratureContext, topK);
         }
     }
 

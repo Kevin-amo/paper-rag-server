@@ -97,6 +97,21 @@ public class VectorWriteServiceImpl implements VectorWriteService {
         log.info("vector.delete.done ownerUserId={} sourceId={} costMs={}", ownerUserId, sourceId, elapsedMs(startNanos));
     }
 
+    /**
+     * 删除当前用户的全部向量记录。
+     */
+    @Override
+    @Transactional
+    public void deleteByOwnerUserId(UUID ownerUserId) {
+        if (ownerUserId == null) {
+            log.warn("vector.delete-all.skipped ownerUserId={} reason=INVALID_ARGUMENT", ownerUserId);
+            return;
+        }
+        long startNanos = System.nanoTime();
+        vectorStoreMapper.deleteByOwnerUserId(ownerUserId.toString());
+        log.info("vector.delete-all.done ownerUserId={} costMs={}", ownerUserId, elapsedMs(startNanos));
+    }
+
     private Map<String, Long> sourceDistribution(List<EmbeddingService.EmbeddingVector> vectors) {
         return vectors.stream()
                 .map(vector -> vector.chunk().sourceId())

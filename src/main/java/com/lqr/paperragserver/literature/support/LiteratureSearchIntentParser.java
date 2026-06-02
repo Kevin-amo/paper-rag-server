@@ -21,6 +21,12 @@ public class LiteratureSearchIntentParser {
     private static final Pattern CHINESE_LIMIT_PATTERN = Pattern.compile("(一|两|二|三|四|五|六|七|八|九|十)\\s*(篇|个|条|篇论文|篇文献)");
     private static final Pattern FOLLOW_UP_PATTERN = Pattern.compile(".*(有吗|有没有|有没|这些里面|这些文献|上面结果|上面的|里面|再找|再来|更多|最新的?|最近的?|换成|改成).*", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Pattern PREVIOUS_ITEMS_PATTERN = Pattern.compile(".*(这些里面|这些文献|上面结果|上面的|上述|里面).*", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+    private static final List<String> COMPOSITE_QUERY_BOUNDARIES = List.of(
+            "并结合", "结合我的知识库", "结合本地知识库", "结合知识库",
+            "根据我的知识库", "基于我的知识库", "用我的文档", "利用我的文档",
+            "用我的论文", "利用我的论文", "根据我的文档", "基于我的文档",
+            "总结趋势", "总结研究趋势", "归纳趋势", "分析趋势"
+    );
 
     public Intent parse(String userInput) {
         return parse(userInput, null);
@@ -133,7 +139,7 @@ public class LiteratureSearchIntentParser {
         if (userInput == null || userInput.isBlank()) {
             return userInput;
         }
-        String text = userInput.trim();
+        String text = truncateCompositeTask(userInput.trim());
         var aboutMatcher = ABOUT_PATTERN.matcher(text);
         if (aboutMatcher.find()) {
             text = aboutMatcher.group(1).trim();
@@ -147,6 +153,21 @@ public class LiteratureSearchIntentParser {
         text = text.replaceFirst("(?iu)\\s*(的)?\\s*(论文|文献|文章|papers?|articles?|literature)$", "");
         text = text.trim();
         return text.isBlank() || isOnlyFilter(text) ? null : text;
+    }
+
+    private String truncateCompositeTask(String text) {
+        String candidate = text == null ? "" : text.trim();
+        int boundaryIndex = -1;
+        for (String boundary : COMPOSITE_QUERY_BOUNDARIES) {
+            int index = candidate.indexOf(boundary);
+            if (index >= 0 && (boundaryIndex < 0 || index < boundaryIndex)) {
+                boundaryIndex = index;
+            }
+        }
+        if (boundaryIndex < 0) {
+            return candidate;
+        }
+        return candidate.substring(0, boundaryIndex).replaceFirst("[，。,.;；、\\s]+$", "").trim();
     }
 
     public record Intent(

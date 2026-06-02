@@ -1,6 +1,7 @@
 package com.lqr.paperragserver.agent.core;
 
 import com.lqr.paperragserver.agent.paper.CitationNormalizer;
+import com.lqr.paperragserver.agent.planning.AgentHybridTaskPolicy;
 import com.lqr.paperragserver.agent.planning.AgentPlanner;
 import com.lqr.paperragserver.agent.tool.AgentTool;
 import com.lqr.paperragserver.agent.tool.AgentToolRegistry;
@@ -30,6 +31,7 @@ public class AgentRuntime {
     private final AgentPlanner planner;
     private final AgentToolRegistry toolRegistry;
     private final CitationNormalizer citationNormalizer;
+    private final AgentHybridTaskPolicy hybridTaskPolicy;
 
     /**
      * 执行完整 ReAct 循环，按规划决策调用工具并累计步骤、观察、引用和元数据。
@@ -94,7 +96,6 @@ public class AgentRuntime {
                     ownerUserId, conversationId, index, tool.name(), textLength(result.observationSummary()), result.citations().size(), metadataKeys(result.metadata()), elapsedMs(toolStartNanos));
             citations.addAll(result.citations());
             observations.add(result.evidenceText());
-            mergeMetadata(extraMetadata, result.metadata());
             AgentStep trace = new AgentStep(
                     index,
                     thoughtSummary,
@@ -105,12 +106,22 @@ public class AgentRuntime {
             steps.add(trace);
             sink.accept(AgentRuntimeEvent.toolResult(index, tool.name(), result.observationSummary()));
             if (isToolUnavailable(result.metadata())) {
+                if (hybridTaskPolicy.shouldContinueAfterLiteratureUnavailable(question, tool.name(), steps)) {
+                    extraMetadata.put("literatureUnavailable", true);
+                    Object reason = result.metadata().get("toolErrorMessage");
+                    extraMetadata.putIfAbsent("literatureUnavailableReason", reason == null ? "外部文献工具暂不可用" : reason);
+                    log.warn("agent.loop.continue ownerUserId={} conversationId={} step={} reason=HYBRID_LITERATURE_UNAVAILABLE toolName={}",
+                            ownerUserId, conversationId, index, tool.name());
+                    continue;
+                }
+                mergeMetadata(extraMetadata, result.metadata());
                 Map<String, Object> metadata = metadata(steps, extraMetadata);
                 metadata.put("stopReason", "TOOL_UNAVAILABLE");
                 log.warn("agent.loop.stop ownerUserId={} conversationId={} step={} stopReason=TOOL_UNAVAILABLE toolName={}",
                         ownerUserId, conversationId, index, tool.name());
                 return result(null, citations, topK, metadata, steps, observations);
             }
+            mergeMetadata(extraMetadata, result.metadata());
         }
 
         Map<String, Object> metadata = metadata(steps, extraMetadata);

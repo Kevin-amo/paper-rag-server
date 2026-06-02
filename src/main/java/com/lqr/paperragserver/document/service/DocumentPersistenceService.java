@@ -90,6 +90,11 @@ public interface DocumentPersistenceService {
      */
     void markDeleted(UUID ownerUserId, String sourceId);
 
+    /**
+     * 软删除当前用户的全部有效文档。
+     */
+    void markAllDeleted(UUID ownerUserId);
+
     record PageResult<T>(List<T> items, int page, int size, long total) {
     }
 

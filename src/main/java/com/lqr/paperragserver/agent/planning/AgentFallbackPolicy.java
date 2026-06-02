@@ -2,6 +2,7 @@ package com.lqr.paperragserver.agent.planning;
 
 import com.lqr.paperragserver.agent.core.AgentActionType;
 import com.lqr.paperragserver.agent.core.AgentDecision;
+import com.lqr.paperragserver.agent.core.AgentStep;
 import com.lqr.paperragserver.agent.paper.LiteratureFollowUpPolicy;
 import com.lqr.paperragserver.common.logging.LogSanitizer;
 import com.lqr.paperragserver.literature.model.LiteratureSearchContext;
@@ -17,20 +18,27 @@ import java.util.Map;
 public class AgentFallbackPolicy {
 
     private final LiteratureFollowUpPolicy literatureFollowUpPolicy;
+    private final AgentHybridTaskPolicy hybridTaskPolicy;
 
     /**
      * 在模型不可用或决策失败时，根据问题类型选择可执行的兜底动作。
      *
      * @param question              用户当前问题
+     * @param steps                 已执行步骤
      * @param observations          当前已有观察结果
      * @param lastLiteratureContext 最近一次文献搜索上下文
      * @param topK                  本地检索片段数量配置
      * @return 兜底智能体决策
      */
     public AgentDecision decision(String question,
+                                  List<AgentStep> steps,
                                   List<String> observations,
                                   LiteratureSearchContext lastLiteratureContext,
                                   Integer topK) {
+        AgentDecision hybridDecision = hybridTaskPolicy.decide(question, steps, topK);
+        if (hybridDecision != null && !hybridDecision.finish()) {
+            return hybridDecision;
+        }
         if (observations != null && !observations.isEmpty()) {
             return AgentDecision.finish("已有工具观察，直接整理当前结果。", answerFromObservations(observations));
         }

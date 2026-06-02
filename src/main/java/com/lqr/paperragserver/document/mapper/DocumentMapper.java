@@ -158,6 +158,18 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
     int markDeleted(@Param("ownerUserId") UUID ownerUserId, @Param("sourceId") String sourceId);
 
     /**
+     * 软删除当前用户的全部有效文档。
+     */
+    @Update("""
+            update public.paper_document
+            set status = 'DELETED', deleted_at = now(), updated_at = now()
+            where owner_user_id = #{ownerUserId}
+              and deleted_at is null
+              and status <> 'DELETED'
+            """)
+    int markAllDeleted(@Param("ownerUserId") UUID ownerUserId);
+
+    /**
      * 统计指定来源 ID 的有效文档数量。
      */
     @Select("""

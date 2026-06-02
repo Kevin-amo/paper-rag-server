@@ -231,6 +231,56 @@ class DocumentSplittingServiceImplTest {
         assertThat(chunks.getFirst().metadata()).containsEntry("sectionTitle", "Abstract");
     }
     @Test
+    void splitShouldRemoveVisualArtifactLineRunsFromPdfImageText() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(800, 120, 5, 0));
+        DocumentSource source = new DocumentSource("source-visual-artifacts", "RAG Survey", "paper.pdf", Map.of("title", "RAG Survey"));
+        String text = """
+                1 Introduction
+
+                Our contributions are as follows:
+                In this survey, we present a thorough and systematic review of RAG methods.
+                ar
+
+                X
+
+                iv
+
+                :2
+
+                10 99
+
+                99
+
+                7v
+
+                5
+
+                [
+
+                cs
+
+                .C
+
+                L
+
+                ]
+
+                2
+                """;
+
+        List<DocumentChunk> chunks = service.split(source, text);
+
+        assertThat(chunks).hasSize(1);
+        assertThat(chunks.getFirst().content())
+                .contains("Our contributions are as follows")
+                .contains("systematic review of RAG methods")
+                .doesNotContain("\nar\n")
+                .doesNotContain("10 99")
+                .doesNotContain("\ncs\n")
+                .doesNotContain(".C");
+    }
+
+    @Test
     void splitShouldReturnEmptyListForBlankText() {
         DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(8, 2, 5, 0));
         DocumentSource source = new DocumentSource("source-1", "Paper A", "paper.pdf", Map.of());

@@ -209,6 +209,12 @@ public class DocumentController {
         return detail(principal, sourceId);
     }
 
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAll(@AuthenticationPrincipal SecurityUserPrincipal principal) {
+        documentIngestionService.deleteAll(principal.getId());
+    }
+
     @DeleteMapping("/{sourceId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteBySourceId(@AuthenticationPrincipal SecurityUserPrincipal principal,

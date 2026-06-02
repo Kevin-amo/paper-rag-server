@@ -3,14 +3,17 @@ package com.lqr.paperragserver.agent;
 import com.lqr.paperragserver.agent.core.AgentActionType;
 import com.lqr.paperragserver.agent.core.AgentDecision;
 import com.lqr.paperragserver.agent.core.AgentRuntime;
+import com.lqr.paperragserver.agent.core.AgentStep;
 import com.lqr.paperragserver.agent.dto.AgentStreamEvent;
 import com.lqr.paperragserver.agent.paper.CitationNormalizer;
 import com.lqr.paperragserver.agent.tool.AgentToolResult;
 import com.lqr.paperragserver.agent.service.AgentLoop;
+import com.lqr.paperragserver.agent.planning.AgentHybridTaskPolicy;
 import com.lqr.paperragserver.agent.planning.AgentPlanner;
 import com.lqr.paperragserver.agent.tool.AgentTool;
 import com.lqr.paperragserver.agent.tool.AgentToolRegistry;
 import com.lqr.paperragserver.common.model.AnswerCitation;
+import com.lqr.paperragserver.literature.support.LiteratureSearchIntentParser;
 import com.lqr.paperragserver.rag.config.RagProperties;
 import org.junit.jupiter.api.Test;
 
@@ -49,7 +52,7 @@ class AgentLoopTest {
                 List.of(new AnswerCitation("source-1", "chunk-1", 1, "Paper A", "excerpt", 0.9)),
                 Map.of("localPaperChunks", List.of(Map.of("chunkId", "chunk-1")))
         ));
-        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(3)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
@@ -86,7 +89,7 @@ class AgentLoopTest {
                 citations("single", 10, 0.1),
                 Map.of("localPaperChunks", List.of())
         ));
-        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(8)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
@@ -116,7 +119,7 @@ class AgentLoopTest {
                 new AgentToolResult("第一次找到 8 个相关片段。", "第一次本地论文证据", citations("first", 8, 0.1), Map.of()),
                 new AgentToolResult("第二次找到 8 个相关片段。", "第二次本地论文证据", citations("second", 8, 10.1), Map.of())
         );
-        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(8)))
                 .thenReturn(new AgentDecision(
                         "先检索一个角度。",
@@ -155,7 +158,7 @@ class AgentLoopTest {
         AgentTool tool = mockTool("local_paper_retrieval",
                 new AgentToolResult("找到 2 个相关片段。", "本地论文证据", List.of(lower, higher), Map.of())
         );
-        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(8)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
@@ -189,7 +192,7 @@ class AgentLoopTest {
                         "items", literatureItems
                 ))
         ));
-        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(3)))
                 .thenReturn(new AgentDecision(
                         "搜索外部文献。",
@@ -222,7 +225,7 @@ class AgentLoopTest {
                 citations("default", 5, 0.1),
                 Map.of()
         ));
-        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(null)))
                 .thenReturn(new AgentDecision(
                         "先检索本地论文。",
@@ -255,7 +258,7 @@ class AgentLoopTest {
                         "items", List.of(Map.of("title", "RAG Paper"))
                 ))
         ));
-        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
         when(planner.decide(eq("给我搜一篇关于 RAG 的文献，要最新的"), anyList(), any(), anyList(), anyList(), eq(3)))
                 .thenReturn(new AgentDecision(
                         "虽然本地知识库有3篇相关论文，但用户需要最新文献",
@@ -291,7 +294,7 @@ class AgentLoopTest {
                 List.of(),
                 Map.of("literature", Map.of("type", "LITERATURE_SEARCH_RESULT", "query", "问题", "items", List.of()))
         ));
-        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(null)))
                 .thenReturn(new AgentDecision(
                         "继续搜索。",
@@ -322,7 +325,7 @@ class AgentLoopTest {
         when(tool.name()).thenReturn("literature_search");
         when(tool.description()).thenReturn("literature_search description");
         when(tool.execute(any(), any())).thenThrow(new RuntimeException("外部文献服务暂不可用，请稍后重试"));
-        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties())));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(tool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
         when(planner.decide(eq("问题"), anyList(), any(), anyList(), anyList(), eq(null)))
                 .thenReturn(new AgentDecision(
                         "先搜索外部文献。",
@@ -341,6 +344,117 @@ class AgentLoopTest {
         assertThat(result.metadata()).containsEntry("stopReason", "TOOL_UNAVAILABLE");
         assertThat(events.stream().map(AgentStreamEvent::type)).contains("tool_result");
         verify(tool, times(1)).execute(eq(ownerUserId), any());
+    }
+
+    /**
+     * 验证复合任务会按外部文献、本地知识库、结束的顺序执行。
+     */
+    @Test
+    void runShouldExecuteHybridLiteratureThenLocalRetrievalThenFinish() {
+        String question = "帮我找 Graph RAG 最新论文，并结合我的知识库总结趋势";
+        AgentPlanner planner = mock(AgentPlanner.class);
+        AgentTool literatureTool = mockTool("literature_search", new AgentToolResult(
+                "外部文献搜索完成，找到 1 篇论文。",
+                "外部文献证据",
+                List.of(),
+                Map.of("literature", Map.of("type", "LITERATURE_SEARCH_RESULT", "query", "Graph RAG", "items", literatureItems(1)))
+        ));
+        AgentTool localTool = mockTool("local_paper_retrieval", new AgentToolResult(
+                "本地论文检索完成，找到 1 个相关片段。",
+                "本地论文证据",
+                citations("hybrid", 1, 0.9),
+                Map.of("localPaperChunks", List.of(Map.of("chunkId", "chunk-hybrid-0")))
+        ));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(literatureTool, localTool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
+        when(planner.decide(eq(question), anyList(), any(), anyList(), anyList(), eq(5)))
+                .thenReturn(new AgentDecision("搜索外部文献。", AgentActionType.LITERATURE_SEARCH, Map.of("query", "Graph RAG", "limit", 5, "sortBy", "date"), false, null))
+                .thenReturn(new AgentDecision("检索本地知识库。", AgentActionType.LOCAL_PAPER_RETRIEVAL, Map.of("query", "Graph RAG 研究趋势", "topK", 5), false, null))
+                .thenReturn(AgentDecision.finish("证据足够。", "最终回答"));
+        List<AgentStreamEvent> events = new ArrayList<>();
+
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, question, 5, List.of(), null, events::add);
+
+        assertThat(result.draftAnswer()).isEqualTo("最终回答");
+        assertThat(result.steps()).extracting(AgentStep::action).containsExactly("literature_search", "local_paper_retrieval");
+        assertThat(result.observations()).containsExactly("外部文献证据", "本地论文证据");
+        assertThat(events.stream().filter(event -> "tool_call".equals(event.type())).map(AgentStreamEvent::toolName))
+                .containsExactly("literature_search", "local_paper_retrieval");
+        verify(literatureTool, times(1)).execute(eq(ownerUserId), any());
+        verify(localTool, times(1)).execute(eq(ownerUserId), any());
+    }
+
+    /**
+     * 验证文献搜索 0 篇但工具正常时，复合任务仍继续执行本地知识库检索。
+     */
+    @Test
+    void runShouldContinueLocalRetrievalWhenHybridLiteratureReturnsZeroItems() {
+        String question = "帮我找 Graph RAG 最新论文，并结合我的知识库总结趋势";
+        AgentPlanner planner = mock(AgentPlanner.class);
+        AgentTool literatureTool = mockTool("literature_search", new AgentToolResult(
+                "外部文献搜索完成，找到 0 篇论文。",
+                "未找到外部文献结果。",
+                List.of(),
+                Map.of("literature", Map.of("type", "LITERATURE_SEARCH_RESULT", "query", "Graph RAG", "items", List.of()))
+        ));
+        AgentTool localTool = mockTool("local_paper_retrieval", new AgentToolResult(
+                "本地论文检索完成，找到 1 个相关片段。",
+                "本地论文证据",
+                citations("zero", 1, 0.9),
+                Map.of("localPaperChunks", List.of(Map.of("chunkId", "chunk-zero-0")))
+        ));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(literatureTool, localTool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
+        when(planner.decide(eq(question), anyList(), any(), anyList(), anyList(), eq(4)))
+                .thenReturn(new AgentDecision("搜索外部文献。", AgentActionType.LITERATURE_SEARCH, Map.of("query", "Graph RAG", "limit", 5, "sortBy", "date"), false, null))
+                .thenReturn(new AgentDecision("检索本地知识库。", AgentActionType.LOCAL_PAPER_RETRIEVAL, Map.of("query", "Graph RAG 研究趋势", "topK", 4), false, null))
+                .thenReturn(AgentDecision.finish("证据足够。", "最终回答"));
+
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, question, 4, List.of(), null, event -> {
+        });
+
+        assertThat(result.draftAnswer()).isEqualTo("最终回答");
+        assertThat(result.observations()).containsExactly("未找到外部文献结果。", "本地论文证据");
+        assertThat(result.steps()).extracting(AgentStep::action).containsExactly("literature_search", "local_paper_retrieval");
+        assertThat(result.metadata()).doesNotContainEntry("stopReason", "TOOL_UNAVAILABLE");
+        verify(literatureTool, times(1)).execute(eq(ownerUserId), any());
+        verify(localTool, times(1)).execute(eq(ownerUserId), any());
+    }
+
+    /**
+     * 验证复合任务中文献工具不可用时，不阻断后续本地知识库检索。
+     */
+    @Test
+    void runShouldContinueLocalRetrievalWhenHybridLiteratureIsUnavailable() {
+        String question = "帮我找 Graph RAG 最新论文，并结合我的知识库总结趋势";
+        AgentPlanner planner = mock(AgentPlanner.class);
+        AgentTool literatureTool = mock(AgentTool.class);
+        when(literatureTool.name()).thenReturn("literature_search");
+        when(literatureTool.description()).thenReturn("literature_search description");
+        when(literatureTool.execute(any(), any())).thenThrow(new RuntimeException("外部文献服务暂不可用"));
+        AgentTool localTool = mockTool("local_paper_retrieval", new AgentToolResult(
+                "本地论文检索完成，找到 1 个相关片段。",
+                "本地论文证据",
+                citations("unavailable", 1, 0.9),
+                Map.of("localPaperChunks", List.of(Map.of("chunkId", "chunk-unavailable-0")))
+        ));
+        AgentLoop loop = new AgentLoop(new AgentRuntime(planner, new AgentToolRegistry(List.of(literatureTool, localTool)), new CitationNormalizer(ragProperties()), hybridTaskPolicy()));
+        when(planner.decide(eq(question), anyList(), any(), anyList(), anyList(), eq(4)))
+                .thenReturn(new AgentDecision("搜索外部文献。", AgentActionType.LITERATURE_SEARCH, Map.of("query", "Graph RAG", "limit", 5, "sortBy", "date"), false, null))
+                .thenReturn(new AgentDecision("检索本地知识库。", AgentActionType.LOCAL_PAPER_RETRIEVAL, Map.of("query", "Graph RAG 研究趋势", "topK", 4), false, null))
+                .thenReturn(AgentDecision.finish("证据足够。", "最终回答"));
+
+        AgentLoop.AgentLoopResult result = loop.run(ownerUserId, conversationId, question, 4, List.of(), null, event -> {
+        });
+
+        assertThat(result.draftAnswer()).isEqualTo("最终回答");
+        assertThat(result.observations()).anyMatch(observation -> observation.contains("外部文献服务暂不可用"));
+        assertThat(result.observations()).contains("本地论文证据");
+        assertThat(result.steps()).extracting(AgentStep::action).containsExactly("literature_search", "local_paper_retrieval");
+        assertThat(result.metadata()).containsEntry("literatureUnavailable", true);
+        assertThat(result.metadata()).containsEntry("literatureUnavailableReason", "外部文献服务暂不可用");
+        assertThat(result.metadata()).doesNotContainKeys("toolUnavailable", "toolErrorMessage");
+        assertThat(result.metadata()).doesNotContainEntry("stopReason", "TOOL_UNAVAILABLE");
+        verify(literatureTool, times(1)).execute(eq(ownerUserId), any());
+        verify(localTool, times(1)).execute(eq(ownerUserId), any());
     }
 
     /**
@@ -394,6 +508,15 @@ class AgentLoopTest {
             items.add(Map.of("title", "Paper " + index));
         }
         return items;
+    }
+
+    /**
+     * 构造测试用 hybrid 策略。
+     *
+     * @return hybrid 任务策略
+     */
+    private AgentHybridTaskPolicy hybridTaskPolicy() {
+        return new AgentHybridTaskPolicy(new LiteratureSearchIntentParser());
     }
 
     /**

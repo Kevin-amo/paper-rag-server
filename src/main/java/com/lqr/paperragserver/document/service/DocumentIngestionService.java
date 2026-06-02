@@ -37,4 +37,9 @@ public interface DocumentIngestionService {
      * @param sourceId 文档来源标识
      */
     void deleteBySourceId(UUID ownerUserId, String sourceId);
+
+    /**
+     * 删除当前用户的全部文档数据。
+     */
+    void deleteAll(UUID ownerUserId);
 }

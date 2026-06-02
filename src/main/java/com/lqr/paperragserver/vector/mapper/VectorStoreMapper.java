@@ -33,4 +33,13 @@ public interface VectorStoreMapper {
               and metadata ->> 'sourceId' = #{sourceId}
             """)
     int deleteBySourceId(@Param("ownerUserId") String ownerUserId, @Param("sourceId") String sourceId);
+
+    /**
+     * 删除指定用户的全部向量记录。
+     */
+    @Delete("""
+            delete from public.vector_store
+            where metadata ->> 'ownerUserId' = #{ownerUserId}
+            """)
+    int deleteByOwnerUserId(@Param("ownerUserId") String ownerUserId);
 }

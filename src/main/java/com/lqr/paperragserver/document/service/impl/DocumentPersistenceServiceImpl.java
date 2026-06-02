@@ -314,6 +314,19 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
     }
 
     /**
+     * 软删除当前用户的全部文档并清理关联资产和分块。
+     */
+    @Override
+    @Transactional
+    public void markAllDeleted(UUID ownerUserId) {
+        assetMapper.delete(new LambdaQueryWrapper<DocumentAssetEntity>()
+                .eq(DocumentAssetEntity::getOwnerUserId, ownerUserId));
+        chunkMapper.delete(new LambdaQueryWrapper<DocumentChunkEntity>()
+                .eq(DocumentChunkEntity::getOwnerUserId, ownerUserId));
+        documentMapper.markAllDeleted(ownerUserId);
+    }
+
+    /**
      * 构建文档列表查询条件。
      */
     private LambdaQueryWrapper<DocumentEntity> documentListWrapper(UUID ownerUserId, String keyword, String status) {

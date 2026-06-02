@@ -19,6 +19,7 @@ const props = defineProps<{
   size: number;
   total: number;
   deletingSourceId: string | null;
+  deletingAllDocuments: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -27,6 +28,7 @@ const emit = defineEmits<{
   rowClick: [document: DocumentSummary];
   refresh: [];
   delete: [document: DocumentSummary];
+  deleteAll: [];
   upload: [];
 }>();
 
@@ -71,6 +73,15 @@ function handleCurrentChange(value: number) {
         @keyup.enter="emit('search', localKeyword)"
       />
       <el-button :icon="Refresh" @click="emit('refresh')">刷新</el-button>
+      <ConfirmDeleteButton
+        title="确认清空全部论文吗？删除后将无法在问答中引用。"
+        confirm-text="清空"
+        :loading="props.deletingAllDocuments"
+        :disabled="!props.documents.length || props.loading"
+        @confirm="emit('deleteAll')"
+      >
+        清空
+      </ConfirmDeleteButton>
       <el-button type="primary" :icon="UploadFilled" @click="emit('upload')">上传论文</el-button>
     </div>
 
@@ -133,7 +144,7 @@ function handleCurrentChange(value: number) {
 
 .library-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(220px, 1fr) auto auto auto;
   gap: 10px;
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.76);

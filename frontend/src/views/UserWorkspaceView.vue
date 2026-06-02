@@ -220,11 +220,13 @@ onMounted(async () => {
       :size="documentsState.pagination.size"
       :total="documentsState.pagination.total"
       :deleting-source-id="documentsState.deletingSourceId.value"
+      :deleting-all-documents="documentsState.deletingAllDocuments.value"
       @search="documentsState.search"
       @page-change="documentsState.loadDocuments"
       @row-click="openDocumentDetail"
       @refresh="documentsState.loadDocuments(0)"
       @delete="documentsState.removeDocument"
+      @delete-all="documentsState.removeAllDocuments"
       @upload="uploadVisible = true"
     />
 
