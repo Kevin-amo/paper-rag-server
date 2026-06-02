@@ -92,6 +92,10 @@ app:
       cache:
         enabled: ${LITERATURE_SEARCH_CACHE_ENABLED:true}
         ttl: ${LITERATURE_SEARCH_CACHE_TTL:20m}
+        lock-ttl: ${LITERATURE_SEARCH_CACHE_LOCK_TTL:10s}
+        wait-retry-interval: ${LITERATURE_SEARCH_CACHE_WAIT_RETRY_INTERVAL:100ms}
+        wait-max-attempts: ${LITERATURE_SEARCH_CACHE_WAIT_MAX_ATTEMPTS:5}
+        ttl-jitter: ${LITERATURE_SEARCH_CACHE_TTL_JITTER:2m}
   storage:
     oss:
       endpoint: ${ALIYUN_OSS_ENDPOINT:}

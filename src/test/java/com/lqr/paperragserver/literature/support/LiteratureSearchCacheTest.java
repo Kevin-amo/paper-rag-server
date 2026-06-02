@@ -18,6 +18,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -113,6 +114,72 @@ class LiteratureSearchCacheTest {
 
         assertThat(redisKey).startsWith(LiteratureSearchCache.REDIS_KEY_PREFIX);
         assertThat(redisKey).doesNotContain("retrieval augmented generation private query");
+    }
+
+    @Test
+    void tryAcquireLockShouldReturnHandleWhenSetIfAbsentSucceeds() {
+        LiteratureSearchCache.Key key = cacheKey(List.of("cs.AI"));
+        Duration lockTtl = Duration.ofSeconds(10);
+        when(valueOperations.setIfAbsent(any(String.class), any(String.class), eq(lockTtl))).thenReturn(true);
+
+        var lockHandle = cache.tryAcquireLock(key, lockTtl);
+
+        assertThat(lockHandle).isPresent();
+        assertThat(lockHandle.get().lockKey()).startsWith(LiteratureSearchCache.LOCK_REDIS_KEY_PREFIX);
+        assertThat(lockHandle.get().lockValue()).isNotBlank();
+        verify(valueOperations).setIfAbsent(eq(lockHandle.get().lockKey()), eq(lockHandle.get().lockValue()), eq(lockTtl));
+    }
+
+    @Test
+    void tryAcquireLockShouldReturnEmptyWhenSetIfAbsentFails() {
+        LiteratureSearchCache.Key key = cacheKey(List.of("cs.AI"));
+        Duration lockTtl = Duration.ofSeconds(10);
+        when(valueOperations.setIfAbsent(any(String.class), any(String.class), eq(lockTtl))).thenReturn(false);
+
+        assertThat(cache.tryAcquireLock(key, lockTtl)).isEmpty();
+    }
+
+    @Test
+    void releaseLockShouldDeleteWhenTokenMatches() {
+        LiteratureSearchCache.LockHandle lockHandle = new LiteratureSearchCache.LockHandle(
+                LiteratureSearchCache.LOCK_REDIS_KEY_PREFIX + "abc",
+                "token-1"
+        );
+        when(valueOperations.get(lockHandle.lockKey())).thenReturn(lockHandle.lockValue());
+
+        cache.releaseLock(lockHandle);
+
+        verify(redisTemplate).delete(lockHandle.lockKey());
+    }
+
+    @Test
+    void releaseLockShouldNotDeleteWhenTokenDoesNotMatch() {
+        LiteratureSearchCache.LockHandle lockHandle = new LiteratureSearchCache.LockHandle(
+                LiteratureSearchCache.LOCK_REDIS_KEY_PREFIX + "abc",
+                "token-1"
+        );
+        when(valueOperations.get(lockHandle.lockKey())).thenReturn("token-2");
+
+        cache.releaseLock(lockHandle);
+
+        verify(redisTemplate, never()).delete(lockHandle.lockKey());
+    }
+
+    @Test
+    void lockOperationsShouldNotThrowWhenRedisFails() {
+        LiteratureSearchCache.Key key = cacheKey(List.of("cs.AI"));
+        Duration lockTtl = Duration.ofSeconds(10);
+        when(valueOperations.setIfAbsent(any(String.class), any(String.class), eq(lockTtl)))
+                .thenThrow(new RedisConnectionFailureException("redis down"));
+        LiteratureSearchCache.LockHandle lockHandle = new LiteratureSearchCache.LockHandle(
+                LiteratureSearchCache.LOCK_REDIS_KEY_PREFIX + "abc",
+                "token-1"
+        );
+        when(valueOperations.get(lockHandle.lockKey())).thenThrow(new RedisConnectionFailureException("redis down"));
+
+        assertThatCode(() -> cache.tryAcquireLock(key, lockTtl)).doesNotThrowAnyException();
+        assertThat(cache.tryAcquireLock(key, lockTtl)).isEmpty();
+        assertThatCode(() -> cache.releaseLock(lockHandle)).doesNotThrowAnyException();
     }
 
     private LiteratureSearchCache.Key cacheKey(List<String> categories) {

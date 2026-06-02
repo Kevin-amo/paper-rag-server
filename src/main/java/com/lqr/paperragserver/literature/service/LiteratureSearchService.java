@@ -13,9 +13,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 文献搜索业务入口。
@@ -55,8 +58,84 @@ public class LiteratureSearchService {
             }
             log.info("literature.search.cache.miss queryExcerpt={} limit={} sortBy={} dateFrom={} dateTo={}",
                     LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, dateTo);
+            return searchWithCacheRebuildGuard(request, cacheKey, query, categories, dateFrom, dateTo, sortBy, limit, startNanos);
         }
 
+        return searchOpenAlexAndCache(request, cacheKey, query, categories, dateFrom, dateTo, sortBy, limit, startNanos);
+    }
+
+    private LiteratureSearchResponse searchWithCacheRebuildGuard(
+            LiteratureSearchRequest request,
+            LiteratureSearchCache.Key cacheKey,
+            String query,
+            List<String> categories,
+            String dateFrom,
+            String dateTo,
+            String sortBy,
+            int limit,
+            long startNanos
+    ) {
+        Optional<LiteratureSearchCache.LockHandle> lockHandle = cache.tryAcquireLock(cacheKey, literatureProperties.cache().lockTtl());
+        if (lockHandle.isPresent()) {
+            try {
+                var cached = cache.get(cacheKey);
+                if (cached.isPresent()) {
+                    log.info("literature.search.cache.hit.after_lock limit={} sortBy={} dateFrom={} dateTo={} resultCount={} costMs={}",
+                            limit, sortBy, dateFrom, dateTo, cached.get().items().size(), elapsedMs(startNanos));
+                    return cached.get();
+                }
+                return searchOpenAlexAndCache(request, cacheKey, query, categories, dateFrom, dateTo, sortBy, limit, startNanos);
+            } finally {
+                cache.releaseLock(lockHandle.get());
+            }
+        }
+
+        var waited = waitForRebuiltCache(cacheKey, limit, sortBy, dateFrom, dateTo, startNanos);
+        if (waited.isPresent()) {
+            return waited.get();
+        }
+        return searchOpenAlexAndCache(request, cacheKey, query, categories, dateFrom, dateTo, sortBy, limit, startNanos);
+    }
+
+    private Optional<LiteratureSearchResponse> waitForRebuiltCache(
+            LiteratureSearchCache.Key cacheKey,
+            int limit,
+            String sortBy,
+            String dateFrom,
+            String dateTo,
+            long startNanos
+    ) {
+        LiteratureSearchProperties.Cache cacheProperties = literatureProperties.cache();
+        for (int attempt = 0; attempt < cacheProperties.waitMaxAttempts(); attempt++) {
+            try {
+                Thread.sleep(cacheProperties.waitRetryInterval().toMillis());
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                log.warn("literature.search.cache.wait.interrupted limit={} sortBy={} dateFrom={} dateTo={} attempt={} costMs={}",
+                        limit, sortBy, dateFrom, dateTo, attempt + 1, elapsedMs(startNanos));
+                return Optional.empty();
+            }
+            var cached = cache.get(cacheKey);
+            if (cached.isPresent()) {
+                log.info("literature.search.cache.hit.after_wait limit={} sortBy={} dateFrom={} dateTo={} attempt={} resultCount={} costMs={}",
+                        limit, sortBy, dateFrom, dateTo, attempt + 1, cached.get().items().size(), elapsedMs(startNanos));
+                return cached;
+            }
+        }
+        return Optional.empty();
+    }
+
+    private LiteratureSearchResponse searchOpenAlexAndCache(
+            LiteratureSearchRequest request,
+            LiteratureSearchCache.Key cacheKey,
+            String query,
+            List<String> categories,
+            String dateFrom,
+            String dateTo,
+            String sortBy,
+            int limit,
+            long startNanos
+    ) {
         if (!literatureProperties.openalex().isEnabled()) {
             log.warn("literature.search.fallback queryExcerpt={} limit={} sortBy={} dateFrom={} dateTo={} reason=OPENALEX_DISABLED",
                     LogSanitizer.safeExcerpt(query, 160), limit, sortBy, dateFrom, dateTo);
@@ -124,8 +203,24 @@ public class LiteratureSearchService {
 
     private void cacheIfEnabled(LiteratureSearchCache.Key key, LiteratureSearchResponse response) {
         if (literatureProperties.cache().isEnabled()) {
-            cache.put(key, response, literatureProperties.cache().ttl());
+            cache.put(key, response, cacheTtlWithJitter());
         }
+    }
+
+    private Duration cacheTtlWithJitter() {
+        Duration ttl = literatureProperties.cache().ttl();
+        Duration ttlJitter = literatureProperties.cache().ttlJitter();
+        if (ttlJitter == null || ttlJitter.isZero() || ttlJitter.isNegative()) {
+            return ttl;
+        }
+        long jitterMillis = ttlJitter.toMillis();
+        if (jitterMillis <= 0) {
+            return ttl;
+        }
+        long randomMillis = jitterMillis == Long.MAX_VALUE
+                ? ThreadLocalRandom.current().nextLong(Long.MAX_VALUE)
+                : ThreadLocalRandom.current().nextLong(jitterMillis + 1);
+        return ttl.plusMillis(randomMillis);
     }
 
     private LiteratureSearchException allSourcesUnavailable(Throwable cause) {

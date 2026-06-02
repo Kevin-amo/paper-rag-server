@@ -20,7 +20,7 @@ public record LiteratureSearchProperties(
             openalex = new OpenAlex(null, null, null, null);
         }
         if (cache == null) {
-            cache = new Cache(null, null);
+            cache = new Cache(null, null, null, null, null, null);
         }
     }
 
@@ -57,7 +57,11 @@ public record LiteratureSearchProperties(
 
     public record Cache(
             Boolean enabled,
-            Duration ttl
+            Duration ttl,
+            Duration lockTtl,
+            Duration waitRetryInterval,
+            Integer waitMaxAttempts,
+            Duration ttlJitter
     ) {
         public Cache {
             if (enabled == null) {
@@ -65,6 +69,18 @@ public record LiteratureSearchProperties(
             }
             if (ttl == null || ttl.isNegative() || ttl.isZero()) {
                 ttl = Duration.ofMinutes(20);
+            }
+            if (lockTtl == null || lockTtl.isNegative() || lockTtl.isZero()) {
+                lockTtl = Duration.ofSeconds(10);
+            }
+            if (waitRetryInterval == null || waitRetryInterval.isNegative() || waitRetryInterval.isZero()) {
+                waitRetryInterval = Duration.ofMillis(100);
+            }
+            if (waitMaxAttempts == null || waitMaxAttempts < 0) {
+                waitMaxAttempts = 5;
+            }
+            if (ttlJitter == null || ttlJitter.isNegative()) {
+                ttlJitter = Duration.ofMinutes(2);
             }
         }
 
