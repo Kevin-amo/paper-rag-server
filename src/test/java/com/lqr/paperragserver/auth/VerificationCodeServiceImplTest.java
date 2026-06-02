@@ -43,7 +43,7 @@ class VerificationCodeServiceImplTest {
                         2,
                         2,
                         3
-                ), null, null),
+                ), null),
                 mailService
         );
     }

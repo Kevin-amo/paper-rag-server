@@ -161,7 +161,6 @@ public class AuthServiceImpl implements AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "新密码不能与当前密码相同");
         }
         userMapper.updatePassword(user.getId(), passwordEncoder.encode(normalizedNewPassword));
-        userDetailsService.evictUserDetails(user.getUsername());
         return toCurrentUser(userMapper.selectById(user.getId()));
     }
 
@@ -171,7 +170,6 @@ public class AuthServiceImpl implements AuthService {
         SysUser user = requireUser(principal.getId());
         String normalizedDisplayName = requireText(displayName, "昵称不能为空");
         userMapper.updateDisplayName(user.getId(), normalizedDisplayName);
-        userDetailsService.evictUserDetails(user.getUsername());
         return toCurrentUser(userMapper.selectById(user.getId()));
     }
 
@@ -192,7 +190,6 @@ public class AuthServiceImpl implements AuthService {
         verificationCodeService.requireChangeEmailCodeMatches(normalizedEmail, requireText(emailCode, "验证码不能为空"));
         userMapper.updateEmail(user.getId(), normalizedEmail);
         verificationCodeService.deleteChangeEmailCode(normalizedEmail);
-        userDetailsService.evictUserDetails(user.getUsername());
         return toCurrentUser(userMapper.selectById(user.getId()));
     }
 

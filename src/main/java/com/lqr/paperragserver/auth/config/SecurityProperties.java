@@ -12,8 +12,7 @@ public record SecurityProperties(
         Jwt jwt,
         BootstrapAdmin bootstrapAdmin,
         RegisterEmailCode registerEmailCode,
-        LoginAttempt loginAttempt,
-        UserDetailsCache userDetailsCache
+        LoginAttempt loginAttempt
 ) {
     public SecurityProperties {
         if (jwt == null) {
@@ -27,9 +26,6 @@ public record SecurityProperties(
         }
         if (loginAttempt == null) {
             loginAttempt = new LoginAttempt(true, 0, null, null);
-        }
-        if (userDetailsCache == null) {
-            userDetailsCache = new UserDetailsCache(true, null);
         }
     }
 
@@ -126,17 +122,4 @@ public record SecurityProperties(
         }
     }
 
-    /**
-     * 用户详情缓存配置。
-     */
-    public record UserDetailsCache(
-            boolean enabled,
-            Duration ttl
-    ) {
-        public UserDetailsCache {
-            if (ttl == null || ttl.isNegative() || ttl.isZero()) {
-                ttl = Duration.ofMinutes(10);
-            }
-        }
-    }
 }
