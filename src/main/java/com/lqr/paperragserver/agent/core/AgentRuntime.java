@@ -96,7 +96,6 @@ public class AgentRuntime {
                     ownerUserId, conversationId, index, tool.name(), textLength(result.observationSummary()), result.citations().size(), metadataKeys(result.metadata()), elapsedMs(toolStartNanos));
             citations.addAll(result.citations());
             observations.add(result.evidenceText());
-            mergeMetadata(extraMetadata, result.metadata());
             AgentStep trace = new AgentStep(
                     index,
                     thoughtSummary,
@@ -115,12 +114,14 @@ public class AgentRuntime {
                             ownerUserId, conversationId, index, tool.name());
                     continue;
                 }
+                mergeMetadata(extraMetadata, result.metadata());
                 Map<String, Object> metadata = metadata(steps, extraMetadata);
                 metadata.put("stopReason", "TOOL_UNAVAILABLE");
                 log.warn("agent.loop.stop ownerUserId={} conversationId={} step={} stopReason=TOOL_UNAVAILABLE toolName={}",
                         ownerUserId, conversationId, index, tool.name());
                 return result(null, citations, topK, metadata, steps, observations);
             }
+            mergeMetadata(extraMetadata, result.metadata());
         }
 
         Map<String, Object> metadata = metadata(steps, extraMetadata);

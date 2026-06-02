@@ -451,6 +451,7 @@ class AgentLoopTest {
         assertThat(result.steps()).extracting(AgentStep::action).containsExactly("literature_search", "local_paper_retrieval");
         assertThat(result.metadata()).containsEntry("literatureUnavailable", true);
         assertThat(result.metadata()).containsEntry("literatureUnavailableReason", "外部文献服务暂不可用");
+        assertThat(result.metadata()).doesNotContainKeys("toolUnavailable", "toolErrorMessage");
         assertThat(result.metadata()).doesNotContainEntry("stopReason", "TOOL_UNAVAILABLE");
         verify(literatureTool, times(1)).execute(eq(ownerUserId), any());
         verify(localTool, times(1)).execute(eq(ownerUserId), any());
