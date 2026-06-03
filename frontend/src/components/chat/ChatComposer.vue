@@ -6,7 +6,7 @@ export default {
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Promotion, Setting } from '@element-plus/icons-vue';
+import { Promotion, Setting, Plus } from '@element-plus/icons-vue';
 
 const props = defineProps<{
   loading?: boolean;
@@ -14,6 +14,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   submit: [payload: { question: string; topK?: number }];
+  selectFiles: [];
 }>();
 
 const question = ref('');
@@ -67,6 +68,15 @@ defineExpose({ fillQuestion });
       />
       <div class="composer-actions">
         <div class="composer-left-actions">
+          <el-button
+            class="composer-pill upload-pill"
+            text
+            :icon="Plus"
+            title="上传论文"
+            @click="emit('selectFiles')"
+          >
+            上传
+          </el-button>
           <el-button class="composer-pill" text :icon="Setting" @click="advancedVisible = true">
             高级设置 · Top K {{ topK }}
           </el-button>

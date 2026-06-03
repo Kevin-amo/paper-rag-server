@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router';
 import ChatSidebar from '../components/chat/ChatSidebar.vue';
 import RagChatWorkspace from '../components/chat/RagChatWorkspace.vue';
 import DocumentLibraryDrawer from '../components/documents/DocumentLibraryDrawer.vue';
-import UploadDocumentDialog from '../components/documents/UploadDocumentDialog.vue';
 import DocumentDetailDrawer from '../components/documents/DocumentDetailDrawer.vue';
 import AccountManagementDialog from '../components/user/AccountManagementDialog.vue';
 import { getErrorMessage } from '../api/http';
@@ -14,6 +13,7 @@ import { clearAuthSession } from '../composables/authState';
 import { useDocuments } from '../composables/useDocuments';
 import { useConversations } from '../composables/useConversations';
 import { useAgentChat } from '../composables/useAgentChat';
+import { useChatUpload } from '../composables/useChatUpload';
 import type { ConversationMessage } from '../types';
 
 const router = useRouter();
@@ -21,7 +21,6 @@ const auth = useAuth();
 const documentsState = useDocuments();
 const conversationsState = useConversations();
 const documentLibraryVisible = ref(false);
-const uploadVisible = ref(false);
 const accountManagementVisible = ref(false);
 const avatarUploading = ref(false);
 const displayNameChanging = ref(false);
@@ -29,6 +28,13 @@ const passwordChanging = ref(false);
 const emailCodeSending = ref(false);
 const emailChanging = ref(false);
 const avatarRefreshVersion = ref(0);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+
+const chatUpload = useChatUpload({
+  onSuccess: () => {
+    documentsState.loadDocuments(0);
+  },
+});
 
 const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '当前用户');
 const currentUserAvatarUrl = computed(() => buildAvatarDisplayUrl(auth.state.user?.avatarUrl ?? null));
@@ -85,9 +91,26 @@ async function handleLogout() {
   await router.replace('/login');
 }
 
-async function handleUpload(payload: Parameters<typeof documentsState.uploadBatch>[0]) {
-  await documentsState.uploadBatch(payload);
-  documentLibraryVisible.value = true;
+async function handleDropFiles(files: File[]) {
+  await chatUpload.uploadFiles(files);
+}
+
+function handleSelectFiles() {
+  fileInputRef.value?.click();
+}
+
+function handleFileInputChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const files = target.files;
+  if (!files || files.length === 0) {
+    return;
+  }
+  const fileList: File[] = [];
+  for (let i = 0; i < files.length; i++) {
+    fileList.push(files[i]);
+  }
+  chatUpload.uploadFiles(fileList);
+  target.value = '';
 }
 
 async function handleAvatarUpload(file: File) {
@@ -206,9 +229,13 @@ onMounted(async () => {
       :messages-loading="conversationsState.messagesLoading.value"
       :document-total="documentsState.pagination.total"
       :current-user-avatar-url="currentUserAvatarUrl"
+      :upload-queue="chatUpload.queue.value"
       @submit="handleChatSubmit"
       @open-documents="documentLibraryVisible = true"
-      @open-upload="uploadVisible = true"
+      @drop-files="handleDropFiles"
+      @select-files="handleSelectFiles"
+      @remove-queue-item="chatUpload.removeItem"
+      @clear-queue="chatUpload.clearQueue"
     />
 
     <DocumentLibraryDrawer
@@ -227,15 +254,6 @@ onMounted(async () => {
       @refresh="documentsState.loadDocuments(0)"
       @delete="documentsState.removeDocument"
       @delete-all="documentsState.removeAllDocuments"
-      @upload="uploadVisible = true"
-    />
-
-    <UploadDocumentDialog
-      v-model="uploadVisible"
-      :loading="documentsState.uploadLoading.value"
-      :result="documentsState.lastBatchUploadResult.value"
-      :error-message="documentsState.uploadErrorMessage.value"
-      @submit="handleUpload"
     />
 
     <AccountManagementDialog
@@ -265,6 +283,15 @@ onMounted(async () => {
       :chunk-total="documentsState.chunkPagination.total"
       @chunk-page-change="documentsState.changeChunkPage"
       @chunk-size-change="documentsState.changeChunkSize"
+    />
+
+    <input
+      ref="fileInputRef"
+      type="file"
+      multiple
+      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      style="display: none"
+      @change="handleFileInputChange"
     />
   </div>
 </template>

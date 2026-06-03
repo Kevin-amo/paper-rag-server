@@ -6,7 +6,7 @@ export default {
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Search, UploadFilled, Refresh } from '@element-plus/icons-vue';
+import { Search, Refresh } from '@element-plus/icons-vue';
 import StatusTag from '../common/StatusTag.vue';
 import ConfirmDeleteButton from '../common/ConfirmDeleteButton.vue';
 import type { DocumentSummary } from '../../types';
@@ -82,12 +82,11 @@ function handleCurrentChange(value: number) {
       >
         清空
       </ConfirmDeleteButton>
-      <el-button type="primary" :icon="UploadFilled" @click="emit('upload')">上传论文</el-button>
     </div>
 
     <div v-loading="props.loading" class="library-content">
       <el-empty v-if="!props.documents.length" description="还没有论文文档" :image-size="120">
-        <el-button type="primary" :icon="UploadFilled" @click="emit('upload')">上传第一篇论文</el-button>
+        <span class="empty-hint">请在聊天界面通过拖拽或点击"+"按钮上传论文</span>
       </el-empty>
 
       <div v-else class="paper-card-list">
@@ -144,13 +143,20 @@ function handleCurrentChange(value: number) {
 
 .library-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto auto;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
   gap: 10px;
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.76);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.58);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.empty-hint {
+  display: block;
+  margin-top: 8px;
+  color: var(--app-text-muted);
+  font-size: 13px;
 }
 
 .library-toolbar .el-button,

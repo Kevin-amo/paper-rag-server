@@ -37,7 +37,8 @@ const label = computed(() => {
     case 'PROCESSING':
       return '处理中';
     case 'PENDING':
-      return '等待处理';
+    case 'QUEUED':
+      return '排队中';
     default:
       return props.status || '-';
   }

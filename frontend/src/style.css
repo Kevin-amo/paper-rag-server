@@ -98,12 +98,10 @@ a {
 
 .el-dialog {
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(209, 209, 214, 0.72);
   border-radius: 26px;
-  background: rgba(255, 255, 255, 0.86);
+  background: #ffffff;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
-  backdrop-filter: blur(26px) saturate(180%);
-  -webkit-backdrop-filter: blur(26px) saturate(180%);
 }
 
 .el-dialog__title {

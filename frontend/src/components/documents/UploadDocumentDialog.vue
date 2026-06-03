@@ -146,10 +146,10 @@ function statusType(status: UploadStatus) {
 }
 
 function statusText(status: UploadStatus) {
-  if (status === 'success') return '已入队';
+  if (status === 'success') return '上传成功';
   if (status === 'failed') return '上传失败';
-  if (status === 'uploading') return '提交中';
-  return '待上传';
+  if (status === 'uploading') return '正在上传';
+  return '等待上传';
 }
 
 function formatFileSize(size: number) {
@@ -177,36 +177,14 @@ function formatFileSize(size: number) {
       <el-icon class="upload-icon"><UploadFilled /></el-icon>
       <div class="el-upload__text">拖拽论文文件到这里，或 <em>点击选择</em></div>
       <template #tip>
-        <div class="el-upload__tip">建议上传 PDF、文本或图片型论文资料。标题可在下方编辑。</div>
+        <div class="el-upload__tip">建议上传 PDF、Word类型论文资料。标题可在下方编辑。</div>
       </template>
     </el-upload>
-
-    <div v-if="uploadItems.length" class="upload-list">
-      <article v-for="item in uploadItems" :key="item.uid" class="upload-item">
-        <div class="file-info">
-          <strong>{{ item.file.name }}</strong>
-          <span>{{ formatFileSize(item.file.size) }}</span>
-        </div>
-        <el-input v-model="item.title" :disabled="props.loading" placeholder="论文标题" />
-        <el-tag :type="statusType(item.status)" effect="light">{{ statusText(item.status) }}</el-tag>
-        <el-button text type="danger" :disabled="props.loading" @click="removeItem(item.uid)">移除</el-button>
-        <el-alert v-if="item.errorMessage" class="upload-error" type="error" :closable="false" :title="item.errorMessage" />
-      </article>
-    </div>
-
-    <el-alert
-      v-if="props.result"
-      class="upload-result"
-      type="success"
-      show-icon
-      :closable="false"
-      :title="`上传请求已提交：已入队 ${props.result.acceptedCount} 个，失败 ${props.result.failureCount} 个`"
-    />
 
     <template #footer>
       <el-button @click="visible = false">关闭</el-button>
       <el-button :disabled="!uploadItems.length || props.loading" @click="clearFinished">清空列表</el-button>
-      <el-button type="primary" :loading="props.loading" @click="submitUpload">开始上传</el-button>
+      <el-button type="primary" :loading="props.loading" @click="submitUpload">上传</el-button>
     </template>
   </el-dialog>
 </template>
@@ -243,52 +221,5 @@ function formatFileSize(size: number) {
   background: #fbfdff;
 }
 
-.upload-list {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-}
 
-.upload-item {
-  display: grid;
-  grid-template-columns: minmax(170px, 1fr) minmax(180px, 1fr) auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--app-border);
-  border-radius: 16px;
-  background: #fff;
-}
-
-.file-info {
-  min-width: 0;
-}
-
-.file-info strong,
-.file-info span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-info span {
-  margin-top: 4px;
-  color: var(--app-text-muted);
-  font-size: 12px;
-}
-
-.upload-error,
-.upload-result {
-  grid-column: 1 / -1;
-  margin-top: 4px;
-  border-radius: 12px;
-}
-
-@media (max-width: 720px) {
-  .upload-item {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-  }
-}
 </style>

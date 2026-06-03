@@ -274,7 +274,7 @@ function handleChunkSizeChange(size: number) {
 <style scoped>
 .detail-hero {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 18px;
@@ -282,6 +282,11 @@ function handleChunkSizeChange(size: number) {
   border: 1px solid var(--app-border);
   border-radius: 22px;
   background: #f7f8fa;
+}
+
+.detail-hero > div {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .detail-hero p {
@@ -298,6 +303,8 @@ function handleChunkSizeChange(size: number) {
   color: var(--app-text);
   font-size: 21px;
   line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .detail-hero span {
@@ -306,6 +313,11 @@ function handleChunkSizeChange(size: number) {
   color: var(--app-text-muted);
   font-size: 12px;
   word-break: break-all;
+}
+
+.detail-hero .el-tag {
+  flex-shrink: 0;
+  align-self: center;
 }
 
 .detail-section {
