@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -235,10 +237,93 @@ class LiteratureSearchServiceTest {
         verify(openAlexLiteratureClient, times(1)).search(org.mockito.ArgumentMatchers.argThat(request -> request != null && "2026-12-31".equals(request.dateTo())), anyInt(), anyString(), any());
     }
 
+    @Test
+    void cacheMissWithLockShouldCheckCacheAgain() {
+        LiteratureSearchCache guardedCache = mock(LiteratureSearchCache.class);
+        LiteratureSearchCache.LockHandle lockHandle = new LiteratureSearchCache.LockHandle("lock-key", "token");
+        LiteratureSearchResult result = openAlexResult("Graph RAG");
+        when(guardedCache.get(any())).thenReturn(Optional.empty());
+        when(guardedCache.tryAcquireLock(any(), any())).thenReturn(Optional.of(lockHandle));
+        when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of(result));
+        LiteratureSearchService guardedService = new LiteratureSearchService(searchProperties(true, true), openAlexLiteratureClient, guardedCache);
+
+        LiteratureSearchResponse response = guardedService.search(new LiteratureSearchRequest("Graph RAG", 10, null, null, "relevance"));
+
+        assertThat(response.items()).containsExactly(result);
+        verify(guardedCache, times(2)).get(any());
+        verify(guardedCache).releaseLock(lockHandle);
+    }
+
+    @Test
+    void cacheMissWithLockShouldReturnSecondCacheHitWithoutCallingOpenAlex() {
+        LiteratureSearchCache guardedCache = mock(LiteratureSearchCache.class);
+        LiteratureSearchCache.LockHandle lockHandle = new LiteratureSearchCache.LockHandle("lock-key", "token");
+        LiteratureSearchResponse cachedResponse = new LiteratureSearchResponse(List.of(openAlexResult("Cached Graph RAG")));
+        when(guardedCache.get(any())).thenReturn(Optional.empty(), Optional.of(cachedResponse));
+        when(guardedCache.tryAcquireLock(any(), any())).thenReturn(Optional.of(lockHandle));
+        LiteratureSearchService guardedService = new LiteratureSearchService(searchProperties(true, true), openAlexLiteratureClient, guardedCache);
+
+        LiteratureSearchResponse response = guardedService.search(new LiteratureSearchRequest("Graph RAG", 10, null, null, "relevance"));
+
+        assertThat(response).isEqualTo(cachedResponse);
+        verifyNoInteractions(openAlexLiteratureClient);
+        verify(guardedCache).releaseLock(lockHandle);
+        verify(guardedCache, never()).put(any(), any(), any());
+    }
+
+    @Test
+    void cacheMissWithLockAndSecondMissShouldCallOpenAlexOnceAndWriteCache() {
+        LiteratureSearchCache guardedCache = mock(LiteratureSearchCache.class);
+        LiteratureSearchCache.LockHandle lockHandle = new LiteratureSearchCache.LockHandle("lock-key", "token");
+        LiteratureSearchResult result = openAlexResult("Graph RAG");
+        when(guardedCache.get(any())).thenReturn(Optional.empty());
+        when(guardedCache.tryAcquireLock(any(), any())).thenReturn(Optional.of(lockHandle));
+        when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of(result));
+        LiteratureSearchService guardedService = new LiteratureSearchService(searchProperties(true, true), openAlexLiteratureClient, guardedCache);
+
+        LiteratureSearchResponse response = guardedService.search(new LiteratureSearchRequest("Graph RAG", 10, null, null, "relevance"));
+
+        assertThat(response.items()).containsExactly(result);
+        verify(openAlexLiteratureClient, times(1)).search(any(), anyInt(), anyString(), any());
+        verify(guardedCache).put(any(), org.mockito.ArgumentMatchers.eq(response), org.mockito.ArgumentMatchers.eq(Duration.ofMinutes(20)));
+        verify(guardedCache).releaseLock(lockHandle);
+    }
+
+    @Test
+    void cacheMissWithoutLockShouldReturnWaitedCacheHitWithoutCallingOpenAlex() {
+        LiteratureSearchCache guardedCache = mock(LiteratureSearchCache.class);
+        LiteratureSearchResponse cachedResponse = new LiteratureSearchResponse(List.of(openAlexResult("Cached Graph RAG")));
+        when(guardedCache.get(any())).thenReturn(Optional.empty(), Optional.of(cachedResponse));
+        when(guardedCache.tryAcquireLock(any(), any())).thenReturn(Optional.empty());
+        LiteratureSearchService guardedService = new LiteratureSearchService(searchProperties(true, true), openAlexLiteratureClient, guardedCache);
+
+        LiteratureSearchResponse response = guardedService.search(new LiteratureSearchRequest("Graph RAG", 10, null, null, "relevance"));
+
+        assertThat(response).isEqualTo(cachedResponse);
+        verifyNoInteractions(openAlexLiteratureClient);
+        verify(guardedCache, times(2)).get(any());
+    }
+
+    @Test
+    void cacheMissWithoutLockAndWaitMissShouldFallbackToOpenAlexOnce() {
+        LiteratureSearchCache guardedCache = mock(LiteratureSearchCache.class);
+        LiteratureSearchResult result = openAlexResult("Graph RAG");
+        when(guardedCache.get(any())).thenReturn(Optional.empty());
+        when(guardedCache.tryAcquireLock(any(), any())).thenReturn(Optional.empty());
+        when(openAlexLiteratureClient.search(any(), anyInt(), anyString(), any())).thenReturn(List.of(result));
+        LiteratureSearchService guardedService = new LiteratureSearchService(searchProperties(true, true), openAlexLiteratureClient, guardedCache);
+
+        LiteratureSearchResponse response = guardedService.search(new LiteratureSearchRequest("Graph RAG", 10, null, null, "relevance"));
+
+        assertThat(response.items()).containsExactly(result);
+        verify(openAlexLiteratureClient, times(1)).search(any(), anyInt(), anyString(), any());
+        verify(guardedCache).put(any(), org.mockito.ArgumentMatchers.eq(response), org.mockito.ArgumentMatchers.eq(Duration.ofMinutes(20)));
+    }
+
     private LiteratureSearchProperties searchProperties(boolean openAlexEnabled, boolean cacheEnabled) {
         return new LiteratureSearchProperties(
                 new LiteratureSearchProperties.OpenAlex(openAlexEnabled, "https://api.openalex.org/works", Duration.ofSeconds(10), null),
-                new LiteratureSearchProperties.Cache(cacheEnabled, Duration.ofMinutes(20))
+                new LiteratureSearchProperties.Cache(cacheEnabled, Duration.ofMinutes(20), Duration.ofSeconds(10), Duration.ofMillis(1), 1, Duration.ZERO)
         );
     }
 
@@ -252,6 +337,15 @@ class LiteratureSearchServiceTest {
             store.put(invocation.getArgument(0), invocation.getArgument(1));
             return null;
         }).when(valueOperations).set(anyString(), anyString(), any(Duration.class));
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenAnswer(invocation -> {
+            String key = invocation.getArgument(0);
+            if (store.containsKey(key)) {
+                return false;
+            }
+            store.put(key, invocation.getArgument(1));
+            return true;
+        });
+        doAnswer(invocation -> store.remove(invocation.getArgument(0)) != null).when(redisTemplate).delete(anyString());
         return new LiteratureSearchCache(redisTemplate, new ObjectMapper());
     }
 

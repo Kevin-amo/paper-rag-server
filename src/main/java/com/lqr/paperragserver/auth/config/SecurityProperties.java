@@ -3,6 +3,7 @@ package com.lqr.paperragserver.auth.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
  * 登录与权限配置。
@@ -10,14 +11,17 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "app.security")
 public record SecurityProperties(
         Jwt jwt,
+        Cors cors,
         BootstrapAdmin bootstrapAdmin,
         RegisterEmailCode registerEmailCode,
-        LoginAttempt loginAttempt,
-        UserDetailsCache userDetailsCache
+        LoginAttempt loginAttempt
 ) {
     public SecurityProperties {
         if (jwt == null) {
             jwt = new Jwt(null, null, null);
+        }
+        if (cors == null) {
+            cors = new Cors(null, null, null, null);
         }
         if (bootstrapAdmin == null) {
             bootstrapAdmin = new BootstrapAdmin(false, null, null, null);
@@ -27,9 +31,6 @@ public record SecurityProperties(
         }
         if (loginAttempt == null) {
             loginAttempt = new LoginAttempt(true, 0, null, null);
-        }
-        if (userDetailsCache == null) {
-            userDetailsCache = new UserDetailsCache(true, null);
         }
     }
 
@@ -41,7 +42,7 @@ public record SecurityProperties(
             String secret,
             Duration accessTokenTtl
     ) {
-        private static final String DEFAULT_SECRET = "paper-rag-server-local-development-secret-change-before-production";
+        private static final String DEFAULT_SECRET = "V1kNrJuT67FGQp0fWCJlkzH3KdavGcGYoUz6TdBzheIOVu7E5HfJQVxulvmIh73E";
 
         public Jwt {
             if (issuer == null || issuer.isBlank()) {
@@ -126,17 +127,26 @@ public record SecurityProperties(
         }
     }
 
-    /**
-     * 用户详情缓存配置。
-     */
-    public record UserDetailsCache(
-            boolean enabled,
-            Duration ttl
+    public record Cors(
+            List<String> allowedOrigins,
+            List<String> allowedMethods,
+            List<String> allowedHeaders,
+            Duration maxAge
     ) {
-        public UserDetailsCache {
-            if (ttl == null || ttl.isNegative() || ttl.isZero()) {
-                ttl = Duration.ofMinutes(10);
+        public Cors {
+            if (allowedOrigins == null || allowedOrigins.isEmpty()) {
+                allowedOrigins = List.of("http://localhost:5173");
+            }
+            if (allowedMethods == null || allowedMethods.isEmpty()) {
+                allowedMethods = List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS");
+            }
+            if (allowedHeaders == null || allowedHeaders.isEmpty()) {
+                allowedHeaders = List.of("Authorization", "Content-Type");
+            }
+            if (maxAge == null || maxAge.isNegative() || maxAge.isZero()) {
+                maxAge = Duration.ofHours(1);
             }
         }
     }
+
 }

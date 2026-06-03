@@ -28,10 +28,16 @@ public class LiteratureSearchIntentParser {
             "总结趋势", "总结研究趋势", "归纳趋势", "分析趋势"
     );
 
+    /**
+     * 解析当前用户输入，不携带上一次文献搜索上下文。
+     */
     public Intent parse(String userInput) {
         return parse(userInput, null);
     }
 
+    /**
+     * 解析当前用户输入，并结合上一次文献搜索上下文恢复追问条件。
+     */
     public Intent parse(String userInput, LiteratureSearchContext lastContext) {
         String source = userInput == null ? "" : userInput.trim();
         Integer year = year(source);
@@ -58,6 +64,9 @@ public class LiteratureSearchIntentParser {
         );
     }
 
+    /**
+     * 在显式新主题、追问和纯筛选输入之间选择最终搜索关键词。
+     */
     private String resolveQuery(String explicitQuery,
                                 boolean explicitNewTopic,
                                 boolean followUp,
@@ -72,10 +81,16 @@ public class LiteratureSearchIntentParser {
         return explicitQuery == null || explicitQuery.isBlank() ? source : explicitQuery;
     }
 
+    /**
+     * 判断当前输入是否需要继承上一轮文献搜索上下文。
+     */
     private boolean isFollowUp(String source, LiteratureSearchContext lastContext) {
         return lastContext != null && FOLLOW_UP_PATTERN.matcher(source).matches();
     }
 
+    /**
+     * 判断当前输入是否明确切换到了新的搜索主题。
+     */
     private boolean hasExplicitNewTopic(String source, String explicitQuery) {
         if (explicitQuery == null || explicitQuery.isBlank() || isOnlyFilter(explicitQuery)) {
             return false;
@@ -84,6 +99,9 @@ public class LiteratureSearchIntentParser {
                 || source.matches("(?iu).*(搜|搜索|找|查找|推荐|检索|换成|改成|换为|改为).*");
     }
 
+    /**
+     * 判断文本是否只包含年份、数量、排序或追问表达等筛选条件。
+     */
     private boolean isOnlyFilter(String value) {
         if (value == null || value.isBlank()) {
             return true;
@@ -96,6 +114,9 @@ public class LiteratureSearchIntentParser {
         return withoutYear.isBlank();
     }
 
+    /**
+     * 从用户输入中提取四位年份。
+     */
     private Integer year(String source) {
         Matcher matcher = YEAR_PATTERN.matcher(source);
         if (!matcher.find()) {
@@ -104,6 +125,9 @@ public class LiteratureSearchIntentParser {
         return Integer.parseInt(matcher.group(1));
     }
 
+    /**
+     * 从用户输入中提取期望返回的文献数量。
+     */
     private Integer limit(String source) {
         Matcher digitMatcher = DIGIT_LIMIT_PATTERN.matcher(source);
         if (digitMatcher.find()) {
@@ -119,6 +143,9 @@ public class LiteratureSearchIntentParser {
         return null;
     }
 
+    /**
+     * 将一到十的中文数量词转换为整数。
+     */
     private Integer chineseNumber(String value) {
         return switch (value) {
             case "一" -> 1;
@@ -135,6 +162,9 @@ public class LiteratureSearchIntentParser {
         };
     }
 
+    /**
+     * 从自然语言请求中抽取可直接提交给文献服务的关键词。
+     */
     private String fallbackQuery(String userInput) {
         if (userInput == null || userInput.isBlank()) {
             return userInput;
@@ -155,6 +185,9 @@ public class LiteratureSearchIntentParser {
         return text.isBlank() || isOnlyFilter(text) ? null : text;
     }
 
+    /**
+     * 截断复合任务中的非搜索部分，只保留前置文献检索意图。
+     */
     private String truncateCompositeTask(String text) {
         String candidate = text == null ? "" : text.trim();
         int boundaryIndex = -1;

@@ -41,6 +41,12 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
     private final SecurityProperties securityProperties;
     private final MailService mailService;
 
+    /**
+     * 生成邮箱注册验证码，校验频控限制后存入 Redis 并发送邮件。
+     *
+     * @param email 邮箱地址
+     * @param clientIp 客户端IP地址
+     */
     @Override
     public void createRegisterEmailCode(String email, String clientIp) {
         String normalizedEmail = normalizeEmail(email);
@@ -69,6 +75,12 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
         }
     }
 
+    /**
+     * 生成换绑邮箱验证码，校验频控限制后存入 Redis 并发送邮件。
+     *
+     * @param email 邮箱地址
+     * @param clientIp 客户端IP地址
+     */
     @Override
     public void createChangeEmailCode(String email, String clientIp) {
         String normalizedEmail = normalizeEmail(email);
@@ -97,26 +109,55 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
         }
     }
 
+    /**
+     * 校验邮箱注册验证码是否匹配。
+     *
+     * @param email 邮箱地址
+     * @param code 验证码
+     */
     @Override
     public void requireRegisterEmailCodeMatches(String email, String code) {
         requireCodeMatches(registerEmailCodeKey(normalizeEmail(email)), code);
     }
 
+    /**
+     * 校验换绑邮箱验证码是否匹配。
+     *
+     * @param email 邮箱地址
+     * @param code 验证码
+     */
     @Override
     public void requireChangeEmailCodeMatches(String email, String code) {
         requireCodeMatches(changeEmailCodeKey(normalizeEmail(email)), code);
     }
 
+    /**
+     * 删除邮箱注册验证码。
+     *
+     * @param email 邮箱地址
+     */
     @Override
     public void deleteRegisterEmailCode(String email) {
         redisTemplate.delete(registerEmailCodeKey(normalizeEmail(email)));
     }
 
+    /**
+     * 删除换绑邮箱验证码。
+     *
+     * @param email 邮箱地址
+     */
     @Override
     public void deleteChangeEmailCode(String email) {
         redisTemplate.delete(changeEmailCodeKey(normalizeEmail(email)));
     }
 
+    /**
+     * 校验验证码是否与 Redis 中存储的验证码匹配。
+     *
+     * @param codeKey 验证码缓存键
+     * @param code 用户输入的验证码
+     * @throws ResponseStatusException 验证码过期或不正确时抛出
+     */
     private void requireCodeMatches(String codeKey, String code) {
         String expectedCode = redisTemplate.opsForValue().get(codeKey);
         if (expectedCode == null) {
@@ -127,46 +168,115 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
         }
     }
 
+    /**
+     * 构造注册邮箱验证码的缓存键。
+     *
+     * @param normalizedEmail 标准化后的邮箱地址
+     * @return 缓存键
+     */
     private String registerEmailCodeKey(String normalizedEmail) {
         return REGISTER_EMAIL_CODE_KEY_PREFIX + normalizedEmail;
     }
 
+    /**
+     * 构造注册邮箱发送冷却的缓存键。
+     *
+     * @param normalizedEmail 标准化后的邮箱地址
+     * @return 缓存键
+     */
     private String registerEmailCooldownKey(String normalizedEmail) {
         return REGISTER_EMAIL_COOLDOWN_KEY_PREFIX + normalizedEmail;
     }
 
+    /**
+     * 构造注册邮箱每日发送计数的缓存键。
+     *
+     * @param normalizedEmail 标准化后的邮箱地址
+     * @return 缓存键
+     */
     private String registerEmailDailyKey(String normalizedEmail) {
         return REGISTER_EMAIL_DAILY_KEY_PREFIX + normalizedEmail;
     }
 
+    /**
+     * 构造注册IP每分钟请求计数的缓存键。
+     *
+     * @param normalizedIp 标准化后的IP地址
+     * @return 缓存键
+     */
     private String registerIpMinuteKey(String normalizedIp) {
         return REGISTER_IP_MINUTE_KEY_PREFIX + normalizedIp;
     }
 
+    /**
+     * 构造注册IP每日请求计数的缓存键。
+     *
+     * @param normalizedIp 标准化后的IP地址
+     * @return 缓存键
+     */
     private String registerIpDailyKey(String normalizedIp) {
         return REGISTER_IP_DAILY_KEY_PREFIX + normalizedIp;
     }
 
+    /**
+     * 构造换绑邮箱验证码的缓存键。
+     *
+     * @param normalizedEmail 标准化后的邮箱地址
+     * @return 缓存键
+     */
     private String changeEmailCodeKey(String normalizedEmail) {
         return CHANGE_EMAIL_CODE_KEY_PREFIX + normalizedEmail;
     }
 
+    /**
+     * 构造换绑邮箱发送冷却的缓存键。
+     *
+     * @param normalizedEmail 标准化后的邮箱地址
+     * @return 缓存键
+     */
     private String changeEmailCooldownKey(String normalizedEmail) {
         return CHANGE_EMAIL_COOLDOWN_KEY_PREFIX + normalizedEmail;
     }
 
+    /**
+     * 构造换绑邮箱每日发送计数的缓存键。
+     *
+     * @param normalizedEmail 标准化后的邮箱地址
+     * @return 缓存键
+     */
     private String changeEmailDailyKey(String normalizedEmail) {
         return CHANGE_EMAIL_DAILY_KEY_PREFIX + normalizedEmail;
     }
 
+    /**
+     * 构造换绑邮箱IP每分钟请求计数的缓存键。
+     *
+     * @param normalizedIp 标准化后的IP地址
+     * @return 缓存键
+     */
     private String changeEmailIpMinuteKey(String normalizedIp) {
         return CHANGE_EMAIL_IP_MINUTE_KEY_PREFIX + normalizedIp;
     }
 
+    /**
+     * 构造换绑邮箱IP每日请求计数的缓存键。
+     *
+     * @param normalizedIp 标准化后的IP地址
+     * @return 缓存键
+     */
     private String changeEmailIpDailyKey(String normalizedIp) {
         return CHANGE_EMAIL_IP_DAILY_KEY_PREFIX + normalizedIp;
     }
 
+    /**
+     * 递增计数器并校验是否超出限制，首次递增时设置过期时间。
+     *
+     * @param key 缓存键
+     * @param ttl 过期时间
+     * @param limit 限制次数
+     * @param message 超出限制时的异常提示信息
+     * @throws ResponseStatusException 超出限制时抛出
+     */
     private void requireWithinLimit(String key, Duration ttl, int limit, String message) {
         Long count = redisTemplate.opsForValue().increment(key);
         if (count != null && count == 1L) {
@@ -177,6 +287,13 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
         }
     }
 
+    /**
+     * 标准化邮箱地址，校验非空后转为小写。
+     *
+     * @param email 邮箱地址
+     * @return 标准化后的邮箱地址
+     * @throws ResponseStatusException 邮箱为空时抛出
+     */
     private String normalizeEmail(String email) {
         if (email == null || email.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "邮箱不能为空");
@@ -184,6 +301,12 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 标准化IP地址，去除首尾空白，为空时返回 "unknown"。
+     *
+     * @param clientIp 客户端IP地址
+     * @return 标准化后的IP地址
+     */
     private String normalizeIp(String clientIp) {
         if (clientIp == null || clientIp.isBlank()) {
             return "unknown";

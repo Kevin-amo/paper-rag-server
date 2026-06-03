@@ -61,6 +61,9 @@ public record RagProperties(
             String baseUrl
     ) {
 
+        /**
+         * 创建精排序配置，并补齐模型、候选倍数、超时和基础地址的默认值。
+         */
         public RerankProperties {
             if (model == null || model.isBlank()) {
                 model = "qwen3-rerank";

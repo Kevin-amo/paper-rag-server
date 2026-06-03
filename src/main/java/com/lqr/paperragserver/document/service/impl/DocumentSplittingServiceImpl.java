@@ -579,10 +579,24 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return chunks;
     }
 
+    /**
+     * 返回首个切片的标题段落，非首个切片返回 null。
+     *
+     * @param firstChunk 是否为首个切片
+     * @param leadingHeading 标题段落
+     * @return 标题段落或 null
+     */
     private ParagraphBlock leadingHeadingFor(boolean firstChunk, ParagraphBlock leadingHeading) {
         return firstChunk ? leadingHeading : null;
     }
 
+    /**
+     * 判断段落是否为章节的独立标题行。
+     *
+     * @param section 所属章节
+     * @param paragraph 待判断段落
+     * @return 是独立标题行时返回 true
+     */
     private boolean standaloneSectionHeading(SectionBlock section, ParagraphBlock paragraph) {
         if (section.type() == SectionType.PREFACE || paragraph == null) {
             return false;
@@ -595,6 +609,10 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
 
     /**
      * 判断当前位置是否以隐式目录条目块开头。
+     *
+     * @param paragraphs 段落列表
+     * @param startIndex 起始索引
+     * @return 符合隐式目录特征时返回 true
      */
     private boolean startsImplicitContentsBlock(List<ParagraphBlock> paragraphs, int startIndex) {
         int matchedEntries = 0;
@@ -614,6 +632,9 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
 
     /**
      * 统计段落中符合目录项特征的行数。
+     *
+     * @param paragraph 待统计段落
+     * @return 符合目录项特征的行数
      */
     private int countContentsEntryLines(ParagraphBlock paragraph) {
         int count = 0;
@@ -627,6 +648,9 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
 
     /**
      * 判断段落是否包含目录项行。
+     *
+     * @param paragraph 待判断段落
+     * @return 包含目录项行时返回 true
      */
     private boolean containsContentsEntries(ParagraphBlock paragraph) {
         for (LineBlock line : extractLines(paragraph.content())) {
@@ -639,6 +663,9 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
 
     /**
      * 判断单行文本是否符合目录项格式。
+     *
+     * @param text 待判断文本
+     * @return 符合目录项格式时返回 true
      */
     private boolean looksLikeContentsEntry(String text) {
         String normalized = normalizeWhitespace(text);
@@ -881,6 +908,12 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return digitsOnly || lettersOrDigits < compact.length();
     }
 
+    /**
+     * 以调试级别输出章节结构信息。
+     *
+     * @param sourceId 文档来源标识
+     * @param sections 章节列表
+     */
     private void logSections(String sourceId, List<SectionBlock> sections) {
         if (!log.isDebugEnabled()) {
             return;
@@ -897,6 +930,12 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         }
     }
 
+    /**
+     * 判断切片是否仅包含标题而无正文内容。
+     *
+     * @param slice 待判断切片
+     * @return 仅包含标题时返回 true
+     */
     private boolean isTitleOnlyChunk(ChunkSlice slice) {
         if (slice == null) {
             return false;
@@ -908,10 +947,22 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
                 || stripTrailingHeadingPunctuation(normalizedContent).equals(normalizedTitle));
     }
 
+    /**
+     * 安全获取文本长度。
+     *
+     * @param text 文本内容
+     * @return 文本长度
+     */
     private int textLength(String text) {
         return text == null ? 0 : text.length();
     }
 
+    /**
+     * 计算从指定起始时间到当前的耗时（毫秒）。
+     *
+     * @param startNanos 起始时间（纳秒）
+     * @return 耗时毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }

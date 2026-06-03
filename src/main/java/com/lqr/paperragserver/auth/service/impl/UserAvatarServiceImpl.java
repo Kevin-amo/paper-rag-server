@@ -3,7 +3,6 @@ package com.lqr.paperragserver.auth.service.impl;
 import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.mapper.SysRoleMapper;
 import com.lqr.paperragserver.auth.mapper.SysUserMapper;
-import com.lqr.paperragserver.auth.security.DatabaseUserDetailsService;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
 import com.lqr.paperragserver.auth.service.AuthService;
 import com.lqr.paperragserver.auth.service.UserAvatarService;
@@ -43,8 +42,14 @@ public class UserAvatarServiceImpl implements UserAvatarService {
     private final ObjectStorageService objectStorageService;
     private final OssProperties ossProperties;
     private final Tika tika;
-    private final DatabaseUserDetailsService userDetailsService;
 
+    /**
+     * 上传用户头像，校验文件大小和类型后存储到 OSS 并更新用户资料。
+     *
+     * @param principal 当前用户主体
+     * @param file 头像文件
+     * @return 更新后的用户信息
+     */
     @Override
     @Transactional
     public AuthService.CurrentUser uploadAvatar(SecurityUserPrincipal principal, MultipartFile file) {
@@ -75,7 +80,6 @@ public class UserAvatarServiceImpl implements UserAvatarService {
         }
 
         userMapper.updateAvatar(user.getId(), objectKey);
-        userDetailsService.evictUserDetails(user.getUsername());
         deleteOldAvatarQuietly(oldObjectKey, objectKey);
 
         SysUser updated = userMapper.selectById(user.getId());
@@ -83,6 +87,13 @@ public class UserAvatarServiceImpl implements UserAvatarService {
         return toCurrentUser(updated, roles);
     }
 
+    /**
+     * 使用 Apache Tika 检测文件的实际内容类型。
+     *
+     * @param file 上传的文件
+     * @return 检测到的内容类型（小写）
+     * @throws ResponseStatusException 读取文件失败时抛出
+     */
     private String detectContentType(MultipartFile file) {
         try (InputStream inputStream = file.getInputStream()) {
             String detected = tika.detect(inputStream, file.getOriginalFilename());
@@ -95,6 +106,13 @@ public class UserAvatarServiceImpl implements UserAvatarService {
         }
     }
 
+    /**
+     * 根据用户ID和内容类型构造 OSS 对象键，按年月分目录。
+     *
+     * @param userId 用户ID
+     * @param contentType 文件内容类型
+     * @return OSS 对象键
+     */
     private String buildObjectKey(UUID userId, String contentType) {
         OffsetDateTime now = OffsetDateTime.now();
         return String.join("/",
@@ -106,6 +124,13 @@ public class UserAvatarServiceImpl implements UserAvatarService {
         );
     }
 
+    /**
+     * 根据内容类型获取文件扩展名。
+     *
+     * @param contentType 文件内容类型
+     * @return 文件扩展名
+     * @throws ResponseStatusException 图片类型不支持时抛出
+     */
     private String extension(String contentType) {
         return switch (contentType) {
             case "image/jpeg" -> ".jpg";
@@ -115,6 +140,12 @@ public class UserAvatarServiceImpl implements UserAvatarService {
         };
     }
 
+    /**
+     * 静默删除旧头像文件，删除失败仅记录警告日志不中断流程。
+     *
+     * @param oldObjectKey 旧头像的对象键
+     * @param newObjectKey 新头像的对象键
+     */
     private void deleteOldAvatarQuietly(String oldObjectKey, String newObjectKey) {
         if (oldObjectKey == null || oldObjectKey.isBlank() || oldObjectKey.equals(newObjectKey)) {
             return;
@@ -126,6 +157,13 @@ public class UserAvatarServiceImpl implements UserAvatarService {
         }
     }
 
+    /**
+     * 将用户实体和角色列表转换为当前用户信息。
+     *
+     * @param user 系统用户实体
+     * @param roles 角色编码列表
+     * @return 当前用户信息
+     */
     private AuthService.CurrentUser toCurrentUser(SysUser user, List<String> roles) {
         return new AuthService.CurrentUser(
                 user.getId().toString(),

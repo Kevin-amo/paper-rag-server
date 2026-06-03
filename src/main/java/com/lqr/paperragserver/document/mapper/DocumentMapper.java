@@ -15,6 +15,23 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
 
     /**
      * 新增或覆盖文档解析中的基础信息。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param title 文档标题
+     * @param origin 文档来源文件名
+     * @param fileName 文件名
+     * @param fileType 文件 MIME 类型
+     * @param fileSize 文件大小
+     * @param authorsJson 作者 JSON 字符串
+     * @param abstractText 摘要文本
+     * @param doi DOI 标识
+     * @param journal 期刊名称
+     * @param publishYear 发表年份
+     * @param keywordsJson 关键词 JSON 字符串
+     * @param contentText 正文文本
+     * @param metadataJson 元数据 JSON 字符串
+     * @return 影响行数
      */
     @Update("""
             insert into public.paper_document (
@@ -64,6 +81,18 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
 
     /**
      * 更新文档的可编辑元数据字段。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param title 文档标题
+     * @param authorsJson 作者 JSON 字符串
+     * @param abstractText 摘要文本
+     * @param doi DOI 标识
+     * @param journal 期刊名称
+     * @param publishYear 发表年份
+     * @param keywordsJson 关键词 JSON 字符串
+     * @param metadataJson 元数据 JSON 字符串
+     * @return 影响行数
      */
     @Update("""
             update public.paper_document
@@ -92,6 +121,10 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
 
     /**
      * 恢复已软删除文档。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @return 影响行数
      */
     @Update("""
             update public.paper_document
@@ -104,6 +137,11 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
 
     /**
      * 标记文档索引完成并记录分块数量。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param chunkCount 分块数量
+     * @return 影响行数
      */
     @Update("""
             update public.paper_document
@@ -119,6 +157,12 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
 
     /**
      * 标记文档进入指定处理状态。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param status 目标状态
+     * @param progress 进度百分比
+     * @return 影响行数
      */
     @Update("""
             update public.paper_document
@@ -135,6 +179,11 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
 
     /**
      * 标记文档处理失败并保存错误信息。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param errorMessage 错误信息
+     * @return 影响行数
      */
     @Update("""
             update public.paper_document
@@ -148,6 +197,10 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
 
     /**
      * 软删除指定文档。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @return 影响行数
      */
     @Update("""
             update public.paper_document
@@ -159,6 +212,9 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
 
     /**
      * 软删除当前用户的全部有效文档。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @return 影响行数
      */
     @Update("""
             update public.paper_document
@@ -171,6 +227,10 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
 
     /**
      * 统计指定来源 ID 的有效文档数量。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @return 有效文档数量
      */
     @Select("""
             select count(*)

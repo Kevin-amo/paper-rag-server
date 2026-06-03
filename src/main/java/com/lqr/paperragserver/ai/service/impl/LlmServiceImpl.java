@@ -49,6 +49,12 @@ public class LlmServiceImpl implements LlmService {
                 .content();
     }
 
+    /**
+     * 使用构造好的提示词并允许模型调用已注册工具生成回答内容。
+     *
+     * @param prompt 包含 system 与 user 消息的提示词对象
+     * @return 模型返回的文本内容
+     */
     @Override
     public String generateWithTools(PromptConstructionService.Prompt prompt) {
         return withTools(request(prompt))
@@ -56,6 +62,12 @@ public class LlmServiceImpl implements LlmService {
                 .content();
     }
 
+    /**
+     * 使用构造好的提示词并允许模型调用已注册工具流式生成回答内容。
+     *
+     * @param prompt 包含 system 与 user 消息的提示词对象
+     * @return 模型返回的增量文本流
+     */
     @Override
     public Flux<String> streamGenerateWithTools(PromptConstructionService.Prompt prompt) {
         return withTools(request(prompt))
@@ -63,6 +75,12 @@ public class LlmServiceImpl implements LlmService {
                 .content();
     }
 
+    /**
+     * 根据提示词对象构建 ChatClient 请求规格。
+     *
+     * @param prompt 包含 system 与 user 消息的提示词对象
+     * @return ChatClient 请求规格
+     */
     private ChatClientRequestSpec request(PromptConstructionService.Prompt prompt) {
         return chatClient.prompt()
                 .messages(
@@ -71,6 +89,12 @@ public class LlmServiceImpl implements LlmService {
                 );
     }
 
+    /**
+     * 为请求规格注册所有可用的工具回调提供者。
+     *
+     * @param requestSpec 原始请求规格
+     * @return 注册了工具回调的请求规格，无可用工具时返回原始规格
+     */
     private ChatClientRequestSpec withTools(ChatClientRequestSpec requestSpec) {
         if (toolCallbackProviders == null || toolCallbackProviders.isEmpty()) {
             return requestSpec;

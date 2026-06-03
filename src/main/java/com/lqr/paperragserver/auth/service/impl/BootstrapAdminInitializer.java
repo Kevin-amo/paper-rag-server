@@ -25,6 +25,11 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
     private final SecurityProperties securityProperties;
     private final UserAdminService userAdminService;
 
+    /**
+     * 应用启动时检查用户库是否为空，若为空且配置了引导管理员则自动创建。
+     *
+     * @param args 应用启动参数
+     */
     @Override
     public void run(ApplicationArguments args) {
         SecurityProperties.BootstrapAdmin config = securityProperties.bootstrapAdmin();

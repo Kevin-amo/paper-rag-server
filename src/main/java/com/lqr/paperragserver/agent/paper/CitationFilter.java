@@ -86,10 +86,15 @@ public class CitationFilter {
     }
 
     public enum Reason {
+        /** 可展示 */
         DISPLAYABLE,
+        /** 内容为空 */
         EMPTY,
+        /** 内容过短 */
         TOO_SHORT,
+        /** 纯标题内容 */
         TITLE_ONLY,
+        /** 目录项内容 */
         CONTENTS_ENTRY
     }
 

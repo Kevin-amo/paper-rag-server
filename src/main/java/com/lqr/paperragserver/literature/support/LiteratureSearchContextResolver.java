@@ -24,6 +24,9 @@ public class LiteratureSearchContextResolver {
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * 从会话历史中倒序查找最近一次可恢复的文献搜索上下文。
+     */
     public Optional<LiteratureSearchContext> resolve(List<ConversationService.MessageView> history) {
         if (history == null || history.isEmpty()) {
             return Optional.empty();
@@ -38,6 +41,9 @@ public class LiteratureSearchContextResolver {
         return Optional.empty();
     }
 
+    /**
+     * 从单条助手消息的 metadata 中恢复文献搜索上下文。
+     */
     private Optional<LiteratureSearchContext> resolveMessage(ConversationService.MessageView message) {
         if (message == null || !ASSISTANT_ROLE.equalsIgnoreCase(nullToEmpty(message.role()))) {
             return Optional.empty();
@@ -72,6 +78,9 @@ public class LiteratureSearchContextResolver {
         ));
     }
 
+    /**
+     * 将 metadata 中的结果列表恢复为统一搜索结果列表。
+     */
     private List<LiteratureSearchResult> resultList(Object value) {
         if (!(value instanceof List<?> values) || values.isEmpty()) {
             return List.of();
@@ -82,6 +91,9 @@ public class LiteratureSearchContextResolver {
                 .toList();
     }
 
+    /**
+     * 将单个 metadata 结果项转换为统一搜索结果。
+     */
     private Optional<LiteratureSearchResult> toResult(Object value) {
         if (value == null) {
             return Optional.empty();
@@ -92,6 +104,9 @@ public class LiteratureSearchContextResolver {
         return Optional.ofNullable(objectMapper.convertValue(value, LiteratureSearchResult.class));
     }
 
+    /**
+     * 将 metadata 中的列表值转换为去重后的字符串列表。
+     */
     private List<String> stringList(Object value) {
         if (!(value instanceof List<?> values) || values.isEmpty()) {
             return List.of();
@@ -103,6 +118,9 @@ public class LiteratureSearchContextResolver {
                 .toList();
     }
 
+    /**
+     * 将 metadata 值转换为整数，无法转换时返回空值。
+     */
     private Integer intValue(Object value) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -117,14 +135,23 @@ public class LiteratureSearchContextResolver {
         }
     }
 
+    /**
+     * 将 metadata 值转换为去除首尾空白的字符串。
+     */
     private String stringValue(Object value) {
         return value == null ? "" : String.valueOf(value).trim();
     }
 
+    /**
+     * 将可能为空的角色值转换为大写字符串。
+     */
     private String nullToEmpty(String value) {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 将空白字符串转换为空值，保留有效文本。
+     */
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }

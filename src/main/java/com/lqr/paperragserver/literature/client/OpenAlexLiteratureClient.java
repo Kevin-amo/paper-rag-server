@@ -38,11 +38,17 @@ public class OpenAlexLiteratureClient {
     private final RestClient.Builder restClientBuilder;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 创建 OpenAlex 客户端，复用 Spring HTTP 客户端构建器和 JSON 映射器。
+     */
     public OpenAlexLiteratureClient(RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
         this.restClientBuilder = restClientBuilder;
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 调用 OpenAlex 搜索接口，并将响应转换为统一文献搜索结果。
+     */
     public List<LiteratureSearchResult> search(LiteratureSearchRequest request, int limit, String sortBy, LiteratureSearchProperties.OpenAlex properties) {
         if (!properties.isEnabled()) {
             log.warn("literature.search.openalex.skipped queryExcerpt={} limit={} sortBy={} dateFrom={} dateTo={} reason=DISABLED",
@@ -95,6 +101,9 @@ public class OpenAlexLiteratureClient {
         }
     }
 
+    /**
+     * 将 OpenAlex 原始 JSON 响应中的 results 数组转换为统一结果列表。
+     */
     List<LiteratureSearchResult> normalize(JsonNode raw) {
         if (raw == null || raw.isNull() || raw.isMissingNode()) {
             return List.of();
@@ -112,6 +121,9 @@ public class OpenAlexLiteratureClient {
         return items;
     }
 
+    /**
+     * 将搜索结果按发表日期倒序排列，缺失日期的结果排在后面。
+     */
     List<LiteratureSearchResult> sortByDateDescending(List<LiteratureSearchResult> results) {
         return results.stream()
                 .sorted(Comparator.comparing(
@@ -121,6 +133,9 @@ public class OpenAlexLiteratureClient {
                 .toList();
     }
 
+    /**
+     * 将 OpenAlex 的倒排摘要索引还原为自然文本摘要。
+     */
     String restoreAbstract(JsonNode invertedIndex) {
         if (invertedIndex == null || invertedIndex.isNull() || invertedIndex.isMissingNode() || !invertedIndex.isObject()) {
             return null;
@@ -148,6 +163,9 @@ public class OpenAlexLiteratureClient {
         return text.isBlank() ? null : text;
     }
 
+    /**
+     * 将单条 OpenAlex work 节点转换为统一文献搜索结果。
+     */
     private LiteratureSearchResult toResult(JsonNode node) {
         List<String> categories = categories(node);
         String primaryCategory = firstText(node.path("primary_topic"), List.of("display_name"));
@@ -178,6 +196,9 @@ public class OpenAlexLiteratureClient {
         );
     }
 
+    /**
+     * 从 OpenAlex authorships 数组中提取作者名称列表。
+     */
     private List<String> authors(JsonNode authorships) {
         if (!authorships.isArray()) {
             return List.of();
@@ -189,6 +210,9 @@ public class OpenAlexLiteratureClient {
         return List.copyOf(items);
     }
 
+    /**
+     * 从 OpenAlex 主题和 concepts 字段中提取分类列表。
+     */
     private List<String> categories(JsonNode node) {
         Set<String> items = new LinkedHashSet<>();
         addNonBlank(items, firstText(node.path("primary_topic"), List.of("display_name")));
@@ -201,12 +225,18 @@ public class OpenAlexLiteratureClient {
         return List.copyOf(items);
     }
 
+    /**
+     * 向集合中追加非空白文本，并统一去除首尾空白。
+     */
     private void addNonBlank(Set<String> items, String value) {
         if (value != null && !value.isBlank()) {
             items.add(value.trim());
         }
     }
 
+    /**
+     * 按候选字段顺序读取第一个可用文本值。
+     */
     private String firstText(JsonNode node, List<String> fields) {
         if (node == null || node.isNull() || node.isMissingNode()) {
             return null;
@@ -225,6 +255,9 @@ public class OpenAlexLiteratureClient {
         return null;
     }
 
+    /**
+     * 返回参数列表中第一个非空白字符串。
+     */
     private String firstNonBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank()) {
@@ -234,6 +267,9 @@ public class OpenAlexLiteratureClient {
         return null;
     }
 
+    /**
+     * 将 JSON 数值或数字字符串转换为整数。
+     */
     private Integer intValue(JsonNode value) {
         if (value == null || value.isNull() || value.isMissingNode()) {
             return null;
@@ -251,10 +287,16 @@ public class OpenAlexLiteratureClient {
         return null;
     }
 
+    /**
+     * 将内部排序参数转换为 OpenAlex 支持的排序表达。
+     */
     private String openAlexSort(String sortBy) {
         return "relevance_score:desc";
     }
 
+    /**
+     * 根据搜索请求、分页数量和配置组装 OpenAlex 请求地址。
+     */
     URI openAlexUri(
             LiteratureSearchRequest request,
             int limit,
@@ -275,6 +317,9 @@ public class OpenAlexLiteratureClient {
         return builder.build().encode().toUri();
     }
 
+    /**
+     * 将请求中的起止日期转换为 OpenAlex publication_date 过滤条件。
+     */
     private String publicationDateFilter(LiteratureSearchRequest request) {
         List<String> filters = new ArrayList<>();
         if (request.dateFrom() != null && !request.dateFrom().isBlank()) {
@@ -289,6 +334,9 @@ public class OpenAlexLiteratureClient {
         return String.join(",", filters);
     }
 
+    /**
+     * 创建带请求超时和指定 JSON 映射器的 RestClient。
+     */
     private RestClient client(Duration timeout) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(timeout);
@@ -299,6 +347,9 @@ public class OpenAlexLiteratureClient {
                 .build();
     }
 
+    /**
+     * 统计 OpenAlex 原始响应中的结果数量。
+     */
     private int rawResultCount(JsonNode raw) {
         if (raw == null || raw.isNull() || raw.isMissingNode()) {
             return 0;
@@ -307,10 +358,16 @@ public class OpenAlexLiteratureClient {
         return results.isArray() ? results.size() : 0;
     }
 
+    /**
+     * 计算从指定起点到当前时间的毫秒耗时。
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
+    /**
+     * 判断异常链路中是否包含 socket 超时。
+     */
     private boolean isTimeout(Throwable ex) {
         Throwable current = ex;
         while (current != null) {

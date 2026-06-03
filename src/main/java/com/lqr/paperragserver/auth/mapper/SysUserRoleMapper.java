@@ -11,6 +11,13 @@ import java.util.UUID;
  */
 public interface SysUserRoleMapper {
 
+    /**
+     * 插入用户角色关联，若已存在则忽略。
+     *
+     * @param userId 用户ID
+     * @param roleId 角色ID
+     * @return 影响行数
+     */
     @Insert("""
             insert into public.sys_user_role (user_id, role_id)
             values (#{userId}, #{roleId})
@@ -18,6 +25,12 @@ public interface SysUserRoleMapper {
             """)
     int insertIgnore(@Param("userId") UUID userId, @Param("roleId") UUID roleId);
 
+    /**
+     * 删除指定用户的所有角色关联。
+     *
+     * @param userId 用户ID
+     * @return 影响行数
+     */
     @Delete("""
             delete from public.sys_user_role
             where user_id = #{userId}

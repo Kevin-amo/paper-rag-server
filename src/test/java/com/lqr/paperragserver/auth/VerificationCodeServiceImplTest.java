@@ -37,13 +37,13 @@ class VerificationCodeServiceImplTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         service = new VerificationCodeServiceImpl(
                 redisTemplate,
-                new SecurityProperties(null, null, new SecurityProperties.RegisterEmailCode(
+                new SecurityProperties(null, null, null, new SecurityProperties.RegisterEmailCode(
                         Duration.ofMinutes(5),
                         Duration.ofSeconds(60),
                         2,
                         2,
                         3
-                ), null, null),
+                ), null),
                 mailService
         );
     }

@@ -26,6 +26,13 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
     private final StringRedisTemplate redisTemplate;
     private final SecurityProperties securityProperties;
 
+    /**
+     * 如果当前账号或 IP 已被锁定，则直接拒绝本次登录。
+     *
+     * @param username 用户名
+     * @param clientIp 客户端IP地址
+     * @throws ResponseStatusException 账号或IP已被锁定时抛出
+     */
     @Override
     public void assertNotLocked(String username, String clientIp) {
         SecurityProperties.LoginAttempt config = securityProperties.loginAttempt();
@@ -40,6 +47,12 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
         }
     }
 
+    /**
+     * 记录一次登录失败，达到阈值时锁定账号与 IP。
+     *
+     * @param username 用户名
+     * @param clientIp 客户端IP地址
+     */
     @Override
     public void recordFailure(String username, String clientIp) {
         SecurityProperties.LoginAttempt config = securityProperties.loginAttempt();
@@ -91,26 +104,62 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
         return count == null ? 0L : count;
     }
 
+    /**
+     * 构造登录锁定异常。
+     *
+     * @param message 异常提示信息
+     * @return 429 响应状态异常
+     */
     private ResponseStatusException lockedException(String message) {
         return new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, message);
     }
 
+    /**
+     * 构造账号失败计数的缓存键。
+     *
+     * @param normalizedUsername 标准化后的用户名
+     * @return 缓存键
+     */
     private String accountFailureKey(String normalizedUsername) {
         return ACCOUNT_FAILURE_KEY_PREFIX + normalizedUsername;
     }
 
+    /**
+     * 构造IP失败计数的缓存键。
+     *
+     * @param normalizedIp 标准化后的IP地址
+     * @return 缓存键
+     */
     private String ipFailureKey(String normalizedIp) {
         return IP_FAILURE_KEY_PREFIX + normalizedIp;
     }
 
+    /**
+     * 构造账号锁定状态的缓存键。
+     *
+     * @param normalizedUsername 标准化后的用户名
+     * @return 缓存键
+     */
     private String accountLockKey(String normalizedUsername) {
         return ACCOUNT_LOCK_KEY_PREFIX + normalizedUsername;
     }
 
+    /**
+     * 构造IP锁定状态的缓存键。
+     *
+     * @param normalizedIp 标准化后的IP地址
+     * @return 缓存键
+     */
     private String ipLockKey(String normalizedIp) {
         return IP_LOCK_KEY_PREFIX + normalizedIp;
     }
 
+    /**
+     * 标准化用户名，转为小写并去除首尾空白，为空时返回 "unknown"。
+     *
+     * @param username 用户名
+     * @return 标准化后的用户名
+     */
     private String normalizeUsername(String username) {
         if (username == null || username.isBlank()) {
             return "unknown";
@@ -118,6 +167,12 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
         return username.trim().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 标准化IP地址，去除首尾空白，为空时返回 "unknown"。
+     *
+     * @param clientIp 客户端IP地址
+     * @return 标准化后的IP地址
+     */
     private String normalizeIp(String clientIp) {
         if (clientIp == null || clientIp.isBlank()) {
             return "unknown";

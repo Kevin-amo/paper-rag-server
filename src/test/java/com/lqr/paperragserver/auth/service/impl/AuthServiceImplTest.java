@@ -76,7 +76,6 @@ class AuthServiceImplTest {
 
         verify(userMapper, never()).updatePassword(any(), anyString());
         verify(passwordEncoder, never()).encode(anyString());
-        verify(userDetailsService, never()).evictUserDetails(anyString());
     }
 
     @Test
@@ -91,7 +90,6 @@ class AuthServiceImplTest {
                 });
 
         verify(userMapper, never()).updateDisplayName(any(), anyString());
-        verify(userDetailsService, never()).evictUserDetails(anyString());
     }
 
     @Test
@@ -107,7 +105,6 @@ class AuthServiceImplTest {
 
         assertThat(result.displayName()).isEqualTo("New Nick");
         verify(userMapper).updateDisplayName(user.getId(), "New Nick");
-        verify(userDetailsService).evictUserDetails(user.getUsername());
     }
 
     @Test

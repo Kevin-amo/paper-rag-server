@@ -67,6 +67,16 @@ public class DocumentController {
     private final DocumentIngestionProducer documentIngestionProducer;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 上传单个文档并异步入库。
+     *
+     * @param principal 当前登录用户
+     * @param file 上传的文件
+     * @param sourceId 文档来源标识（可选）
+     * @param title 文档标题（可选）
+     * @return 202 Accepted，包含入库任务信息
+     * @throws IOException 文件读取失败时抛出
+     */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DocumentUploadAcceptedResponse> ingest(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                                  @RequestParam("file") MultipartFile file,
@@ -90,6 +100,14 @@ public class DocumentController {
         }
     }
 
+    /**
+     * 批量上传文档并异步入库。
+     *
+     * @param principal 当前登录用户
+     * @param files 上传的文件数组
+     * @param items 批量上传项参数（JSON 格式，可选）
+     * @return 202 Accepted，包含每个文件的处理结果
+     */
     @PostMapping(path = "/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BatchDocumentIngestionResponse> ingestBatch(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                                       @RequestParam("files") MultipartFile[] files,
@@ -129,6 +147,16 @@ public class DocumentController {
                 .body(new BatchDocumentIngestionResponse(results, acceptedCount, files.length - acceptedCount));
     }
 
+    /**
+     * 分页查询当前用户的文档摘要列表。
+     *
+     * @param principal 当前登录用户
+     * @param keyword 关键词过滤（可选）
+     * @param status 状态过滤（可选）
+     * @param page 页码（从 0 开始）
+     * @param size 每页条数
+     * @return 分页文档摘要响应
+     */
     @GetMapping
     public PageResponse<DocumentSummaryResponse> list(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                       @RequestParam(value = "keyword", required = false) String keyword,
@@ -145,6 +173,13 @@ public class DocumentController {
         );
     }
 
+    /**
+     * 查询指定入库任务的状态。
+     *
+     * @param principal 当前登录用户
+     * @param jobId 任务 ID
+     * @return 任务状态响应
+     */
     @GetMapping("/jobs/{jobId}")
     public DocumentJobResponse job(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                    @PathVariable UUID jobId) {
@@ -153,6 +188,13 @@ public class DocumentController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在"));
     }
 
+    /**
+     * 查询指定文档的详情。
+     *
+     * @param principal 当前登录用户
+     * @param sourceId 文档来源标识
+     * @return 文档详情响应
+     */
     @GetMapping("/{sourceId}")
     public DocumentDetailResponse detail(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                          @PathVariable String sourceId) {
@@ -161,6 +203,15 @@ public class DocumentController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文档不存在"));
     }
 
+    /**
+     * 分页查询指定文档的分块列表。
+     *
+     * @param principal 当前登录用户
+     * @param sourceId 文档来源标识
+     * @param page 页码（从 0 开始）
+     * @param size 每页条数
+     * @return 分页分块响应
+     */
     @GetMapping("/{sourceId}/chunks")
     public PageResponse<DocumentChunkResponse> chunks(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                       @PathVariable String sourceId,
@@ -176,6 +227,14 @@ public class DocumentController {
         );
     }
 
+    /**
+     * 查询指定文档的资产列表，可按资产 ID 过滤。
+     *
+     * @param principal 当前登录用户
+     * @param sourceId 文档来源标识
+     * @param assetIds 逗号分隔的资产 ID（可选）
+     * @return 资产响应列表
+     */
     @GetMapping("/{sourceId}/assets")
     public List<DocumentAssetResponse> assets(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                               @PathVariable String sourceId,
@@ -185,6 +244,14 @@ public class DocumentController {
                 .toList();
     }
 
+    /**
+     * 下载指定文档资产的二进制内容。
+     *
+     * @param principal 当前登录用户
+     * @param sourceId 文档来源标识
+     * @param assetId 资产 ID
+     * @return 资产二进制内容响应
+     */
     @GetMapping("/{sourceId}/assets/{assetId}/content")
     public ResponseEntity<byte[]> assetContent(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                @PathVariable String sourceId,
@@ -201,6 +268,14 @@ public class DocumentController {
                 .body(content);
     }
 
+    /**
+     * 更新指定文档的可编辑元数据。
+     *
+     * @param principal 当前登录用户
+     * @param sourceId 文档来源标识
+     * @param request 元数据更新请求
+     * @return 更新后的文档详情
+     */
     @PatchMapping("/{sourceId}/metadata")
     public DocumentDetailResponse updateMetadata(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                  @PathVariable String sourceId,
@@ -209,12 +284,23 @@ public class DocumentController {
         return detail(principal, sourceId);
     }
 
+    /**
+     * 删除当前用户的全部文档。
+     *
+     * @param principal 当前登录用户
+     */
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteAll(@AuthenticationPrincipal SecurityUserPrincipal principal) {
         documentIngestionService.deleteAll(principal.getId());
     }
 
+    /**
+     * 删除指定来源标识的文档。
+     *
+     * @param principal 当前登录用户
+     * @param sourceId 文档来源标识
+     */
     @DeleteMapping("/{sourceId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteBySourceId(@AuthenticationPrincipal SecurityUserPrincipal principal,
@@ -222,6 +308,13 @@ public class DocumentController {
         documentIngestionService.deleteBySourceId(principal.getId(), sourceId);
     }
 
+    /**
+     * 恢复已删除的文档。
+     *
+     * @param principal 当前登录用户
+     * @param sourceId 文档来源标识
+     * @return 恢复后的文档详情
+     */
     @PostMapping("/{sourceId}/restore")
     public DocumentDetailResponse restore(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                           @PathVariable String sourceId) {
@@ -229,6 +322,13 @@ public class DocumentController {
         return detail(principal, sourceId);
     }
 
+    /**
+     * 重建指定文档的分块和向量索引。
+     *
+     * @param principal 当前登录用户
+     * @param sourceId 文档来源标识
+     * @return 重建索引结果
+     */
     @PostMapping("/{sourceId}/reindex")
     public ReindexResponse reindex(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                    @PathVariable String sourceId) {
@@ -236,6 +336,17 @@ public class DocumentController {
         return new ReindexResponse(result.sourceId(), result.chunkCount());
     }
 
+    /**
+     * 创建入库任务、存储上传文件并发布消息到队列。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param file 上传的文件
+     * @param sourceId 文档来源标识
+     * @param title 文档标题
+     * @param fallbackFileName 备用文件名
+     * @return 创建的入库任务实体
+     * @throws IOException 文件存储失败时抛出
+     */
     private DocumentIngestionJob createAndPublishJob(UUID ownerUserId,
                                                      MultipartFile file,
                                                      String sourceId,
@@ -263,6 +374,12 @@ public class DocumentController {
         return documentIngestionJobService.findJob(ownerUserId, job.getId()).orElse(job);
     }
 
+    /**
+     * 解析逗号分隔的资产 ID 字符串为列表。
+     *
+     * @param assetIds 逗号分隔的资产 ID 字符串
+     * @return 资产 ID 列表
+     */
     private List<String> parseAssetIds(String assetIds) {
         if (assetIds == null || assetIds.isBlank()) {
             return List.of();
@@ -273,6 +390,14 @@ public class DocumentController {
                 .toList();
     }
 
+    /**
+     * 解析批量上传的 items 参数，校验数量与文件数一致。
+     *
+     * @param items JSON 格式的批量上传项参数
+     * @param fileCount 上传文件数量
+     * @return 批量上传项请求列表
+     * @throws ResponseStatusException 参数格式错误或数量不一致时抛出
+     */
     private List<BatchDocumentIngestionItemRequest> parseBatchItems(String items, int fileCount) {
         if (items == null || items.isBlank()) {
             return java.util.stream.IntStream.range(0, fileCount)
@@ -298,10 +423,23 @@ public class DocumentController {
         }
     }
 
+    /**
+     * 计算从指定起始时间到当前的耗时（毫秒）。
+     *
+     * @param startNanos 起始时间（纳秒）
+     * @return 耗时毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
+    /**
+     * 获取上传文件的原始文件名，优先使用文件自带名称，其次使用请求中指定的名称。
+     *
+     * @param file 上传的文件
+     * @param item 批量上传项请求
+     * @return 文件名
+     */
     private String originalFileName(MultipartFile file, BatchDocumentIngestionItemRequest item) {
         String fileName = file.getOriginalFilename();
         if (fileName != null && !fileName.isBlank()) {

@@ -21,6 +21,9 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -33,43 +36,106 @@ import java.nio.charset.StandardCharsets;
 @EnableWebSecurity
 public class SecurityConfiguration {
 
+    /**
+     * 配置 HTTP 安全过滤链，包括 CORS、CSRF、会话管理、安全头、异常处理和请求授权规则。
+     *
+     * @param http                     Spring Security HTTP 安全构建器
+     * @param jwtAuthenticationFilter  JWT 认证过滤器
+     * @param authenticationEntryPoint REST 认证入口点
+     * @param accessDeniedHandler      REST 访问拒绝处理器
+     * @param corsConfigurationSource  CORS 配置源
+     * @return 配置完成的安全过滤链
+     * @throws Exception 配置过程中的异常
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtAuthenticationFilter jwtAuthenticationFilter,
                                                    RestAuthenticationEntryPoint authenticationEntryPoint,
-                                                   RestAccessDeniedHandler accessDeniedHandler) throws Exception {
+                                                   RestAccessDeniedHandler accessDeniedHandler,
+                                                   CorsConfigurationSource corsConfigurationSource) throws Exception {
         return http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
+                        .frameOptions(frame -> frame.deny())
+                        .contentTypeOptions(cto -> cto.disable())
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .preload(true)
+                                .maxAgeInSeconds(31536000))
+                        .xssProtection(xss -> xss.disable())
+                        .addHeaderWriter((request, response) -> {
+                            response.setHeader("X-Content-Type-Options", "nosniff");
+                            response.setHeader("X-XSS-Protection", "0");
+                            response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+                            response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+                        }))
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.ASYNC).permitAll()
-                        // 放行登录注册接口
                         .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/register", "/auth/register/email-code").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/documents/**", "/conversations/**", "/agent/**").hasRole("USER")
                         .requestMatchers("/auth/**").authenticated()
                         .anyRequest().authenticated())
-                // 在 UsernamePasswordAuthenticationFilter 之前插入jwt过滤器
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
+    /**
+     * 根据 SecurityProperties 中的 CORS 配置创建跨域配置源。
+     *
+     * @param securityProperties 安全配置属性
+     * @return 基于路径匹配的 CORS 配置源
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(SecurityProperties securityProperties) {
+        SecurityProperties.Cors corsProps = securityProperties.cors();
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(corsProps.allowedOrigins());
+        configuration.setAllowedMethods(corsProps.allowedMethods());
+        configuration.setAllowedHeaders(corsProps.allowedHeaders());
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(corsProps.maxAge());
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    /**
+     * 注册 BCrypt 密码编码器，用于用户注册和登录验证。
+     *
+     * @return BCrypt 密码编码器实例
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * 创建 JWT 编码器，使用配置中的密钥对 JWT 令牌进行签名。
+     *
+     * @param securityProperties 安全配置属性，包含 JWT 密钥
+     * @return Nimbus JWT 编码器实例
+     */
     @Bean
     public JwtEncoder jwtEncoder(SecurityProperties securityProperties) {
         return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSecretKey(securityProperties)));
     }
 
+    /**
+     * 创建 JWT 解码器，使用配置中的密钥和 HS256 算法验证 JWT 令牌。
+     *
+     * @param securityProperties 安全配置属性，包含 JWT 密钥
+     * @return Nimbus JWT 解码器实例
+     */
     @Bean
     public JwtDecoder jwtDecoder(SecurityProperties securityProperties) {
         return NimbusJwtDecoder.withSecretKey(jwtSecretKey(securityProperties))
@@ -77,6 +143,12 @@ public class SecurityConfiguration {
                 .build();
     }
 
+    /**
+     * 从安全配置属性中提取 JWT 签名密钥，转换为 HmacSHA256 规格的 SecretKey。
+     *
+     * @param securityProperties 安全配置属性，包含 JWT 密钥字符串
+     * @return HmacSHA256 规格的 SecretKey 实例
+     */
     private SecretKey jwtSecretKey(SecurityProperties securityProperties) {
         byte[] keyBytes = securityProperties.jwt().secret().getBytes(StandardCharsets.UTF_8);
         return new SecretKeySpec(keyBytes, "HmacSHA256");

@@ -13,6 +13,12 @@ import java.util.UUID;
  */
 public interface SysUserMapper extends BaseMapper<SysUser> {
 
+    /**
+     * 统计指定角色下的活跃用户数量。
+     *
+     * @param roleCode 角色编码
+     * @return 活跃用户数量
+     */
     @Select("""
             select count(*)
             from public.sys_user u
@@ -23,6 +29,12 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             """)
     long countActiveByRole(@Param("roleCode") String roleCode);
 
+    /**
+     * 更新用户最后登录时间。
+     *
+     * @param id 用户ID
+     * @return 影响行数
+     */
     @Update("""
             update public.sys_user
             set last_login_at = now(), updated_at = now()
@@ -30,6 +42,13 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             """)
     int updateLastLoginAt(@Param("id") UUID id);
 
+    /**
+     * 更新用户头像对象键。
+     *
+     * @param id 用户ID
+     * @param avatarObjectKey 头像对象存储键
+     * @return 影响行数
+     */
     @Update("""
             update public.sys_user
             set avatar_object_key = #{avatarObjectKey}, avatar_updated_at = now(), updated_at = now()
@@ -37,6 +56,13 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             """)
     int updateAvatar(@Param("id") UUID id, @Param("avatarObjectKey") String avatarObjectKey);
 
+    /**
+     * 更新用户密码哈希。
+     *
+     * @param id 用户ID
+     * @param passwordHash 新密码哈希值
+     * @return 影响行数
+     */
     @Update("""
             update public.sys_user
             set password_hash = #{passwordHash}, updated_at = now()
@@ -44,6 +70,13 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             """)
     int updatePassword(@Param("id") UUID id, @Param("passwordHash") String passwordHash);
 
+    /**
+     * 更新用户昵称。
+     *
+     * @param id 用户ID
+     * @param displayName 新昵称
+     * @return 影响行数
+     */
     @Update("""
             update public.sys_user
             set display_name = #{displayName}, updated_at = now()
@@ -51,6 +84,13 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             """)
     int updateDisplayName(@Param("id") UUID id, @Param("displayName") String displayName);
 
+    /**
+     * 更新用户邮箱。
+     *
+     * @param id 用户ID
+     * @param email 新邮箱地址
+     * @return 影响行数
+     */
     @Update("""
             update public.sys_user
             set email = #{email}, updated_at = now()

@@ -19,9 +19,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.UUID;
 
-/**
- * JWT 认证过滤器，从请求头或资源访问参数中解析访问令牌并写入安全上下文。
- */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -32,21 +29,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final DatabaseUserDetailsService userDetailsService;
     private final TokenRevocationService tokenRevocationService;
 
+    /**
+     * 从请求中提取 JWT 令牌，校验有效性后设置安全上下文。
+     *
+     * @param request HTTP 请求
+     * @param response HTTP 响应
+     * @param filterChain 过滤器链
+     * @throws ServletException Servlet 异常
+     * @throws IOException IO 异常
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        // 尝试从请求头或资源访问参数中解析访问令牌
         String token = resolveToken(request);
         if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
-                // 判断 token 是否在黑名单（退出登录）
                 if (tokenRevocationService.isRevoked(token)) {
                     SecurityContextHolder.clearContext();
                     filterChain.doFilter(request, response);
                     return;
                 }
                 Jwt jwt = jwtDecoder.decode(token);
+                if (isTokenRevokedByPasswordChange(jwt)) {
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 String username = jwt.getSubject();
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 if (!isTokenBoundToUser(jwt, userDetails)) {
@@ -68,6 +77,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    private boolean isTokenRevokedByPasswordChange(Jwt jwt) {
+        try {
+            String userId = jwt.getClaimAsString("userId");
+            if (userId == null) {
+                return false;
+            }
+            return tokenRevocationService.isTokenRevokedByPasswordChange(
+                    UUID.fromString(userId), jwt.getIssuedAt());
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
     private boolean isTokenBoundToUser(Jwt jwt, UserDetails userDetails) {
         if (!(userDetails instanceof SecurityUserPrincipal principal)) {
             return false;
@@ -80,6 +102,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * 从请求头或查询参数中提取 Bearer 令牌。
+     *
+     * @param request HTTP 请求
+     * @return 令牌字符串，不存在时返回 null
+     */
     private String resolveToken(HttpServletRequest request) {
         String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (authorization != null && authorization.startsWith(BEARER_PREFIX)) {

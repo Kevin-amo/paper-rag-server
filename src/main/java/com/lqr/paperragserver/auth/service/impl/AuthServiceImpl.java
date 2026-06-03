@@ -16,6 +16,7 @@ import com.lqr.paperragserver.auth.service.TokenRevocationService;
 import com.lqr.paperragserver.auth.service.VerificationCodeService;
 import com.lqr.paperragserver.storage.service.ObjectStorageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -35,6 +36,7 @@ import java.util.regex.Pattern;
 /**
  * 默认认证服务实现，使用数据库账号、BCrypt 密码和 JWT 令牌完成登录流程。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -52,6 +54,14 @@ public class AuthServiceImpl implements AuthService {
     private final TokenRevocationService tokenRevocationService;
     private final ObjectStorageService objectStorageService;
 
+    /**
+     * 用户登录校验，校验密码和账号状态后签发访问令牌。
+     *
+     * @param username 用户名
+     * @param password 密码
+     * @param clientIp 客户端IP地址
+     * @return 登录结果，包含令牌和用户信息
+     */
     @Override
     public LoginResult login(String username, String password, String clientIp) {
         loginAttemptService.assertNotLocked(username, clientIp);
@@ -75,6 +85,12 @@ public class AuthServiceImpl implements AuthService {
         return createLoginResult(principal);
     }
 
+    /**
+     * 发送邮箱注册验证码，校验邮箱是否已被注册。
+     *
+     * @param email 邮箱地址
+     * @param clientIp 客户端IP地址
+     */
     @Override
     public void createRegisterEmailCode(String email, String clientIp) {
         String normalizedEmail = normalizeEmail(email);
@@ -84,6 +100,15 @@ public class AuthServiceImpl implements AuthService {
         verificationCodeService.createRegisterEmailCode(normalizedEmail, clientIp);
     }
 
+    /**
+     * 使用邮箱验证码完成注册，创建用户并分配默认角色后自动登录。
+     *
+     * @param username 用户名
+     * @param password 密码
+     * @param email 邮箱地址
+     * @param emailCode 邮箱验证码
+     * @return 登录结果，包含令牌和用户信息
+     */
     @Override
     @Transactional
     public LoginResult registerWithEmailCode(String username, String password, String email, String emailCode) {
@@ -124,6 +149,11 @@ public class AuthServiceImpl implements AuthService {
         return createLoginResult(principal);
     }
 
+    /**
+     * 用户登出，撤销当前访问令牌。令牌无效时静默处理以保持幂等。
+     *
+     * @param token 访问令牌
+     */
     @Override
     public void logout(String token) {
         if (token == null || token.isBlank()) {
@@ -136,6 +166,12 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /**
+     * 获取当前登录用户信息。
+     *
+     * @param principal 当前用户主体
+     * @return 当前用户信息
+     */
     @Override
     public CurrentUser currentUser(SecurityUserPrincipal principal) {
         return new CurrentUser(
@@ -148,6 +184,14 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
+    /**
+     * 修改当前用户密码，校验当前密码正确性和新密码差异性，成功后撤销该用户所有令牌。
+     *
+     * @param principal 当前用户主体
+     * @param currentPassword 当前密码
+     * @param newPassword 新密码
+     * @return 更新后的用户信息
+     */
     @Override
     @Transactional
     public CurrentUser changePassword(SecurityUserPrincipal principal, String currentPassword, String newPassword) {
@@ -161,20 +205,34 @@ public class AuthServiceImpl implements AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "新密码不能与当前密码相同");
         }
         userMapper.updatePassword(user.getId(), passwordEncoder.encode(normalizedNewPassword));
-        userDetailsService.evictUserDetails(user.getUsername());
+        tokenRevocationService.revokeAllTokensForUser(user.getId());
+        log.info("Password changed successfully, all tokens revoked: userId={}", user.getId());
         return toCurrentUser(userMapper.selectById(user.getId()));
     }
 
+    /**
+     * 修改当前用户昵称。
+     *
+     * @param principal 当前用户主体
+     * @param displayName 新昵称
+     * @return 更新后的用户信息
+     */
     @Override
     @Transactional
     public CurrentUser changeDisplayName(SecurityUserPrincipal principal, String displayName) {
         SysUser user = requireUser(principal.getId());
         String normalizedDisplayName = requireText(displayName, "昵称不能为空");
         userMapper.updateDisplayName(user.getId(), normalizedDisplayName);
-        userDetailsService.evictUserDetails(user.getUsername());
         return toCurrentUser(userMapper.selectById(user.getId()));
     }
 
+    /**
+     * 发送换绑邮箱验证码，校验新邮箱可用性。
+     *
+     * @param principal 当前用户主体
+     * @param email 新邮箱地址
+     * @param clientIp 客户端IP地址
+     */
     @Override
     public void createChangeEmailCode(SecurityUserPrincipal principal, String email, String clientIp) {
         SysUser user = requireUser(principal.getId());
@@ -183,6 +241,14 @@ public class AuthServiceImpl implements AuthService {
         verificationCodeService.createChangeEmailCode(normalizedEmail, clientIp);
     }
 
+    /**
+     * 使用验证码换绑邮箱，校验新邮箱可用性和验证码正确性。
+     *
+     * @param principal 当前用户主体
+     * @param email 新邮箱地址
+     * @param emailCode 邮箱验证码
+     * @return 更新后的用户信息
+     */
     @Override
     @Transactional
     public CurrentUser changeEmail(SecurityUserPrincipal principal, String email, String emailCode) {
@@ -192,10 +258,15 @@ public class AuthServiceImpl implements AuthService {
         verificationCodeService.requireChangeEmailCodeMatches(normalizedEmail, requireText(emailCode, "验证码不能为空"));
         userMapper.updateEmail(user.getId(), normalizedEmail);
         verificationCodeService.deleteChangeEmailCode(normalizedEmail);
-        userDetailsService.evictUserDetails(user.getUsername());
         return toCurrentUser(userMapper.selectById(user.getId()));
     }
 
+    /**
+     * 构造登录结果，包含访问令牌和当前用户信息。
+     *
+     * @param principal 用户主体
+     * @return 登录结果
+     */
     private LoginResult createLoginResult(SecurityUserPrincipal principal) {
         return new LoginResult(
                 jwtTokenService.createAccessToken(principal),
@@ -205,6 +276,12 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
+    /**
+     * 将用户实体转换为当前用户信息。
+     *
+     * @param user 系统用户实体
+     * @return 当前用户信息
+     */
     private CurrentUser toCurrentUser(SysUser user) {
         List<String> roles = roleMapper.selectRoleCodesByUserId(user.getId());
         return new CurrentUser(
@@ -217,6 +294,13 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
+    /**
+     * 根据ID查询用户，不存在时抛出404异常。
+     *
+     * @param id 用户ID
+     * @return 用户实体
+     * @throws ResponseStatusException 用户不存在时抛出
+     */
     private SysUser requireUser(UUID id) {
         SysUser user = userMapper.selectById(id);
         if (user == null) {
@@ -225,6 +309,13 @@ public class AuthServiceImpl implements AuthService {
         return user;
     }
 
+    /**
+     * 校验新邮箱可用性，确保不与当前邮箱相同且未被其他用户注册。
+     *
+     * @param currentUser 当前用户实体
+     * @param normalizedEmail 标准化后的邮箱地址
+     * @throws ResponseStatusException 邮箱不可用时抛出
+     */
     private void ensureEmailAvailable(SysUser currentUser, String normalizedEmail) {
         if (currentUser.getEmail() != null
                 && normalizedEmail.equals(currentUser.getEmail().trim().toLowerCase(Locale.ROOT))) {
@@ -236,6 +327,14 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /**
+     * 校验字符串非空，为空时抛出400异常。
+     *
+     * @param value 待校验字符串
+     * @param message 异常提示信息
+     * @return 去除首尾空白后的字符串
+     * @throws ResponseStatusException 字符串为空时抛出
+     */
     private String requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
@@ -243,6 +342,13 @@ public class AuthServiceImpl implements AuthService {
         return value.trim();
     }
 
+    /**
+     * 标准化邮箱地址，校验非空和格式合法性后转为小写。
+     *
+     * @param email 邮箱地址
+     * @return 标准化后的邮箱地址
+     * @throws ResponseStatusException 邮箱为空或格式不合法时抛出
+     */
     private String normalizeEmail(String email) {
         String normalizedEmail = requireText(email, "邮箱不能为空").toLowerCase(Locale.ROOT);
         if (!EMAIL_PATTERN.matcher(normalizedEmail).matches()) {

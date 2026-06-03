@@ -66,6 +66,15 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
                 builder.similarityThresholdAll();
             }
             List<Document> documents = vectorStore.similaritySearch(builder.build());
+            List<String> sourceIds = documents.stream()
+                    .map(doc -> {
+                        Map<String, Object> meta = doc.getMetadata();
+                        return meta == null ? null : String.valueOf(meta.getOrDefault(MetadataKeys.SOURCE_ID, ""));
+                    })
+                    .filter(id -> id != null && !id.isBlank())
+                    .distinct()
+                    .toList();
+            Map<String, Boolean> indexedMap = documentPersistenceService.findIndexedDocuments(ownerUserId, sourceIds);
             List<RetrievedChunk> vectorChunks = new ArrayList<>(documents.size());
             FilterStats filterStats = new FilterStats();
             int index = 0;
@@ -81,7 +90,7 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
                     filterStats.invalidSourceCount++;
                     continue;
                 }
-                if (!isIndexedDocument(ownerUserId, sourceId)) {
+                if (!indexedMap.getOrDefault(sourceId, Boolean.FALSE)) {
                     filterStats.notIndexedCount++;
                     continue;
                 }
@@ -144,6 +153,11 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
         return Math.max(resolvedTopK * multiplier, resolvedTopK);
     }
 
+    /**
+     * 在 DEBUG 级别逐条输出最终召回片段的详细信息。
+     *
+     * @param chunks 最终召回的片段列表
+     */
     private void logFinalChunks(List<RetrievedChunk> chunks) {
         if (!log.isDebugEnabled()) {
             return;
@@ -170,6 +184,12 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
         return value == null ? null : String.valueOf(value);
     }
 
+    /**
+     * 计算从指定起点到当前时间的毫秒耗时。
+     *
+     * @param startNanos 起始纳秒时间戳
+     * @return 耗时毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
@@ -178,22 +198,6 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
         private int ownerMismatchCount;
         private int invalidSourceCount;
         private int notIndexedCount;
-    }
-
-    /**
-     * 判断文档是否仍处于可检索的已索引状态。
-     *
-     * @param sourceId 文档来源 ID
-     * @return 文档存在、未删除且状态为已索引时返回 true
-     */
-    private boolean isIndexedDocument(UUID ownerUserId, String sourceId) {
-        if (ownerUserId == null || sourceId == null || sourceId.isBlank()) {
-            return false;
-        }
-        return documentPersistenceService.findDocument(ownerUserId, sourceId)
-                .filter(document -> document.deletedAt() == null)
-                .map(document -> "INDEXED".equals(document.status()))
-                .orElse(false);
     }
 
     /**

@@ -112,12 +112,24 @@ public class VectorWriteServiceImpl implements VectorWriteService {
         log.info("vector.delete-all.done ownerUserId={} costMs={}", ownerUserId, elapsedMs(startNanos));
     }
 
+    /**
+     * 统计向量列表按来源 ID 的分布情况。
+     *
+     * @param vectors 向量列表
+     * @return 来源 ID 到对应向量数量的映射
+     */
     private Map<String, Long> sourceDistribution(List<EmbeddingService.EmbeddingVector> vectors) {
         return vectors.stream()
                 .map(vector -> vector.chunk().sourceId())
                 .collect(Collectors.groupingBy(sourceId -> sourceId, Collectors.counting()));
     }
 
+    /**
+     * 计算从指定起点到当前时间的毫秒耗时。
+     *
+     * @param startNanos 起始纳秒时间戳
+     * @return 耗时毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }

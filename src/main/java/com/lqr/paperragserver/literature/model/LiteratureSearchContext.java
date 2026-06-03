@@ -19,6 +19,9 @@ public record LiteratureSearchContext(
         UUID sourceMessageId,
         OffsetDateTime createdAt
 ) {
+    /**
+     * 创建搜索上下文，并将集合字段固定为不可变空集合或副本。
+     */
     public LiteratureSearchContext {
         categories = categories == null ? List.of() : List.copyOf(categories);
         items = items == null ? List.of() : List.copyOf(items);

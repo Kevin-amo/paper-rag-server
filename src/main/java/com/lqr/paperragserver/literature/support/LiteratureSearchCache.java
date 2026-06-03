@@ -16,6 +16,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * 文献搜索 Redis 缓存。
@@ -26,6 +27,7 @@ import java.util.Optional;
 public class LiteratureSearchCache {
 
     static final String REDIS_KEY_PREFIX = "paper-rag:literature:search:v1:";
+    static final String LOCK_REDIS_KEY_PREFIX = "paper-rag:literature:search:lock:v1:";
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -67,6 +69,45 @@ public class LiteratureSearchCache {
     }
 
     /**
+     * 为指定缓存 Key 尝试获取短期重建锁，避免同一查询并发重复调用外部服务。
+     */
+    public Optional<LockHandle> tryAcquireLock(Key key, Duration lockTtl) {
+        if (key == null || lockTtl == null || lockTtl.isZero() || lockTtl.isNegative()) {
+            return Optional.empty();
+        }
+        String keyHash = keyHash(key);
+        String lockKey = lockRedisKey(keyHash);
+        String lockValue = UUID.randomUUID().toString();
+        try {
+            Boolean locked = redisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, lockTtl);
+            if (Boolean.TRUE.equals(locked)) {
+                return Optional.of(new LockHandle(lockKey, lockValue));
+            }
+            return Optional.empty();
+        } catch (RuntimeException ex) {
+            log.warn("literature.search.cache.redis.lock.acquire.failed keyHash={}", keyHash, ex);
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * 释放当前实例持有的缓存重建锁，避免误删其他请求新建的锁。
+     */
+    public void releaseLock(LockHandle lockHandle) {
+        if (lockHandle == null) {
+            return;
+        }
+        try {
+            String currentValue = redisTemplate.opsForValue().get(lockHandle.lockKey());
+            if (lockHandle.lockValue().equals(currentValue)) {
+                redisTemplate.delete(lockHandle.lockKey());
+            }
+        } catch (RuntimeException ex) {
+            log.warn("literature.search.cache.redis.lock.release.failed lockKey={}", lockHandle.lockKey(), ex);
+        }
+    }
+
+    /**
      * 根据业务缓存 Key 生成带版本命名空间的 Redis key，供缓存访问和测试断言复用。
      */
     String redisKey(Key key) {
@@ -85,6 +126,13 @@ public class LiteratureSearchCache {
      */
     private String redisKey(String keyHash) {
         return REDIS_KEY_PREFIX + keyHash;
+    }
+
+    /**
+     * 拼接锁 Redis key 前缀和摘要后缀，隔离缓存重建锁的命名空间。
+     */
+    private String lockRedisKey(String keyHash) {
+        return LOCK_REDIS_KEY_PREFIX + keyHash;
     }
 
     /**
@@ -134,6 +182,12 @@ public class LiteratureSearchCache {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 algorithm is unavailable", ex);
         }
+    }
+
+    public record LockHandle(
+            String lockKey,
+            String lockValue
+    ) {
     }
 
     public record Key(

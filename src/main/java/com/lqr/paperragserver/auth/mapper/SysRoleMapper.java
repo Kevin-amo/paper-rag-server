@@ -13,6 +13,12 @@ import java.util.UUID;
  */
 public interface SysRoleMapper extends BaseMapper<SysRole> {
 
+    /**
+     * 根据用户ID查询其拥有的角色编码列表。
+     *
+     * @param userId 用户ID
+     * @return 角色编码列表，按编码排序
+     */
     @Select("""
             select r.code
             from public.sys_role r
@@ -22,6 +28,12 @@ public interface SysRoleMapper extends BaseMapper<SysRole> {
             """)
     List<String> selectRoleCodesByUserId(@Param("userId") UUID userId);
 
+    /**
+     * 根据角色编码查询角色信息。
+     *
+     * @param code 角色编码
+     * @return 角色实体，不存在时返回 null
+     */
     @Select("""
             select *
             from public.sys_role
