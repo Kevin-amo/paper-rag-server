@@ -42,6 +42,12 @@ public class JwtTokenService {
         return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 
+    /**
+     * 校验令牌是否有效。
+     *
+     * @param token JWT 令牌字符串
+     * @return 有效返回 true，否则返回 false
+     */
     public boolean isValid(String token) {
         try {
             jwtDecoder.decode(token);
@@ -55,6 +61,11 @@ public class JwtTokenService {
         return jwtDecoder.decode(token);
     }
 
+    /**
+     * 获取访问令牌的过期时间（秒）。
+     *
+     * @return 过期时间秒数
+     */
     public long accessTokenExpiresInSeconds() {
         return securityProperties.jwt().accessTokenTtl().toSeconds();
     }

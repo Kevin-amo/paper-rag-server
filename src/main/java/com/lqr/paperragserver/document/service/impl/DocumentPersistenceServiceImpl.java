@@ -54,6 +54,13 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 分页查询文档摘要，支持关键词和状态过滤。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param keyword 关键词过滤条件
+     * @param status 状态过滤条件
+     * @param page 页码（从 0 开始）
+     * @param size 每页条数
+     * @return 分页查询结果
      */
     @Override
     public PageResult<DocumentSummary> listDocuments(UUID ownerUserId, String keyword, String status, int page, int size) {
@@ -71,6 +78,10 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 按来源 ID 查询文档详情。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @return 文档详情，不存在时返回空
      */
     @Override
     public Optional<DocumentDetail> findDocument(UUID ownerUserId, String sourceId) {
@@ -81,7 +92,35 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
     }
 
     /**
+     * 根据 sourceId 列表批量查询已索引文档状态。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceIds 文档来源标识列表
+     * @return sourceId 到是否已索引的映射
+     */
+    @Override
+    public Map<String, Boolean> findIndexedDocuments(UUID ownerUserId, List<String> sourceIds) {
+        if (sourceIds == null || sourceIds.isEmpty()) {
+            return Map.of();
+        }
+        List<DocumentEntity> entities = documentMapper.selectList(new LambdaQueryWrapper<DocumentEntity>()
+                .select(DocumentEntity::getSourceId, DocumentEntity::getStatus, DocumentEntity::getDeletedAt)
+                .eq(DocumentEntity::getOwnerUserId, ownerUserId)
+                .in(DocumentEntity::getSourceId, sourceIds)
+                .isNull(DocumentEntity::getDeletedAt)
+                .eq(DocumentEntity::getStatus, "INDEXED"));
+        return entities.stream()
+                .collect(Collectors.toMap(DocumentEntity::getSourceId, e -> Boolean.TRUE));
+    }
+
+    /**
      * 分页查询指定文档的分块视图。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param page 页码（从 0 开始）
+     * @param size 每页条数
+     * @return 分页查询结果
      */
     @Override
     public PageResult<DocumentChunkView> listChunks(UUID ownerUserId, String sourceId, int page, int size) {
@@ -100,6 +139,11 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 基于本地关键词评分检索候选文档分块。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param question 检索问题
+     * @param limit 最大返回条数
+     * @return 匹配的文档分块列表
      */
     @Override
     public List<DocumentChunk> searchChunks(UUID ownerUserId, String question, int limit) {
@@ -130,6 +174,10 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 更新文档可编辑元数据字段。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param update 元数据更新内容
      */
     @Override
     public void updateMetadata(UUID ownerUserId, String sourceId, DocumentMetadataUpdate update) {
@@ -150,12 +198,23 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 恢复已软删除文档。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
      */
     @Override
     public void restore(UUID ownerUserId, String sourceId) {
         documentMapper.restore(ownerUserId, sourceId);
     }
 
+    /**
+     * 标记文档进入指定处理状态。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param status 目标状态
+     * @param progress 进度百分比
+     */
     @Override
     public void markStatus(UUID ownerUserId, String sourceId, String status, int progress) {
         documentMapper.markStatus(ownerUserId, sourceId, status, clamp(progress, 0, 100));
@@ -163,6 +222,10 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 标记文档进入解析中状态并保存正文与基础元数据。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param source 文档来源信息
+     * @param contentText 文档正文文本
      */
     @Override
     @Transactional
@@ -197,6 +260,10 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 替换指定文档的资产记录。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param assets 新的资产列表
      */
     @Override
     @Transactional
@@ -217,6 +284,11 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 查询指定文档的资产视图列表。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param assetIds 需要过滤的资产 ID 列表，为空时不做过滤
+     * @return 资产视图列表
      */
     @Override
     public List<DocumentAssetView> listAssets(UUID ownerUserId, String sourceId, List<String> assetIds) {
@@ -248,6 +320,11 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 查询指定文档下的单个资产视图。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param assetId 资产 ID
+     * @return 资产视图，不存在时返回空
      */
     @Override
     public Optional<DocumentAssetView> findAsset(UUID ownerUserId, String sourceId, String assetId) {
@@ -260,6 +337,10 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 替换指定文档的分块记录。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param chunks 新的分块列表
      */
     @Override
     @Transactional
@@ -280,6 +361,10 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 标记文档索引完成并记录分块数量。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param chunkCount 分块数量
      */
     @Override
     public void markIndexed(UUID ownerUserId, String sourceId, int chunkCount) {
@@ -290,6 +375,10 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 标记文档处理失败并截断过长错误信息。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param errorMessage 错误信息
      */
     @Override
     public void markFailed(UUID ownerUserId, String sourceId, String errorMessage) {
@@ -300,6 +389,9 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 软删除文档并清理关联资产和分块。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
      */
     @Override
     @Transactional
@@ -315,6 +407,8 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
 
     /**
      * 软删除当前用户的全部文档并清理关联资产和分块。
+     *
+     * @param ownerUserId 文档所属用户 ID
      */
     @Override
     @Transactional
@@ -497,6 +591,13 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
         return metadata == null ? Map.of() : metadata;
     }
 
+    /**
+     * 将用户 ID 注入元数据映射，确保元数据中包含归属信息。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param metadata 原始元数据映射
+     * @return 包含用户 ID 的元数据映射
+     */
     private Map<String, Object> ownerMetadata(UUID ownerUserId, Map<String, Object> metadata) {
         Map<String, Object> result = new LinkedHashMap<>();
         if (metadata != null) {

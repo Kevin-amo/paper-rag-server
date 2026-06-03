@@ -14,6 +14,9 @@ public record LiteratureSearchProperties(
         Cache cache
 ) {
 
+    /**
+     * 创建文献搜索配置，并为未提供的分组配置补齐默认值。
+     */
     @ConstructorBinding
     public LiteratureSearchProperties {
         if (openalex == null) {
@@ -30,6 +33,9 @@ public record LiteratureSearchProperties(
             Duration timeout,
             String mailto
     ) {
+        /**
+         * 创建 OpenAlex 配置，并补齐启用状态、接口地址、超时时间和联系邮箱的默认表达。
+         */
         public OpenAlex {
             if (enabled == null) {
                 enabled = true;
@@ -50,6 +56,9 @@ public record LiteratureSearchProperties(
             }
         }
 
+        /**
+         * 判断 OpenAlex 搜索源是否启用。
+         */
         public boolean isEnabled() {
             return Boolean.TRUE.equals(enabled);
         }
@@ -63,6 +72,9 @@ public record LiteratureSearchProperties(
             Integer waitMaxAttempts,
             Duration ttlJitter
     ) {
+        /**
+         * 创建缓存配置，并补齐 TTL、锁等待和随机抖动等默认值。
+         */
         public Cache {
             if (enabled == null) {
                 enabled = true;
@@ -84,6 +96,9 @@ public record LiteratureSearchProperties(
             }
         }
 
+        /**
+         * 判断文献搜索缓存是否启用。
+         */
         public boolean isEnabled() {
             return Boolean.TRUE.equals(enabled);
         }

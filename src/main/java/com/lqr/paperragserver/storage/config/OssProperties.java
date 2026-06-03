@@ -42,6 +42,11 @@ public record OssProperties(
         }
     }
 
+    /**
+     * 获取去除末尾斜杠的公共访问基础地址。
+     *
+     * @return 规范化后的公共访问地址，未配置时返回空字符串
+     */
     public String normalizedPublicBaseUrl() {
         return publicBaseUrl == null ? "" : publicBaseUrl.replaceAll("/+$", "");
     }
@@ -54,6 +59,12 @@ public record OssProperties(
         return value != null && !value.isBlank();
     }
 
+    /**
+     * 去除字符串首尾的斜杠字符。
+     *
+     * @param value 待处理的字符串
+     * @return 去除首尾斜杠后的字符串
+     */
     private static String trimSlashes(String value) {
         return value.replaceAll("^/+", "").replaceAll("/+$", "");
     }

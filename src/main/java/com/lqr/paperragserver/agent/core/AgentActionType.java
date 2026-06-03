@@ -1,8 +1,11 @@
 package com.lqr.paperragserver.agent.core;
 
 public enum AgentActionType {
+    /** 本地论文知识库检索 */
     LOCAL_PAPER_RETRIEVAL("local_paper_retrieval"),
+    /** 外部文献搜索 */
     LITERATURE_SEARCH("literature_search"),
+    /** 结束当前决策循环 */
     FINISH("finish");
 
     private final String value;

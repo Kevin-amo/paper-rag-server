@@ -18,6 +18,7 @@ import com.lqr.paperragserver.vector.service.VectorWriteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -51,6 +52,7 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
      * @return 入库后的文档结果摘要
      */
     @Override
+    @Transactional
     public DocumentIngestionResult ingest(UUID ownerUserId, String fileName, byte[] content, Map<String, Object> metadata) {
         long startNanos = System.nanoTime();
         log.info("document.ingest.start ownerUserId={} sourceId={} fileName={} fileSize={}",
@@ -70,7 +72,15 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         }
     }
 
+    /**
+     * 处理已持久化的异步入库任务，执行完整的解析、切分、嵌入和向量写入流程。
+     *
+     * @param job 入库任务
+     * @return 入库结果
+     * @throws IllegalStateException 读取上传文件失败时抛出
+     */
     @Override
+    @Transactional
     public DocumentIngestionResult processJob(DocumentIngestionJob job) {
         long startNanos = System.nanoTime();
         log.info("document.ingest.start ownerUserId={} jobId={} sourceId={} fileName={}",
@@ -110,6 +120,13 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         }
     }
 
+    /**
+     * 对同步入库的解析结果执行切分、嵌入和向量写入流程。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param parsedDocument 解析后的文档
+     * @return 入库结果
+     */
     private DocumentIngestionResult processParsedDocument(UUID ownerUserId, ParsedDocument parsedDocument) {
         DocumentSource source = parsedDocument.source();
         String text = parsedDocument.text();
@@ -137,6 +154,14 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         }
     }
 
+    /**
+     * 对异步入库的解析结果执行切分、嵌入和向量写入流程，同时更新任务阶段进度。
+     *
+     * @param job 入库任务
+     * @param parsedDocument 解析后的文档
+     * @param startNanos 入库开始时间（纳秒）
+     * @return 入库结果
+     */
     private DocumentIngestionResult processParsedDocument(DocumentIngestionJob job, ParsedDocument parsedDocument, long startNanos) {
         DocumentSource source = parsedDocument.source();
         String text = parsedDocument.text();
@@ -169,28 +194,66 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         return new DocumentIngestionResult(source, chunks.size());
     }
 
+    /**
+     * 更新任务运行阶段并记录日志。
+     *
+     * @param job 入库任务
+     * @param status 当前阶段状态
+     * @param progress 进度百分比
+     */
     private void markJobStage(DocumentIngestionJob job, String status, int progress) {
         documentIngestionJobService.markRunningStage(job.getOwnerUserId(), job.getId(), job.getSourceId(), status, progress);
         log.info("document.ingest.status ownerUserId={} jobId={} sourceId={} status={} progress={}",
                 job.getOwnerUserId(), job.getId(), job.getSourceId(), status, progress);
     }
 
+    /**
+     * 计算从指定起始时间到当前的耗时（毫秒）。
+     *
+     * @param startNanos 起始时间（纳秒）
+     * @return 耗时毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
+    /**
+     * 安全获取二进制内容长度。
+     *
+     * @param content 二进制内容
+     * @return 内容长度
+     */
     private int contentLength(byte[] content) {
         return content == null ? 0 : content.length;
     }
 
+    /**
+     * 安全获取文本长度。
+     *
+     * @param text 文本内容
+     * @return 文本长度
+     */
     private int textLength(String text) {
         return text == null ? 0 : text.length();
     }
 
+    /**
+     * 安全获取文档资产数量。
+     *
+     * @param parsedDocument 解析后的文档
+     * @return 资产数量
+     */
     private int assetCount(ParsedDocument parsedDocument) {
         return parsedDocument.assets() == null ? 0 : parsedDocument.assets().size();
     }
 
+    /**
+     * 从元数据映射中安全获取指定键的值。
+     *
+     * @param metadata 元数据映射
+     * @param key 键名
+     * @return 对应的值，不存在时返回 null
+     */
     private Object metadataValue(Map<String, Object> metadata, String key) {
         return metadata == null ? null : metadata.get(key);
     }
@@ -201,14 +264,21 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
      * @param sourceId 文档来源标识
      */
     @Override
+    @Transactional
     public void deleteBySourceId(UUID ownerUserId, String sourceId) {
-        vectorWriteService.deleteBySourceId(ownerUserId, sourceId);
         documentPersistenceService.markDeleted(ownerUserId, sourceId);
+        vectorWriteService.deleteBySourceId(ownerUserId, sourceId);
     }
 
+    /**
+     * 删除当前用户的全部文档数据，包括持久化状态和向量索引。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     */
     @Override
+    @Transactional
     public void deleteAll(UUID ownerUserId) {
-        vectorWriteService.deleteByOwnerUserId(ownerUserId);
         documentPersistenceService.markAllDeleted(ownerUserId);
+        vectorWriteService.deleteByOwnerUserId(ownerUserId);
     }
 }

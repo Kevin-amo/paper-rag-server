@@ -12,6 +12,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @SpringBootApplication
 public class PaperRagServerApplication {
+    /**
+     * 应用程序入口方法。
+     *
+     * @param args 命令行参数
+     */
     public static void main(String[] args) {
         SpringApplication.run(PaperRagServerApplication.class, args);
     }

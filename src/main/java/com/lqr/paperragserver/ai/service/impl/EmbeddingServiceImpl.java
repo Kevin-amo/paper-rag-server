@@ -55,11 +55,23 @@ public class EmbeddingServiceImpl implements EmbeddingService {
         }
     }
 
+    /**
+     * 按来源 ID 统计文档分块的数量分布。
+     *
+     * @param chunks 文档分块列表
+     * @return 来源 ID 到分块数量的映射
+     */
     private Map<String, Long> sourceDistribution(List<DocumentChunk> chunks) {
         return chunks.stream()
                 .collect(Collectors.groupingBy(DocumentChunk::sourceId, Collectors.counting()));
     }
 
+    /**
+     * 计算从指定起始时间到当前经过的毫秒数。
+     *
+     * @param startNanos 起始纳秒时间戳
+     * @return 经过的毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }

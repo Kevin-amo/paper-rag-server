@@ -18,6 +18,11 @@ public class RabbitDocumentIngestionProducer implements DocumentIngestionProduce
     private final RabbitTemplate rabbitTemplate;
     private final DocumentIngestionJobService documentIngestionJobService;
 
+    /**
+     * 将文档入库消息投递到 RabbitMQ，投递成功后标记任务为已入队状态。
+     *
+     * @param message 文档入库消息
+     */
     @Override
     public void publish(DocumentIngestionMessage message) {
         // 投递RabbitMQ消息（只传递任务索引，后续消费者根据jobId去数据库查任务）

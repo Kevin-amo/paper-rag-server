@@ -68,6 +68,9 @@ public class LiteratureSearchCache {
         }
     }
 
+    /**
+     * 为指定缓存 Key 尝试获取短期重建锁，避免同一查询并发重复调用外部服务。
+     */
     public Optional<LockHandle> tryAcquireLock(Key key, Duration lockTtl) {
         if (key == null || lockTtl == null || lockTtl.isZero() || lockTtl.isNegative()) {
             return Optional.empty();
@@ -87,6 +90,9 @@ public class LiteratureSearchCache {
         }
     }
 
+    /**
+     * 释放当前实例持有的缓存重建锁，避免误删其他请求新建的锁。
+     */
     public void releaseLock(LockHandle lockHandle) {
         if (lockHandle == null) {
             return;
@@ -122,6 +128,9 @@ public class LiteratureSearchCache {
         return REDIS_KEY_PREFIX + keyHash;
     }
 
+    /**
+     * 拼接锁 Redis key 前缀和摘要后缀，隔离缓存重建锁的命名空间。
+     */
     private String lockRedisKey(String keyHash) {
         return LOCK_REDIS_KEY_PREFIX + keyHash;
     }

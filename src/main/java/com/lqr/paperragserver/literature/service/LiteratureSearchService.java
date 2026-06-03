@@ -37,6 +37,9 @@ public class LiteratureSearchService {
     private final OpenAlexLiteratureClient openAlexLiteratureClient;
     private final LiteratureSearchCache cache;
 
+    /**
+     * 执行文献搜索，负责参数规范化、缓存命中、缓存重建保护和外部源兜底。
+     */
     public LiteratureSearchResponse search(LiteratureSearchRequest request) {
         long startNanos = System.nanoTime();
         int limit = resolveLimit(request.limit());
@@ -64,6 +67,9 @@ public class LiteratureSearchService {
         return searchOpenAlexAndCache(request, cacheKey, query, categories, dateFrom, dateTo, sortBy, limit, startNanos);
     }
 
+    /**
+     * 在缓存未命中时协调重建锁，减少同一查询的并发外部请求。
+     */
     private LiteratureSearchResponse searchWithCacheRebuildGuard(
             LiteratureSearchRequest request,
             LiteratureSearchCache.Key cacheKey,
@@ -97,6 +103,9 @@ public class LiteratureSearchService {
         return searchOpenAlexAndCache(request, cacheKey, query, categories, dateFrom, dateTo, sortBy, limit, startNanos);
     }
 
+    /**
+     * 等待其他请求完成缓存重建，并在等待窗口内返回新写入的缓存结果。
+     */
     private Optional<LiteratureSearchResponse> waitForRebuiltCache(
             LiteratureSearchCache.Key cacheKey,
             int limit,
@@ -125,6 +134,9 @@ public class LiteratureSearchService {
         return Optional.empty();
     }
 
+    /**
+     * 调用 OpenAlex 获取搜索结果，并在缓存开启时写回缓存。
+     */
     private LiteratureSearchResponse searchOpenAlexAndCache(
             LiteratureSearchRequest request,
             LiteratureSearchCache.Key cacheKey,
@@ -164,6 +176,9 @@ public class LiteratureSearchService {
         }
     }
 
+    /**
+     * 用规范化后的搜索参数创建下游请求对象。
+     */
     private LiteratureSearchRequest normalizedRequest(
             LiteratureSearchRequest request,
             String query,
@@ -175,6 +190,9 @@ public class LiteratureSearchService {
         return new LiteratureSearchRequest(request.conversationId(), query, request.limit(), categories, dateFrom, dateTo, sortBy);
     }
 
+    /**
+     * 根据排序方式决定实际向外部源拉取的结果数量。
+     */
     private int resolveFetchLimit(int limit, String sortBy) {
         if (!SORT_DATE.equals(sortBy)) {
             return limit;
@@ -182,6 +200,9 @@ public class LiteratureSearchService {
         return Math.min(Math.max(limit * 10, 10), 50);
     }
 
+    /**
+     * 按用户指定排序整理结果，并截断到用户请求的数量。
+     */
     private List<LiteratureSearchResult> sortAndTrimToUserLimit(
             List<LiteratureSearchResult> items,
             int limit,
@@ -201,12 +222,18 @@ public class LiteratureSearchService {
         return sorted.stream().limit(limit).toList();
     }
 
+    /**
+     * 在缓存开启时写入搜索响应。
+     */
     private void cacheIfEnabled(LiteratureSearchCache.Key key, LiteratureSearchResponse response) {
         if (literatureProperties.cache().isEnabled()) {
             cache.put(key, response, cacheTtlWithJitter());
         }
     }
 
+    /**
+     * 计算带随机抖动的缓存 TTL，降低同一时间集中失效概率。
+     */
     private Duration cacheTtlWithJitter() {
         Duration ttl = literatureProperties.cache().ttl();
         Duration ttlJitter = literatureProperties.cache().ttlJitter();
@@ -223,6 +250,9 @@ public class LiteratureSearchService {
         return ttl.plusMillis(randomMillis);
     }
 
+    /**
+     * 将下游失败统一包装为文献搜索暂不可用异常。
+     */
     private LiteratureSearchException allSourcesUnavailable(Throwable cause) {
         return new LiteratureSearchException(
                 HttpStatus.SERVICE_UNAVAILABLE,
@@ -232,6 +262,9 @@ public class LiteratureSearchService {
         );
     }
 
+    /**
+     * 解析并校验用户请求的返回数量。
+     */
     private int resolveLimit(Integer limit) {
         if (limit == null) {
             return 5;
@@ -242,6 +275,9 @@ public class LiteratureSearchService {
         return limit;
     }
 
+    /**
+     * 解析并校验用户请求的排序方式。
+     */
     private String resolveSortBy(String sortBy) {
         if (sortBy == null || sortBy.isBlank()) {
             return SORT_RELEVANCE;
@@ -253,6 +289,9 @@ public class LiteratureSearchService {
         return normalized;
     }
 
+    /**
+     * 清理分类筛选条件，移除空值并去重。
+     */
     private List<String> normalizeCategories(List<String> categories) {
         if (categories == null || categories.isEmpty()) {
             return List.of();
@@ -264,6 +303,9 @@ public class LiteratureSearchService {
                 .toList();
     }
 
+    /**
+     * 清理可选文本参数，空白值统一视为空值。
+     */
     private String normalizeText(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -271,6 +313,9 @@ public class LiteratureSearchService {
         return value.trim();
     }
 
+    /**
+     * 清理搜索关键词，并将常见缩写转换为更稳定的检索表达。
+     */
     private String normalizeQuery(String query) {
         String normalized = query.trim();
         if ("rag".equalsIgnoreCase(normalized)) {
@@ -279,6 +324,9 @@ public class LiteratureSearchService {
         return normalized;
     }
 
+    /**
+     * 提取异常对应的业务错误码或异常类型名称。
+     */
     private String exceptionCode(Throwable ex) {
         if (ex instanceof LiteratureSearchException literatureSearchException) {
             return literatureSearchException.code();
@@ -286,6 +334,9 @@ public class LiteratureSearchService {
         return ex == null ? "UNKNOWN" : ex.getClass().getSimpleName();
     }
 
+    /**
+     * 计算从指定起点到当前时间的毫秒耗时。
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }

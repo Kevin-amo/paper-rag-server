@@ -11,6 +11,12 @@ public final class RoleCodes {
     private RoleCodes() {
     }
 
+    /**
+     * 将角色编码转换为 Spring Security 授权标识（添加 ROLE_ 前缀）。
+     *
+     * @param roleCode 角色编码
+     * @return 带前缀的授权标识
+     */
     public static String authority(String roleCode) {
         return "ROLE_" + roleCode;
     }

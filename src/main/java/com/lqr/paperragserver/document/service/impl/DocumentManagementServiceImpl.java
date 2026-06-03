@@ -29,12 +29,27 @@ public class DocumentManagementServiceImpl implements DocumentManagementService 
     private final EmbeddingService embeddingService;
     private final VectorWriteService vectorWriteService;
 
+    /**
+     * 恢复指定文档的可见状态。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     */
     @Override
     public void restore(UUID ownerUserId, String sourceId) {
         documentPersistenceService.restore(ownerUserId, sourceId);
         log.info("document.restore.done ownerUserId={} sourceId={}", ownerUserId, sourceId);
     }
 
+    /**
+     * 基于已持久化的文档全文重建分块和向量索引。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @return 重建后的分块统计结果
+     * @throws IllegalArgumentException 文档不存在时抛出
+     * @throws IllegalStateException 文档全文为空时抛出
+     */
     @Override
     @Transactional
     public ReindexResult reindex(UUID ownerUserId, String sourceId) {
@@ -72,10 +87,22 @@ public class DocumentManagementServiceImpl implements DocumentManagementService 
         }
     }
 
+    /**
+     * 计算从指定起始时间到当前的耗时（毫秒）。
+     *
+     * @param startNanos 起始时间（纳秒）
+     * @return 耗时毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
+    /**
+     * 安全获取文本内容长度。
+     *
+     * @param content 文本内容
+     * @return 内容长度
+     */
     private int contentLength(String content) {
         return content == null ? 0 : content.length();
     }

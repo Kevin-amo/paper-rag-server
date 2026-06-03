@@ -20,6 +20,9 @@ public record LiteratureSearchResult(
         String source,
         String externalId
 ) {
+    /**
+     * 创建统一搜索结果，并补齐作者、分类和来源的默认表达。
+     */
     public LiteratureSearchResult {
         if (authors == null) {
             authors = List.of();

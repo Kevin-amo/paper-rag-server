@@ -22,6 +22,14 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * 处理未认证请求，返回 401 JSON 错误响应。
+     *
+     * @param request HTTP 请求
+     * @param response HTTP 响应
+     * @param authException 认证异常
+     * @throws IOException IO 异常
+     */
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());

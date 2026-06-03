@@ -16,6 +16,9 @@ public interface DocumentChunkMapper extends BaseMapper<DocumentChunkEntity> {
 
     /**
      * 查询所有可参与关键词检索的有效文档分块。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @return 有效的文档分块实体列表
      */
     @Select("""
             select c.chunk_id, c.source_id, c.chunk_index, c.content, c.metadata
@@ -32,6 +35,11 @@ public interface DocumentChunkMapper extends BaseMapper<DocumentChunkEntity> {
 
     /**
      * 回写文档分块关联的向量库记录 ID。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param chunkId 分块 ID
+     * @param vectorStoreId 向量库记录 ID
+     * @return 更新行数
      */
     @Update("""
             update public.paper_document_chunk

@@ -49,6 +49,13 @@ public class DocumentUploadCleanupScheduler {
         }
     }
 
+    /**
+     * 递归删除超过保留期限的过期文件。
+     *
+     * @param rootDirectory 根目录
+     * @param expireBefore 过期截止时间
+     * @throws IOException 文件遍历或删除失败时抛出
+     */
     private void deleteExpiredFiles(Path rootDirectory, Instant expireBefore) throws IOException {
         // 使用 Java NIO 的 walkFileTree 方法递归遍历目录下的所有文件和子目录
         Files.walkFileTree(rootDirectory, new SimpleFileVisitor<>() {
@@ -68,6 +75,12 @@ public class DocumentUploadCleanupScheduler {
         });
     }
 
+    /**
+     * 递归删除空目录，保留根目录。
+     *
+     * @param rootDirectory 根目录
+     * @throws IOException 目录遍历或删除失败时抛出
+     */
     private void deleteEmptyDirectories(Path rootDirectory) throws IOException {
         Files.walkFileTree(rootDirectory, new SimpleFileVisitor<>() {
             @Override
@@ -84,6 +97,13 @@ public class DocumentUploadCleanupScheduler {
         });
     }
 
+    /**
+     * 判断目录是否为空。
+     *
+     * @param dir 目录路径
+     * @return 目录为空时返回 true
+     * @throws IOException 目录读取失败时抛出
+     */
     private boolean isEmptyDirectory(Path dir) throws IOException {
         try (var stream = Files.list(dir)) {
             return stream.findAny().isEmpty();

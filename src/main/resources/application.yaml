@@ -132,9 +132,14 @@ app:
       concurrency: ${DOCUMENT_INGESTION_LISTENER_CONCURRENCY:3}
       max-concurrency: ${DOCUMENT_INGESTION_LISTENER_MAX_CONCURRENCY:6}
   security:
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+      allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}
+      allowed-headers: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type}
+      max-age: ${CORS_MAX_AGE:1h}
     jwt:
       issuer: ${JWT_ISSUER:paper-rag-server}
-      secret: ${JWT_SECRET:paper-rag-server-local-development-secret-change-before-production}
+      secret: ${JWT_SECRET:V1kNrJuT67FGQp0fWCJlkzH3KdavGcGYoUz6TdBzheIOVu7E5HfJQVxulvmIh73E}
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:12h}
     register-email-code:
       code-ttl: ${REGISTER_EMAIL_CODE_TTL:5m}

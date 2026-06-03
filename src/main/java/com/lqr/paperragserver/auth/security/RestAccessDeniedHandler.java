@@ -22,6 +22,14 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * 处理权限不足异常，返回 403 JSON 错误响应。
+     *
+     * @param request HTTP 请求
+     * @param response HTTP 响应
+     * @param accessDeniedException 权限不足异常
+     * @throws IOException IO 异常
+     */
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException) throws IOException {
         response.setStatus(HttpStatus.FORBIDDEN.value());

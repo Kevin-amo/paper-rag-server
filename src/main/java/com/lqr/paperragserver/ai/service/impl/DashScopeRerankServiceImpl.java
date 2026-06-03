@@ -36,6 +36,13 @@ public class DashScopeRerankServiceImpl implements RerankService {
     private final String apiKey;
     private final boolean configureRequestTimeout;
 
+    /**
+     * 注入依赖的构造函数。
+     *
+     * @param restClientBuilder REST 客户端构建器
+     * @param ragProperties RAG 配置属性
+     * @param apiKey DashScope API 密钥
+     */
     @Autowired
     public DashScopeRerankServiceImpl(RestClient.Builder restClientBuilder,
                                       RagProperties ragProperties,
@@ -84,10 +91,26 @@ public class DashScopeRerankServiceImpl implements RerankService {
         }
     }
 
+    /**
+     * 判断 rerank 服务是否可用。
+     *
+     * @param question 用户问题
+     * @param candidates 候选片段列表
+     * @param topN 期望返回数量
+     * @return 可用时返回 true，否则返回 false
+     */
     private boolean available(String question, List<RetrievedChunk> candidates, int topN) {
         return unavailableReason(question, candidates, topN) == null;
     }
 
+    /**
+     * 返回 rerank 服务不可用的原因，可用时返回 null。
+     *
+     * @param question 用户问题
+     * @param candidates 候选片段列表
+     * @param topN 期望返回数量
+     * @return 不可用原因字符串，可用时返回 null
+     */
     private String unavailableReason(String question, List<RetrievedChunk> candidates, int topN) {
         if (!ragProperties.rerank().enabled()) {
             return "DISABLED";
@@ -107,6 +130,12 @@ public class DashScopeRerankServiceImpl implements RerankService {
         return null;
     }
 
+    /**
+     * 构建 DashScope rerank API 的 REST 客户端。
+     *
+     * @param rerank rerank 配置属性
+     * @return 配置好基础地址和超时的 RestClient
+     */
     private RestClient client(RagProperties.RerankProperties rerank) {
         RestClient.Builder builder = restClientBuilder.baseUrl(rerank.baseUrl());
         if (configureRequestTimeout) {
@@ -119,6 +148,15 @@ public class DashScopeRerankServiceImpl implements RerankService {
         return builder.build();
     }
 
+    /**
+     * 构建 DashScope rerank API 的请求体。
+     *
+     * @param question 用户问题
+     * @param candidates 候选片段列表
+     * @param rerank rerank 配置属性
+     * @param topN 期望返回数量
+     * @return 封装好的 rerank 请求对象
+     */
     private DashScopeRerankRequest request(String question,
                                            List<RetrievedChunk> candidates,
                                            RagProperties.RerankProperties rerank,
@@ -133,6 +171,14 @@ public class DashScopeRerankServiceImpl implements RerankService {
         );
     }
 
+    /**
+     * 将 rerank API 响应结果应用到原始候选列表，返回重排序后的片段。
+     *
+     * @param candidates 原始候选片段列表
+     * @param response DashScope rerank API 响应
+     * @param topN 期望返回数量
+     * @return 重排序后的片段列表
+     */
     private List<RetrievedChunk> applyResponse(List<RetrievedChunk> candidates,
                                                DashScopeRerankResponse response,
                                                int topN) {
@@ -165,6 +211,12 @@ public class DashScopeRerankServiceImpl implements RerankService {
         return reranked;
     }
 
+    /**
+     * 从响应中获取结果数量。
+     *
+     * @param response DashScope rerank API 响应
+     * @return 结果数量，响应为空时返回 0
+     */
     private int resultCount(DashScopeRerankResponse response) {
         if (response == null || response.output() == null || response.output().results() == null) {
             return 0;
@@ -172,6 +224,12 @@ public class DashScopeRerankServiceImpl implements RerankService {
         return response.output().results().size();
     }
 
+    /**
+     * 计算从指定起始时间到当前经过的毫秒数。
+     *
+     * @param startNanos 起始纳秒时间戳
+     * @return 经过的毫秒数
+     */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }

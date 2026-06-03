@@ -31,6 +31,12 @@ public class SecurityUserPrincipal implements UserDetails {
     private final List<String> roles;
     private final List<GrantedAuthority> authorities;
 
+    /**
+     * 根据用户实体和角色列表构造用户主体。
+     *
+     * @param user 系统用户实体
+     * @param roles 角色编码列表
+     */
     public SecurityUserPrincipal(SysUser user, List<String> roles) {
         this.id = user.getId();
         this.username = user.getUsername();
@@ -77,6 +83,11 @@ public class SecurityUserPrincipal implements UserDetails {
         return true;
     }
 
+    /**
+     * 判断账号是否启用，仅状态为 ACTIVE 时返回 true。
+     *
+     * @return 账号启用返回 true，否则返回 false
+     */
     @Override
     public boolean isEnabled() {
         return "ACTIVE".equals(status);

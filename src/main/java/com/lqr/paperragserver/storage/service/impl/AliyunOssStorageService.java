@@ -35,6 +35,11 @@ public class AliyunOssStorageService implements ObjectStorageService {
         }
     }
 
+    /**
+     * 删除阿里云 OSS 上的指定对象。
+     *
+     * @param objectKey 对象键
+     */
     @Override
     public void deleteObject(String objectKey) {
         if (objectKey == null || objectKey.isBlank()) {
@@ -49,6 +54,12 @@ public class AliyunOssStorageService implements ObjectStorageService {
         }
     }
 
+    /**
+     * 拼接对象的公共访问地址。
+     *
+     * @param objectKey 对象键
+     * @return 公共访问 URL，未配置基础地址时返回对象键本身
+     */
     @Override
     public String publicUrl(String objectKey) {
         if (objectKey == null || objectKey.isBlank()) {
@@ -61,6 +72,11 @@ public class AliyunOssStorageService implements ObjectStorageService {
         return baseUrl + "/" + objectKey.replaceAll("^/+", "");
     }
 
+    /**
+     * 创建阿里云 OSS 客户端实例。
+     *
+     * @return 已初始化的 OSS 客户端
+     */
     private OSS createClient() {
         return new OSSClientBuilder().build(
                 properties.endpoint(),
@@ -69,6 +85,11 @@ public class AliyunOssStorageService implements ObjectStorageService {
         );
     }
 
+    /**
+     * 校验 OSS 配置是否完整，配置不完整时抛出内部服务器错误异常。
+     *
+     * @throws ResponseStatusException OSS 配置不完整时抛出
+     */
     private void ensureConfigured() {
         if (!properties.isConfigured()) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "OSS 配置不完整");

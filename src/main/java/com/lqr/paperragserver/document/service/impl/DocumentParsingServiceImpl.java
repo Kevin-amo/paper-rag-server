@@ -120,6 +120,14 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         putTikaValueIfAbsent(metadata, MetadataKeys.PUBLISH_YEAR, tikaMetadata, "dcterms:created", "created", "Creation-Date", "date");
     }
 
+    /**
+     * 当目标键不存在或值为空时，从 Tika 元数据中按候选键列表查找第一个非空值写入。
+     *
+     * @param metadata 目标元数据映射
+     * @param targetKey 目标键名
+     * @param tikaMetadata Tika 解析出的元数据
+     * @param tikaKeys Tika 元数据中的候选键列表
+     */
     private void putTikaValueIfAbsent(Map<String, Object> metadata, String targetKey, Metadata tikaMetadata, String... tikaKeys) {
         if (metadata.containsKey(targetKey) && metadata.get(targetKey) != null && !String.valueOf(metadata.get(targetKey)).isBlank()) {
             return;

@@ -374,9 +374,13 @@ public class AgentRuntime {
         }
 
         public enum Type {
+            /** 步骤开始 */
             STEP,
+            /** 思考摘要 */
             THOUGHT,
+            /** 工具调用 */
             TOOL_CALL,
+            /** 工具结果 */
             TOOL_RESULT
         }
     }

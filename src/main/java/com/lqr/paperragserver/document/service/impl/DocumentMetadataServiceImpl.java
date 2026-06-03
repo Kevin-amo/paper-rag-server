@@ -28,6 +28,10 @@ public class DocumentMetadataServiceImpl implements DocumentMetadataService {
 
     /**
      * 将外部传入的论文元数据归一化后合并到文档来源 metadata。
+     *
+     * @param source 原始文档来源信息
+     * @param documentMetadata 论文领域元数据
+     * @return 补全后的文档来源信息
      */
     @Override
     public DocumentSource enrich(DocumentSource source, Map<String, Object> documentMetadata) {
@@ -58,6 +62,13 @@ public class DocumentMetadataServiceImpl implements DocumentMetadataService {
         );
     }
 
+    /**
+     * 从元数据映射中按候选键列表查找第一个非空值。
+     *
+     * @param metadata 元数据映射
+     * @param keys 候选键列表
+     * @return 第一个匹配的非空值，均未命中时返回 null
+     */
     private Object firstValue(Map<String, Object> metadata, List<String> keys) {
         for (String key : keys) {
             if (metadata.containsKey(key)) {
@@ -70,12 +81,25 @@ public class DocumentMetadataServiceImpl implements DocumentMetadataService {
         return null;
     }
 
+    /**
+     * 当值非空时写入元数据映射。
+     *
+     * @param metadata 元数据映射
+     * @param key 键名
+     * @param value 待写入的值
+     */
     private void putIfPresent(Map<String, Object> metadata, String key, Object value) {
         if (value != null) {
             metadata.put(key, value);
         }
     }
 
+    /**
+     * 将值归一化为非空白字符串，空白时返回 null。
+     *
+     * @param value 原始值
+     * @return 归一化后的文本，空白时返回 null
+     */
     private String normalizeText(Object value) {
         if (value == null) {
             return null;
@@ -84,6 +108,12 @@ public class DocumentMetadataServiceImpl implements DocumentMetadataService {
         return text.isBlank() ? null : text;
     }
 
+    /**
+     * 归一化 DOI 标识，移除 URL 前缀和 "doi:" 前缀。
+     *
+     * @param value 原始 DOI 值
+     * @return 归一化后的 DOI，空白时返回 null
+     */
     private String normalizeDoi(Object value) {
         String text = normalizeText(value);
         if (text == null) {
@@ -95,6 +125,12 @@ public class DocumentMetadataServiceImpl implements DocumentMetadataService {
         return normalized.isBlank() ? null : normalized;
     }
 
+    /**
+     * 归一化发表年份，从数值或字符串中提取合法的四位年份。
+     *
+     * @param value 原始年份值
+     * @return 合法的发表年份，不合法时返回 null
+     */
     private Integer normalizePublishYear(Object value) {
         if (value instanceof Number number) {
             return validYear(number.intValue());
@@ -110,10 +146,22 @@ public class DocumentMetadataServiceImpl implements DocumentMetadataService {
         }
     }
 
+    /**
+     * 校验年份是否在合理范围内。
+     *
+     * @param year 待校验年份
+     * @return 合法时返回年份，否则返回 null
+     */
     private Integer validYear(int year) {
         return year >= MIN_PUBLISH_YEAR && year <= MAX_PUBLISH_YEAR ? year : null;
     }
 
+    /**
+     * 将值归一化为字符串列表，支持数组、集合和逗号/分号分隔的字符串。
+     *
+     * @param value 原始值
+     * @return 归一化后的字符串列表，空列表时返回 null
+     */
     private List<String> normalizeList(Object value) {
         if (value == null) {
             return null;
@@ -136,6 +184,12 @@ public class DocumentMetadataServiceImpl implements DocumentMetadataService {
         return items.isEmpty() ? null : items;
     }
 
+    /**
+     * 将单个条目归一化后追加到列表，自动去重（忽略大小写）。
+     *
+     * @param items 目标列表
+     * @param item 待追加的条目
+     */
     private void addListItem(List<String> items, Object item) {
         String text = normalizeText(item);
         if (text == null) {

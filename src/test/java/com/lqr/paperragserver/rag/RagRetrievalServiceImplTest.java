@@ -12,10 +12,8 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,8 +77,8 @@ class RagRetrievalServiceImplTest {
                         "title", "Paper B"
                 ))
         ));
-        when(documentPersistenceService.findDocument(ownerUserId, "source-1"))
-                .thenReturn(Optional.of(indexedDocument("source-1")));
+        when(documentPersistenceService.findIndexedDocuments(eq(ownerUserId), any()))
+                .thenReturn(Map.of("source-1", Boolean.TRUE));
 
         DocumentChunk lexicalFirst = new DocumentChunk(
                 "chunk-a",
@@ -143,30 +141,4 @@ class RagRetrievalServiceImplTest {
         verify(rerankService).rerank(eq("精排测试"), anyList(), eq(2));
     }
 
-    private DocumentPersistenceService.DocumentDetail indexedDocument(String sourceId) {
-        OffsetDateTime now = OffsetDateTime.now();
-        return new DocumentPersistenceService.DocumentDetail(
-                sourceId,
-                ownerUserId,
-                "Paper",
-                "paper.pdf",
-                "paper.pdf",
-                "application/pdf",
-                100L,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                "content",
-                Map.of(),
-                "INDEXED",
-                1,
-                null,
-                now,
-                now,
-                null
-        );
-    }
 }

@@ -23,6 +23,12 @@ public class DocumentIngestionConsumer {
     private final DocumentIngestionProducer documentIngestionProducer;
     private final DocumentIngestionProperties properties;
 
+    /**
+     * 消费文档入库消息，抢占任务并执行入库流程。
+     * <p>处理失败时增加重试计数，超过最大重试次数后标记任务失败。</p>
+     *
+     * @param message 文档入库消息
+     */
     @RabbitListener(queues = DocumentIngestionRabbitConfiguration.QUEUE,
             containerFactory = "documentIngestionListenerContainerFactory")
     public void consume(DocumentIngestionMessage message) {

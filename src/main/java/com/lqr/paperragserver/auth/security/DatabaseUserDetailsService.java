@@ -22,6 +22,13 @@ public class DatabaseUserDetailsService implements UserDetailsService {
     private final SysUserMapper userMapper;
     private final SysRoleMapper roleMapper;
 
+    /**
+     * 根据用户名从数据库加载用户详情及角色信息。
+     *
+     * @param username 用户名
+     * @return 用户详情主体
+     * @throws UsernameNotFoundException 用户不存在时抛出
+     */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         SysUser user = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
