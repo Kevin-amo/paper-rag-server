@@ -75,29 +75,29 @@ services:
             index index.html;
 
             location / {
-                try_files $uri $uri/ /index.html;
+                try_files $$uri $$uri/ /index.html;
             }
 
             location /api/ {
-                rewrite ^/api/(.*)$ /$1 break;
+                rewrite ^/api/(.*)$$ /$$1 break;
                 proxy_pass http://backend:8080;
                 proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header Host $$host;
+                proxy_set_header X-Real-IP $$remote_addr;
+                proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $$scheme;
                 proxy_buffering off;
                 proxy_read_timeout 300s;
                 proxy_send_timeout 300s;
             }
 
-            location ~ ^/(auth|admin|documents|conversations|agent)(/|$) {
+            location ~ ^/(auth|admin|documents|conversations|agent)(/|$$) {
                 proxy_pass http://backend:8080;
                 proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header Host $$host;
+                proxy_set_header X-Real-IP $$remote_addr;
+                proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $$scheme;
                 proxy_buffering off;
                 proxy_read_timeout 300s;
                 proxy_send_timeout 300s;
