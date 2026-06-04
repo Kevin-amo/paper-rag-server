@@ -73,7 +73,7 @@ class DocumentControllerTest {
         DocumentIngestionJob job = job("source-a", "paper-a.pdf", "Paper A", DocumentIngestionJobService.STATUS_QUEUED);
         when(documentUploadStorageService.store(eq(ownerUserId), eq("source-a"), any(UUID.class), eq(file), eq("paper-a.pdf")))
                 .thenReturn(new DocumentUploadStorageService.StoredUpload("paper-a.pdf", "storage/paper-a.pdf"));
-        when(documentIngestionJobService.createJob(any(UUID.class), eq(ownerUserId), eq("source-a"), eq("paper-a.pdf"), eq("storage/paper-a.pdf"), eq("Paper A")))
+        when(documentIngestionJobService.createJob(any(UUID.class), eq(ownerUserId), eq("source-a"), eq("paper-a.pdf"), eq("storage/paper-a.pdf"), eq("Paper A"), any()))
                 .thenReturn(job);
         when(documentIngestionJobService.findJob(ownerUserId, job.getId())).thenReturn(Optional.of(job));
 
@@ -102,9 +102,9 @@ class DocumentControllerTest {
                 .thenReturn(new DocumentUploadStorageService.StoredUpload("paper-a.pdf", "storage/paper-a.pdf"));
         when(documentUploadStorageService.store(eq(ownerUserId), eq("source-b"), any(UUID.class), eq(file2), eq("paper-b.pdf")))
                 .thenReturn(new DocumentUploadStorageService.StoredUpload("paper-b.pdf", "storage/paper-b.pdf"));
-        when(documentIngestionJobService.createJob(any(UUID.class), eq(ownerUserId), eq("source-a"), eq("paper-a.pdf"), eq("storage/paper-a.pdf"), eq("Paper A")))
+        when(documentIngestionJobService.createJob(any(UUID.class), eq(ownerUserId), eq("source-a"), eq("paper-a.pdf"), eq("storage/paper-a.pdf"), eq("Paper A"), any()))
                 .thenReturn(job1);
-        when(documentIngestionJobService.createJob(any(UUID.class), eq(ownerUserId), eq("source-b"), eq("paper-b.pdf"), eq("storage/paper-b.pdf"), eq("Paper B")))
+        when(documentIngestionJobService.createJob(any(UUID.class), eq(ownerUserId), eq("source-b"), eq("paper-b.pdf"), eq("storage/paper-b.pdf"), eq("Paper B"), any()))
                 .thenReturn(job2);
         when(documentIngestionJobService.findJob(ownerUserId, job1.getId())).thenReturn(Optional.of(job1));
         when(documentIngestionJobService.findJob(ownerUserId, job2.getId())).thenReturn(Optional.of(job2));

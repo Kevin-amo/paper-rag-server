@@ -75,6 +75,7 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         }
         mergedMetadata.putIfAbsent(MetadataKeys.FILE_NAME, normalizedFileName);
         mergedMetadata.putIfAbsent(MetadataKeys.CONTENT_LENGTH, content.length);
+        mergedMetadata.putIfAbsent(MetadataKeys.SOURCE_TYPE, MetadataKeys.SOURCE_TYPE_USER);
         String contentType = tika.detect(content, normalizedFileName);
         mergedMetadata.put(MetadataKeys.CONTENT_TYPE, contentType);
         String sourceId = mergedMetadata.containsKey(MetadataKeys.SOURCE_ID)
@@ -504,6 +505,9 @@ public class DocumentParsingServiceImpl implements DocumentParsingService {
         metadata.put(MetadataKeys.CONTENT_HASH, asset.contentHash());
         metadata.put(MetadataKeys.TEXT_START, asset.textStart());
         metadata.put(MetadataKeys.TEXT_END, asset.textEnd());
+        if (asset.extractedText() != null && !asset.extractedText().isBlank()) {
+            metadata.put(MetadataKeys.ASSET_CAPTION, asset.extractedText());
+        }
         if (asset.metadata() != null) {
             metadata.putAll(asset.metadata());
         }

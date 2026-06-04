@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.document;
 
+import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.model.DocumentChunk;
 import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.rag.config.RagProperties;
@@ -176,6 +177,249 @@ class DocumentSplittingServiceImplTest {
         assertThat(chunks).hasSize(1);
         assertThat(chunks.getFirst().metadata()).containsEntry("assetIds", List.of("asset-1"));
         assertThat(chunks.getFirst().metadata()).doesNotContainKey("documentAssets");
+    }
+
+    @Test
+    void splitShouldKeepOnlyTextChunksWhenDocumentAssetsAbsent() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(800, 120, 5, 0));
+        DocumentSource source = new DocumentSource("source-no-assets", "No Asset Paper", "paper.pdf", Map.of("title", "No Asset Paper"));
+        String text = """
+                1 Methods
+
+                The baseline retrieval method keeps ordinary text chunks unchanged for vector retrieval.
+                """;
+
+        List<DocumentChunk> chunks = service.split(source, text);
+
+        assertThat(chunks).hasSize(1);
+        assertThat(chunks.getFirst().metadata()).containsEntry(MetadataKeys.CHUNK_TYPE, "TEXT");
+        assertThat(chunks.getFirst().metadata()).doesNotContainKey(MetadataKeys.DOCUMENT_ASSETS);
+        assertThat(chunks).noneMatch(chunk -> "FIGURE_CONTEXT".equals(chunk.metadata().get(MetadataKeys.CHUNK_TYPE)));
+    }
+
+    @Test
+    void splitShouldGenerateFigureContextChunkWithCaptionAndNeighborParagraphs() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(1200, 120, 5, 0));
+        String caption = "Figure 1: The proposed architecture connects retrieval, ranking, and answer grounding.";
+        String before = "The paragraph before the figure explains why retrieval context must preserve nearby semantic evidence for downstream reasoning.";
+        String after = "The paragraph after the figure describes how each module exchanges signals during the paper question answering workflow.";
+        DocumentSource source = new DocumentSource("source-figure", "Figure Paper", "paper.pdf", Map.of(
+                MetadataKeys.TITLE, "Figure Paper",
+                MetadataKeys.DOCUMENT_ASSETS, List.of(Map.of(
+                        MetadataKeys.ASSET_ID, "fig-1",
+                        MetadataKeys.ASSET_TYPE, "figure",
+                        MetadataKeys.ASSET_CAPTION, caption,
+                        MetadataKeys.PAGE_NUMBER, 3,
+                        "bbox", "10,10,100,100"
+                ))
+        ));
+        String text = """
+                1 Methods
+
+                %s
+
+                %s
+
+                %s
+                """.formatted(before, caption, after);
+
+        List<DocumentChunk> chunks = service.split(source, text);
+        List<DocumentChunk> figureChunks = chunks.stream()
+                .filter(chunk -> "FIGURE_CONTEXT".equals(chunk.metadata().get(MetadataKeys.CHUNK_TYPE)))
+                .toList();
+        List<DocumentChunk> textChunks = chunks.stream()
+                .filter(chunk -> "TEXT".equals(chunk.metadata().get(MetadataKeys.CHUNK_TYPE)))
+                .toList();
+
+        assertThat(textChunks).hasSize(1);
+        assertThat(textChunks.getFirst().content()).contains(caption);
+        assertThat(figureChunks).hasSize(1);
+        DocumentChunk figureChunk = figureChunks.getFirst();
+        assertThat(figureChunk.content())
+                .contains("[Figure Context]")
+                .contains("Section: 1 Methods")
+                .contains("Caption:\n" + caption)
+                .contains("Before Context:\n" + before)
+                .contains("After Context:\n" + after)
+                .doesNotContain("10,10,100,100");
+        assertThat(figureChunk.metadata())
+                .containsEntry(MetadataKeys.CHUNK_TYPE, "FIGURE_CONTEXT")
+                .containsEntry(MetadataKeys.ASSET_IDS, List.of("fig-1"))
+                .containsEntry(MetadataKeys.ASSET_ID, "fig-1")
+                .containsEntry(MetadataKeys.ASSET_TYPE, "figure")
+                .containsEntry(MetadataKeys.ASSET_CAPTION, caption)
+                .containsEntry(MetadataKeys.SECTION_TITLE, "1 Methods")
+                .containsEntry(MetadataKeys.SECTION_TYPE, "SECTION")
+                .containsEntry(MetadataKeys.SECTION_LEVEL, 1);
+        assertThat(figureChunk.metadata()).containsKeys(
+                MetadataKeys.CHUNK_START,
+                MetadataKeys.CHUNK_END,
+                MetadataKeys.CHUNK_LENGTH,
+                MetadataKeys.CONTEXT_BEFORE_START,
+                MetadataKeys.CONTEXT_BEFORE_END,
+                MetadataKeys.CONTEXT_AFTER_START,
+                MetadataKeys.CONTEXT_AFTER_END
+        );
+    }
+
+    @Test
+    void splitShouldSkipFigureContextWhenCaptionCannotBeLocated() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(800, 120, 5, 0));
+        DocumentSource source = new DocumentSource("source-missing-caption", "Missing Caption", "paper.pdf", Map.of(
+                MetadataKeys.DOCUMENT_ASSETS, List.of(Map.of(
+                        MetadataKeys.ASSET_ID, "fig-missing",
+                        MetadataKeys.ASSET_TYPE, "figure",
+                        MetadataKeys.ASSET_CAPTION, "Figure 9: This caption is absent from the parsed text."
+                ))
+        ));
+        String text = """
+                1 Results
+
+                The parsed text only contains surrounding body paragraphs and no matching caption.
+                """;
+
+        List<DocumentChunk> chunks = service.split(source, text);
+
+        assertThat(chunks).hasSize(1);
+        assertThat(chunks).noneMatch(chunk -> "FIGURE_CONTEXT".equals(chunk.metadata().get(MetadataKeys.CHUNK_TYPE)));
+    }
+
+    @Test
+    void splitShouldGenerateOnlyOneFigureContextChunkForDuplicateAsset() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(1200, 120, 5, 0));
+        String caption = "Table 2: Ablation results demonstrate that contextual caption chunks improve recall.";
+        Map<String, Object> asset = Map.of(
+                MetadataKeys.ASSET_ID, "table-2",
+                MetadataKeys.ASSET_TYPE, "table",
+                MetadataKeys.ASSET_CAPTION, caption
+        );
+        DocumentSource source = new DocumentSource("source-duplicate-asset", "Duplicate Asset", "paper.pdf", Map.of(
+                MetadataKeys.DOCUMENT_ASSETS, List.of(asset, asset)
+        ));
+        String text = """
+                2 Experiments
+
+                Before the table, the paper defines the compared retrieval variants and evaluation metrics.
+
+                %s
+
+                After the table, the paper discusses the most important recall improvements and limitations.
+                """.formatted(caption);
+
+        List<DocumentChunk> chunks = service.split(source, text);
+        List<DocumentChunk> figureChunks = chunks.stream()
+                .filter(chunk -> "FIGURE_CONTEXT".equals(chunk.metadata().get(MetadataKeys.CHUNK_TYPE)))
+                .toList();
+
+        assertThat(figureChunks).hasSize(1);
+        assertThat(figureChunks.getFirst().metadata()).containsEntry(MetadataKeys.ASSET_IDS, List.of("table-2"));
+    }
+
+    @Test
+    void splitShouldLimitLongFigureContextToChunkSizeWithoutTruncatingCaption() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(260, 40, 5, 0));
+        String before = "Before context " + "describes retrieval calibration and semantic evidence preservation ".repeat(8);
+        String caption = "Figure 3: The pipeline aligns dense retrieval, chunk ranking, and answer grounding.";
+        String after = "After context " + "summarizes evaluation robustness and downstream answer quality ".repeat(8);
+        DocumentSource source = new DocumentSource("source-long-context", "Long Context", "paper.pdf", Map.of(
+                MetadataKeys.DOCUMENT_ASSETS, List.of(Map.of(
+                        MetadataKeys.ASSET_ID, "fig-long",
+                        MetadataKeys.ASSET_TYPE, "image",
+                        MetadataKeys.ASSET_CAPTION, caption
+                ))
+        ));
+        String text = """
+                3 Evaluation
+
+                %s
+
+                %s
+
+                %s
+                """.formatted(before, caption, after);
+
+        List<DocumentChunk> chunks = service.split(source, text);
+        DocumentChunk figureChunk = chunks.stream()
+                .filter(chunk -> "FIGURE_CONTEXT".equals(chunk.metadata().get(MetadataKeys.CHUNK_TYPE)))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(figureChunk.content()).contains(caption);
+        assertThat(figureChunk.content().length()).isLessThanOrEqualTo(260);
+        assertThat(((Number) figureChunk.metadata().get(MetadataKeys.CHUNK_LENGTH)).intValue()).isLessThanOrEqualTo(260);
+    }
+
+    @Test
+    void splitShouldStillCreateFigureContextWhenCaptionExistsInTextChunk() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(1200, 120, 5, 0));
+        String caption = "Figure 4: Caption text is already present in the ordinary text chunk.";
+        DocumentSource source = new DocumentSource("source-caption-in-text", "Caption In Text", "paper.pdf", Map.of(
+                MetadataKeys.DOCUMENT_ASSETS, List.of(Map.of(
+                        MetadataKeys.ASSET_ID, "fig-4",
+                        MetadataKeys.ASSET_TYPE, "figure",
+                        MetadataKeys.ASSET_CAPTION, caption
+                ))
+        ));
+        String text = """
+                4 Discussion
+
+                Before the figure, this paragraph provides enough natural language context for retrieval.
+
+                %s
+
+                After the figure, this paragraph adds interpretation that should also be searchable.
+                """.formatted(caption);
+
+        List<DocumentChunk> chunks = service.split(source, text);
+        List<DocumentChunk> textChunks = chunks.stream()
+                .filter(chunk -> "TEXT".equals(chunk.metadata().get(MetadataKeys.CHUNK_TYPE)))
+                .toList();
+        List<DocumentChunk> figureChunks = chunks.stream()
+                .filter(chunk -> "FIGURE_CONTEXT".equals(chunk.metadata().get(MetadataKeys.CHUNK_TYPE)))
+                .toList();
+
+        assertThat(textChunks).anySatisfy(chunk -> assertThat(chunk.content()).contains(caption));
+        assertThat(figureChunks).hasSize(1);
+        assertThat(figureChunks.getFirst().content()).contains(caption);
+        assertThat(figureChunks.getFirst().chunkId()).isNotEqualTo(textChunks.getFirst().chunkId());
+    }
+
+    @Test
+    void splitShouldCreateFigureContextForWordEmbeddedImageText() {
+        DocumentSplittingServiceImpl service = new DocumentSplittingServiceImpl(new RagProperties(1200, 120, 5, 0));
+        String imageText = "图中展示系统架构，包括检索模块、排序模块和答案生成模块之间的关系，并说明这些模块如何围绕文档资产形成完整的数据流。";
+        String before = "图片前的正文说明系统设计目标，需要把文档资产与周围语义一起用于检索。";
+        String after = "图片后的正文继续解释各模块之间的数据流向和状态变化。";
+        String imageBlock = "【图片：image1.png】\n" + imageText;
+        String text = String.join("\n\n", "2 系统设计", before, imageBlock, after);
+        int textStart = text.indexOf(imageBlock);
+        int textEnd = textStart + imageBlock.length();
+        DocumentSource source = new DocumentSource("source-word-image", "Word Image", "paper.docx", Map.of(
+                MetadataKeys.DOCUMENT_ASSETS, List.of(Map.of(
+                        MetadataKeys.ASSET_ID, "word-image-1",
+                        MetadataKeys.ASSET_TYPE, "IMAGE",
+                        MetadataKeys.ASSET_CAPTION, imageText,
+                        MetadataKeys.TEXT_START, textStart,
+                        MetadataKeys.TEXT_END, textEnd
+                ))
+        ));
+
+        List<DocumentChunk> chunks = service.split(source, text);
+        List<DocumentChunk> figureChunks = chunks.stream()
+                .filter(chunk -> "FIGURE_CONTEXT".equals(chunk.metadata().get(MetadataKeys.CHUNK_TYPE)))
+                .toList();
+
+        assertThat(figureChunks).hasSize(1);
+        assertThat(figureChunks.getFirst().content())
+                .contains("Caption:\n" + imageText)
+                .contains("Before Context:\n" + before)
+                .contains("After Context:\n" + after)
+                .doesNotContain("【图片：image1.png】");
+        assertThat(figureChunks.getFirst().metadata())
+                .containsEntry(MetadataKeys.CHUNK_TYPE, "FIGURE_CONTEXT")
+                .containsEntry(MetadataKeys.ASSET_IDS, List.of("word-image-1"))
+                .containsEntry(MetadataKeys.ASSET_TYPE, "image")
+                .containsEntry(MetadataKeys.ASSET_CAPTION, imageText);
     }
 
     @Test

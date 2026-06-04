@@ -3,6 +3,7 @@ package com.lqr.paperragserver.document.web;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.auth.security.SecurityUserPrincipal;
+import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.document.dto.BatchDocumentIngestionItemRequest;
 import com.lqr.paperragserver.document.dto.BatchDocumentIngestionItemResponse;
 import com.lqr.paperragserver.document.dto.BatchDocumentIngestionResponse;
@@ -48,6 +49,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -88,7 +90,7 @@ public class DocumentController {
         log.info("document.upload.start ownerUserId={} sourceId={} fileName={} fileType={} fileSize={}",
                 ownerUserId, sourceId, fileName, file.getContentType(), file.getSize());
         try {
-            DocumentIngestionJob job = createAndPublishJob(ownerUserId, file, sourceId, title, null);
+            DocumentIngestionJob job = createAndPublishJob(ownerUserId, file, sourceId, title, null, MetadataKeys.SOURCE_TYPE_USER);
             log.info("document.upload.done ownerUserId={} jobId={} sourceId={} fileName={} fileType={} fileSize={} costMs={}",
                     ownerUserId, job.getId(), job.getSourceId(), job.getFileName(), file.getContentType(), file.getSize(), elapsedMs(startNanos));
             return ResponseEntity.status(HttpStatus.ACCEPTED)
@@ -128,7 +130,7 @@ public class DocumentController {
             log.info("document.upload.start ownerUserId={} sourceId={} fileName={} fileType={} fileSize={} batchIndex={} batchSize={}",
                     principal.getId(), item.sourceId(), fileName, file.getContentType(), file.getSize(), index, files.length);
             try {
-                DocumentIngestionJob job = createAndPublishJob(principal.getId(), file, item.sourceId(), item.title(), fileName);
+                DocumentIngestionJob job = createAndPublishJob(principal.getId(), file, item.sourceId(), item.title(), fileName, MetadataKeys.SOURCE_TYPE_USER);
                 log.info("document.upload.done ownerUserId={} jobId={} sourceId={} fileName={} fileType={} fileSize={} batchIndex={} batchSize={} costMs={}",
                         principal.getId(), job.getId(), job.getSourceId(), job.getFileName(), file.getContentType(), file.getSize(), index, files.length, elapsedMs(itemStartNanos));
                 results.add(BatchDocumentIngestionItemResponse.accepted(index, fileName, job));
@@ -351,7 +353,8 @@ public class DocumentController {
                                                      MultipartFile file,
                                                      String sourceId,
                                                      String title,
-                                                     String fallbackFileName) throws IOException {
+                                                     String fallbackFileName,
+                                                     String sourceType) throws IOException {
         UUID jobId = UUID.randomUUID();
         String resolvedSourceId = sourceId == null || sourceId.isBlank() ? UUID.randomUUID().toString() : sourceId.trim();
         String fileName = fallbackFileName == null || fallbackFileName.isBlank() ? file.getOriginalFilename() : fallbackFileName;
@@ -368,7 +371,8 @@ public class DocumentController {
                 resolvedSourceId,
                 upload.fileName(),
                 upload.filePath(),
-                title
+                title,
+                Map.of(MetadataKeys.SOURCE_TYPE, sourceType == null || sourceType.isBlank() ? MetadataKeys.SOURCE_TYPE_USER : sourceType)
         );
         documentIngestionProducer.publish(new DocumentIngestionMessage(job.getId(), ownerUserId, resolvedSourceId));
         return documentIngestionJobService.findJob(ownerUserId, job.getId()).orElse(job);

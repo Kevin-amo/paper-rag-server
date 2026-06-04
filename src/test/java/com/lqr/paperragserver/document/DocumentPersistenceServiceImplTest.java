@@ -100,6 +100,8 @@ class DocumentPersistenceServiceImplTest {
                 Map.of("source", "manual")
         );
 
+        when(documentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(userDocument("source-1"));
+
         service.updateMetadata(ownerUserId, "source-1", update);
 
         ArgumentCaptor<String> authorsCaptor = ArgumentCaptor.forClass(String.class);
@@ -198,8 +200,19 @@ class DocumentPersistenceServiceImplTest {
 
     @Test
     void restoreShouldOnlyRestoreDeletedDocumentAsPending() {
+        when(documentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(userDocument("source-1"));
+
         service.restore(ownerUserId, "source-1");
 
         verify(documentMapper).restore(ownerUserId, "source-1");
+    }
+
+    private DocumentEntity userDocument(String sourceId) {
+        DocumentEntity entity = new DocumentEntity();
+        entity.setOwnerUserId(ownerUserId);
+        entity.setSourceId(sourceId);
+        entity.setTitle("Paper A");
+        entity.setMetadata(Map.of("sourceType", "USER"));
+        return entity;
     }
 }

@@ -15,7 +15,15 @@ onMounted(async () => {
       return;
     }
   }
-  await router.replace(auth.isAdmin.value ? '/admin' : '/user');
+  if (auth.isAdmin.value) {
+    await router.replace('/admin');
+    return;
+  }
+  if (auth.isReviewer.value) {
+    await router.replace('/review');
+    return;
+  }
+  await router.replace('/user');
 });
 </script>
 

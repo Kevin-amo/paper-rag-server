@@ -37,6 +37,24 @@ public interface DocumentPersistenceService {
     Optional<DocumentDetail> findDocument(UUID ownerUserId, String sourceId);
 
     /**
+     * 按来源 ID 查询指定用户的任意来源文档详情。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @return 文档详情，不存在时返回空
+     */
+    Optional<DocumentDetail> findAnyDocument(UUID ownerUserId, String sourceId);
+
+    /**
+     * 按来源 ID 查询指定用户的评审文档详情。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @return 文档详情，不存在时返回空
+     */
+    Optional<DocumentDetail> findReviewDocument(UUID ownerUserId, String sourceId);
+
+    /**
      * 根据 sourceId 列表批量查询已索引文档状态。
      * 返回 sourceId -> isIndexed 的映射，仅包含 deletedAt 为空且 status 为 INDEXED 的文档。
      *

@@ -1,6 +1,6 @@
-﻿# Paper RAG Server
+﻿# Paper Review Assistant
 
-Paper RAG Server 是一个面向论文/文档知识库的 RAG 问答系统，支持用户认证、文档上传、异步解析入库、向量检索、重排序、流式问答和后台用户管理。
+Paper Review Assistant 是一个面向论文辅助评审场景的平台，支持用户端论文上传与问答、评审端结构化解析与多维评分、AI 辅助评语与风险提示、后台用户和角色管理。系统保留现有 DashScope / Qwen 模型链路，不额外接入文心大模型。
 
 项目包含两部分：
 
@@ -12,10 +12,12 @@ Paper RAG Server 是一个面向论文/文档知识库的 RAG 问答系统，支
 - 用户登录、注册、登出和当前用户信息查询
 - JWT 鉴权、登录失败锁定、Token 注销
 - 管理员用户管理：创建用户、修改角色、禁用用户、重置密码
-- 文档上传、批量上传、异步入库任务查询
+- 用户端论文上传、批量上传、异步解析入库和文档问答
+- 评审端论文任务池、结构化内容解析、多维辅助评分和人工调整
+- AI 辅助评语生成、风险提示、最终意见保存和评审留档
 - 文档解析、切分、元数据提取和持久化
 - pgvector 向量存储和相似度检索
-- DashScope 大模型问答、Embedding 和 Rerank
+- DashScope / Qwen 大模型问答、Embedding 和 Rerank
 - RAG 普通问答和 SSE 流式问答
 - 文档列表、详情、分片、内嵌图片资源查看
 - Redis、RabbitMQ、PostgreSQL/pgvector 本地 Docker 编排
@@ -61,6 +63,7 @@ paper-rag-server/
 │   │   │   ├── literature/      # 外部文献检索、意图解析和缓存
 │   │   │   ├── mail/            # 邮件发送配置和服务
 │   │   │   ├── rag/             # RAG 检索和回答
+│   │   │   ├── review/          # 论文辅助评审任务、评分报告和评审标准
 │   │   │   ├── storage/         # 对象存储
 │   │   │   └── vector/          # 向量写入
 │   │   └── resources/
@@ -194,7 +197,7 @@ npm run dev
 http://localhost:5173
 ```
 
-Vite 默认会把 `/auth`、`/documents`、`/agent`、`/conversations`、`/admin` 等请求代理到 `http://localhost:8080`。
+Vite 默认会把 `/auth`、`/documents`、`/agent`、`/conversations`、`/admin`、`/reviews` 等请求代理到 `http://localhost:8080`。
 
 如需修改后端地址：
 

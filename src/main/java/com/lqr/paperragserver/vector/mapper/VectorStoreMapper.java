@@ -35,6 +35,17 @@ public interface VectorStoreMapper {
     int deleteBySourceId(@Param("ownerUserId") String ownerUserId, @Param("sourceId") String sourceId);
 
     /**
+     * 删除指定用户知识库文档来源对应的向量记录。
+     */
+    @Delete("""
+            delete from public.vector_store
+            where metadata ->> 'ownerUserId' = #{ownerUserId}
+              and metadata ->> 'sourceId' = #{sourceId}
+              and coalesce(metadata ->> 'sourceType', 'USER') = 'USER'
+            """)
+    int deleteUserVectorsBySourceId(@Param("ownerUserId") String ownerUserId, @Param("sourceId") String sourceId);
+
+    /**
      * 删除指定用户的全部向量记录。
      */
     @Delete("""
@@ -42,4 +53,14 @@ public interface VectorStoreMapper {
             where metadata ->> 'ownerUserId' = #{ownerUserId}
             """)
     int deleteByOwnerUserId(@Param("ownerUserId") String ownerUserId);
+
+    /**
+     * 删除指定用户的用户知识库向量记录。
+     */
+    @Delete("""
+            delete from public.vector_store
+            where metadata ->> 'ownerUserId' = #{ownerUserId}
+              and coalesce(metadata ->> 'sourceType', 'USER') = 'USER'
+            """)
+    int deleteUserVectorsByOwnerUserId(@Param("ownerUserId") String ownerUserId);
 }

@@ -76,6 +76,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/register", "/auth/register/email-code").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/reviews/**").hasAnyRole("REVIEWER", "ADMIN")
                         .requestMatchers("/documents/**", "/conversations/**", "/agent/**").hasRole("USER")
                         .requestMatchers("/auth/**").authenticated()
                         .anyRequest().authenticated())

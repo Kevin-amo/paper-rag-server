@@ -8,7 +8,6 @@ import com.lqr.paperragserver.common.model.RetrievedChunk;
 import com.lqr.paperragserver.rag.config.RagProperties;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.rag.service.RagRetrievalService;
-import jdk.jfr.Registered;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -86,6 +85,10 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
                     filterStats.ownerMismatchCount++;
                     continue;
                 }
+                if (isReviewSource(metadata)) {
+                    filterStats.reviewSourceCount++;
+                    continue;
+                }
                 if (sourceId == null || sourceId.isBlank()) {
                     filterStats.invalidSourceCount++;
                     continue;
@@ -107,8 +110,8 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
                 Double vectorScore = document.getScore();
                 vectorChunks.add(new RetrievedChunk(chunk, vectorRankContribution(vectorScore, currentIndex, documents.size())));
             }
-            log.info("rag.retrieve.vector.done ownerUserId={} vectorRawCount={} vectorFilteredCount={} ownerMismatchCount={} invalidSourceCount={} notIndexedCount={} costMs={}",
-                    ownerUserId, documents.size(), vectorChunks.size(), filterStats.ownerMismatchCount, filterStats.invalidSourceCount, filterStats.notIndexedCount, elapsedMs(startNanos));
+            log.info("rag.retrieve.vector.done ownerUserId={} vectorRawCount={} vectorFilteredCount={} ownerMismatchCount={} reviewSourceCount={} invalidSourceCount={} notIndexedCount={} costMs={}",
+                    ownerUserId, documents.size(), vectorChunks.size(), filterStats.ownerMismatchCount, filterStats.reviewSourceCount, filterStats.invalidSourceCount, filterStats.notIndexedCount, elapsedMs(startNanos));
 
             List<DocumentChunk> lexicalChunks = documentPersistenceService.searchChunks(ownerUserId, question, Math.max(resolvedTopK * 3, resolvedTopK));
             log.info("rag.retrieve.lexical.done ownerUserId={} lexicalCount={} costMs={}", ownerUserId, lexicalChunks.size(), elapsedMs(startNanos));
@@ -196,8 +199,17 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
 
     private static final class FilterStats {
         private int ownerMismatchCount;
+        private int reviewSourceCount;
         private int invalidSourceCount;
         private int notIndexedCount;
+    }
+
+    private boolean isReviewSource(Map<String, Object> metadata) {
+        if (metadata == null) {
+            return false;
+        }
+        Object sourceType = metadata.get(MetadataKeys.SOURCE_TYPE);
+        return MetadataKeys.SOURCE_TYPE_REVIEW.equalsIgnoreCase(sourceType == null ? null : String.valueOf(sourceType));
     }
 
     /**

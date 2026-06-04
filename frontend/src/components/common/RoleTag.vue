@@ -6,8 +6,24 @@ const props = defineProps<{
   role: UserRole | string;
 }>();
 
-const tagType = computed(() => (props.role === 'ADMIN' ? 'danger' : 'primary'));
-const label = computed(() => (props.role === 'ADMIN' ? '管理员' : '普通用户'));
+const tagType = computed(() => {
+  if (props.role === 'ADMIN') {
+    return 'danger';
+  }
+  if (props.role === 'REVIEWER') {
+    return 'warning';
+  }
+  return 'primary';
+});
+const label = computed(() => {
+  if (props.role === 'ADMIN') {
+    return '管理员';
+  }
+  if (props.role === 'REVIEWER') {
+    return '评审员';
+  }
+  return '普通用户';
+});
 </script>
 
 <template>

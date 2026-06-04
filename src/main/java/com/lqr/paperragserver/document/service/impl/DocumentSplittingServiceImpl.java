@@ -10,8 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,6 +44,22 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
     private static final Pattern CONTENTS_NUMBERED_ENTRY = Pattern.compile("^(?:\\d+(?:\\.\\d+){0,4}|第[一二三四五六七八九十百千0-9]+[章节篇部分]|[一二三四五六七八九十]+[、．.\\)])\\s+.+?\\s+(?:\\d+|[ivxlcdmIVXLCDM]+)\\s*$");
     private static final Pattern CONTENTS_NUMBERED_ENTRY_WITH_ATTACHED_PAGE = Pattern.compile("^\\d+(?:\\.\\d+){0,4}\\s+.+?\\d+$");
     private static final int VISUAL_ARTIFACT_RUN_MIN_LINES = 4;
+    private static final int FIGURE_CONTEXT_MIN_LENGTH = 80;
+    private static final int CONTEXT_PARAGRAPH_MIN_LENGTH = 20;
+
+    private static final String CHUNK_TYPE_TEXT = "TEXT";
+    private static final String CHUNK_TYPE_FIGURE_CONTEXT = "FIGURE_CONTEXT";
+    private static final String RAW_ASSET_TYPE = "type";
+    private static final String RAW_CAPTION = "caption";
+    private static final String RAW_CAPTION_TEXT = "captionText";
+    private static final String RAW_EXTRACTED_TEXT = "extractedText";
+    private static final String RAW_PAGE = "page";
+    private static final String RAW_BBOX = "bbox";
+    private static final String RAW_BOUNDING_BOX = "boundingBox";
+    private static final String RAW_START = "start";
+    private static final String RAW_END = "end";
+
+    private static final Set<String> FIGURE_ASSET_TYPES = Set.of("figure", "image", "table");
 
     private static final Set<String> ABSTRACT_HEADINGS = Set.of("摘要", "abstract");
     private static final Set<String> CONTENTS_HEADINGS = Set.of("目录", "目次", "contents", "table of contents");
@@ -87,7 +106,7 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         log.info("document.split.sections.done sourceId={} paragraphCount={} sectionCount={} costMs={}",
                 source.sourceId(), paragraphs.size(), sections.size(), elapsedMs(startNanos));
         logSections(source.sourceId(), sections);
-        List<DocumentChunk> chunks = new ArrayList<>();
+        List<DocumentChunk> textChunks = new ArrayList<>();
         SplitSkipStats skipStats = new SplitSkipStats();
         int chunkIndex = 0;
         for (SectionBlock section : sections) {
@@ -107,13 +126,17 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
                     continue;
                 }
                 DocumentChunk chunk = toDocumentChunk(source, chunkIndex++, cleanedSlice);
-                chunks.add(chunk);
+                textChunks.add(chunk);
                 log.debug("document.split.chunk sourceId={} chunkId={} chunkIndex={} sectionTitle={} sectionType={} chunkLength={} excerpt={}",
                         source.sourceId(), chunk.chunkId(), chunk.chunkIndex(), cleanedSlice.sectionTitle(), cleanedSlice.sectionType(), cleanedSlice.content().length(), LogSanitizer.safeExcerpt(cleanedSlice.content(), 160));
             }
         }
-        log.info("document.split.chunks.done sourceId={} textLength={} paragraphCount={} sectionCount={} chunkCount={} skippedEmptyCount={} skippedTitleOnlyCount={} skippedTooShortCount={} costMs={}",
-                source.sourceId(), fullText.length(), paragraphs.size(), sections.size(), chunks.size(), skipStats.emptyCount, skipStats.titleOnlyCount, skipStats.tooShortCount, elapsedMs(startNanos));
+        List<DocumentChunk> figureContextChunks = buildFigureContextChunks(source, fullText, paragraphs, sections);
+        List<DocumentChunk> chunks = mergeAndReindexChunks(textChunks, figureContextChunks);
+        log.info("document.split.figure-context.done sourceId={} figureContextChunkCount={}",
+                source.sourceId(), figureContextChunks.size());
+        log.info("document.split.chunks.done sourceId={} textLength={} paragraphCount={} sectionCount={} textChunkCount={} figureContextChunkCount={} chunkCount={} skippedEmptyCount={} skippedTitleOnlyCount={} skippedTooShortCount={} costMs={}",
+                source.sourceId(), fullText.length(), paragraphs.size(), sections.size(), textChunks.size(), figureContextChunks.size(), chunks.size(), skipStats.emptyCount, skipStats.titleOnlyCount, skipStats.tooShortCount, elapsedMs(startNanos));
         return chunks;
     }
 
@@ -753,14 +776,9 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
      * @return 可持久化或可嵌入的文档块
      */
     private DocumentChunk toDocumentChunk(DocumentSource source, int chunkIndex, ChunkSlice slice) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        if (source.metadata() != null) {
-            source.metadata().forEach((key, value) -> {
-                if (!MetadataKeys.DOCUMENT_ASSETS.equals(key)) {
-                    metadata.put(key, value);
-                }
-            });
-        }
+        Map<String, Object> metadata = sourceMetadataWithoutDocumentAssets(source);
+        metadata.put(MetadataKeys.CHUNK_INDEX, chunkIndex);
+        metadata.put(MetadataKeys.CHUNK_TYPE, CHUNK_TYPE_TEXT);
         List<String> assetIds = overlappingAssetIds(source.metadata(), slice.start(), slice.end());
         if (!assetIds.isEmpty()) {
             metadata.put(MetadataKeys.ASSET_IDS, assetIds);
@@ -772,12 +790,613 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         metadata.put(MetadataKeys.CHUNK_END, slice.end());
         metadata.put(MetadataKeys.CHUNK_LENGTH, slice.content().length());
         return new DocumentChunk(
-                UUID.nameUUIDFromBytes((source.sourceId() + "::" + chunkIndex + "::" + slice.start() + "::" + slice.end()).getBytes()).toString(),
+                UUID.nameUUIDFromBytes((source.sourceId() + "::" + chunkIndex + "::" + slice.start() + "::" + slice.end()).getBytes(StandardCharsets.UTF_8)).toString(),
                 source.sourceId(),
                 chunkIndex,
                 slice.content(),
                 metadata
         );
+    }
+
+    /**
+     * 从文档资产摘要中生成图片/表格上下文 chunk。
+     */
+    private List<DocumentChunk> buildFigureContextChunks(DocumentSource source,
+                                                         String fullText,
+                                                         List<ParagraphBlock> paragraphs,
+                                                         List<SectionBlock> sections) {
+        List<FigureAsset> assets = extractFigureAssets(source);
+        if (assets.isEmpty()) {
+            return List.of();
+        }
+
+        List<DocumentChunk> chunks = new ArrayList<>();
+        LinkedHashSet<String> seenAssetIds = new LinkedHashSet<>();
+        for (FigureAsset asset : assets) {
+            if (!seenAssetIds.add(asset.assetId())) {
+                log.debug("document.split.figure-context.skip sourceId={} assetId={} reason=duplicate_asset",
+                        source.sourceId(), asset.assetId());
+                continue;
+            }
+            Optional<TextRange> captionRange = locateCaptionOffset(source.sourceId(), fullText, asset);
+            if (captionRange.isEmpty()) {
+                continue;
+            }
+            FigureContext context = selectFigureContext(asset, captionRange.get(), paragraphs, sections);
+            RenderedFigureContext rendered = renderFigureContext(context);
+            if (rendered.content().length() < FIGURE_CONTEXT_MIN_LENGTH) {
+                log.debug("document.split.figure-context.skip sourceId={} assetId={} reason=content_too_short length={}",
+                        source.sourceId(), asset.assetId(), rendered.content().length());
+                continue;
+            }
+            DocumentChunk chunk = toFigureContextChunk(source, chunks.size(), context, rendered);
+            chunks.add(chunk);
+            log.debug("document.split.figure-context.chunk sourceId={} assetId={} assetType={} captionStart={} captionEnd={} chunkLength={} excerpt={}",
+                    source.sourceId(), asset.assetId(), asset.assetType(), captionRange.get().start(), captionRange.get().end(),
+                    rendered.content().length(), LogSanitizer.safeExcerpt(rendered.content(), 160));
+        }
+        return chunks;
+    }
+
+    /**
+     * 抽取可用于构建 figure context 的资产摘要。
+     */
+    private List<FigureAsset> extractFigureAssets(DocumentSource source) {
+        Object documentAssets = source.metadata() == null ? null : source.metadata().get(MetadataKeys.DOCUMENT_ASSETS);
+        if (!(documentAssets instanceof List<?> assets)) {
+            return List.of();
+        }
+        List<FigureAsset> figureAssets = new ArrayList<>();
+        for (Object rawAsset : assets) {
+            if (!(rawAsset instanceof Map<?, ?> asset)) {
+                continue;
+            }
+            toFigureAsset(source, asset).ifPresent(figureAssets::add);
+        }
+        return figureAssets;
+    }
+
+    /**
+     * 将资产 metadata map 归一化为 figure context 可消费的结构。
+     */
+    private Optional<FigureAsset> toFigureAsset(DocumentSource source, Map<?, ?> asset) {
+        String assetType = firstNonBlankString(asset.get(MetadataKeys.ASSET_TYPE), asset.get(RAW_ASSET_TYPE));
+        String normalizedType = normalizeAssetType(assetType);
+        if (!FIGURE_ASSET_TYPES.contains(normalizedType)) {
+            log.debug("document.split.figure-context.skip sourceId={} assetId={} reason=unsupported_asset_type assetType={}",
+                    source.sourceId(), firstNonBlankString(asset.get(MetadataKeys.ASSET_ID)), assetType);
+            return Optional.empty();
+        }
+
+        String caption = firstNonBlankString(
+                asset.get(MetadataKeys.ASSET_CAPTION),
+                asset.get(RAW_CAPTION),
+                asset.get(RAW_CAPTION_TEXT),
+                asset.get(RAW_EXTRACTED_TEXT)
+        );
+        if (caption == null) {
+            log.debug("document.split.figure-context.skip sourceId={} assetId={} reason=missing_caption",
+                    source.sourceId(), firstNonBlankString(asset.get(MetadataKeys.ASSET_ID)));
+            return Optional.empty();
+        }
+
+        Integer page = integerValue(firstPresent(asset.get(MetadataKeys.PAGE_NUMBER), asset.get(RAW_PAGE)));
+        String bbox = firstNonBlankString(asset.get(RAW_BBOX), asset.get(RAW_BOUNDING_BOX));
+        String assetId = firstNonBlankString(asset.get(MetadataKeys.ASSET_ID));
+        if (assetId == null) {
+            assetId = stableAssetId(source.sourceId(), caption, page, bbox);
+        }
+
+        return Optional.of(new FigureAsset(
+                assetId,
+                normalizedType,
+                caption,
+                page,
+                bbox,
+                integerValue(asset.get(MetadataKeys.CAPTION_START)),
+                integerValue(asset.get(MetadataKeys.CAPTION_END)),
+                integerValue(asset.get(MetadataKeys.TEXT_START)),
+                integerValue(asset.get(MetadataKeys.TEXT_END)),
+                integerValue(asset.get(RAW_START)),
+                integerValue(asset.get(RAW_END))
+        ));
+    }
+
+    /**
+     * 定位 caption 在全文中的原文范围。
+     */
+    private Optional<TextRange> locateCaptionOffset(String sourceId, String fullText, FigureAsset asset) {
+        Optional<TextRange> captionRange = validTextRange(asset.captionStart(), asset.captionEnd(), fullText.length());
+        if (captionRange.isPresent()) {
+            return captionRange;
+        }
+        Optional<TextRange> textRange = validTextRange(asset.textStart(), asset.textEnd(), fullText.length());
+        if (textRange.isPresent()) {
+            return textRange;
+        }
+        Optional<TextRange> assetRange = validTextRange(asset.start(), asset.end(), fullText.length());
+        if (assetRange.isPresent()) {
+            return assetRange;
+        }
+
+        List<TextRange> matches = findCaptionMatches(fullText, asset.caption());
+        if (matches.isEmpty()) {
+            log.debug("document.split.figure-context.skip sourceId={} assetId={} reason=caption_not_found caption={}",
+                    sourceId, asset.assetId(), LogSanitizer.safeExcerpt(asset.caption(), 120));
+            return Optional.empty();
+        }
+        if (matches.size() == 1) {
+            return Optional.of(matches.get(0));
+        }
+
+        Integer hint = firstAvailableOffset(asset.captionStart(), asset.textStart(), asset.start());
+        if (hint != null) {
+            return matches.stream()
+                    .min(Comparator.comparingInt(match -> distanceToRange(hint, match)));
+        }
+
+        log.debug("document.split.figure-context.skip sourceId={} assetId={} reason=caption_matched_multiple count={} caption={}",
+                sourceId, asset.assetId(), matches.size(), LogSanitizer.safeExcerpt(asset.caption(), 120));
+        return Optional.empty();
+    }
+
+    /**
+     * 基于 caption 位置选择前后正文上下文。
+     */
+    private FigureContext selectFigureContext(FigureAsset asset,
+                                              TextRange captionRange,
+                                              List<ParagraphBlock> paragraphs,
+                                              List<SectionBlock> sections) {
+        ParagraphBlock captionParagraph = paragraphContainingRange(paragraphs, captionRange).orElse(null);
+        SectionBlock section = sectionContainingOffset(sections, captionRange.start())
+                .orElseGet(() -> captionParagraph == null
+                        ? new SectionBlock("", SectionType.PREFACE, 0, List.of())
+                        : sectionContainingParagraph(sections, captionParagraph)
+                        .orElse(new SectionBlock("", SectionType.PREFACE, 0, List.of())));
+        ParagraphBlock before = captionParagraph == null
+                ? null
+                : nearestContextParagraph(paragraphs, sections, captionParagraph, captionRange, -1);
+        if (before == null && captionParagraph != null) {
+            before = adjacentContextParagraph(paragraphs, sections, captionParagraph, captionRange, -1);
+        }
+        ParagraphBlock after = captionParagraph == null
+                ? null
+                : nearestContextParagraph(paragraphs, sections, captionParagraph, captionRange, 1);
+        if (after == null && captionParagraph != null) {
+            after = adjacentContextParagraph(paragraphs, sections, captionParagraph, captionRange, 1);
+        }
+        return new FigureContext(asset, captionRange, before, after, section);
+    }
+
+    /**
+     * 渲染 figure context 内容，并按 chunkSize 限制上下文长度。
+     */
+    private RenderedFigureContext renderFigureContext(FigureContext context) {
+        String sectionTitle = sectionTitleForContent(context.section());
+        String caption = context.asset().caption().strip();
+        String before = contextText(context.before());
+        String after = contextText(context.after());
+        String content = renderFigureContextContent(sectionTitle, caption, before, after);
+        int maxLength = ragProperties.chunkSize();
+        if (maxLength <= 0 || content.length() <= maxLength) {
+            return new RenderedFigureContext(content, before != null, after != null);
+        }
+
+        String fittedBefore = before;
+        String fittedAfter = after;
+        int guard = 0;
+        while (content.length() > maxLength && guard++ < 12 && (fittedBefore != null || fittedAfter != null)) {
+            int excess = content.length() - maxLength;
+            boolean reduceBefore = fittedBefore != null && (fittedAfter == null || fittedBefore.length() >= fittedAfter.length());
+            if (reduceBefore) {
+                fittedBefore = shortenContext(fittedBefore, excess, true);
+                if (fittedBefore.isBlank()) {
+                    fittedBefore = null;
+                }
+            } else {
+                fittedAfter = shortenContext(fittedAfter, excess, false);
+                if (fittedAfter.isBlank()) {
+                    fittedAfter = null;
+                }
+            }
+            content = renderFigureContextContent(sectionTitle, caption, fittedBefore, fittedAfter);
+        }
+        if (content.length() > maxLength) {
+            content = renderFigureContextContent(sectionTitle, caption, null, null);
+            return new RenderedFigureContext(content, false, false);
+        }
+        return new RenderedFigureContext(content, fittedBefore != null, fittedAfter != null);
+    }
+
+    /**
+     * 构建 figure context chunk。
+     */
+    private DocumentChunk toFigureContextChunk(DocumentSource source,
+                                               int chunkIndex,
+                                               FigureContext context,
+                                               RenderedFigureContext rendered) {
+        FigureAsset asset = context.asset();
+        int chunkStart = context.captionRange().start();
+        int chunkEnd = context.captionRange().end();
+        if (rendered.includesBefore() && context.before() != null) {
+            chunkStart = Math.min(chunkStart, context.before().start());
+            chunkEnd = Math.max(chunkEnd, context.before().end());
+        }
+        if (rendered.includesAfter() && context.after() != null) {
+            chunkStart = Math.min(chunkStart, context.after().start());
+            chunkEnd = Math.max(chunkEnd, context.after().end());
+        }
+
+        Map<String, Object> metadata = sourceMetadataWithoutDocumentAssets(source);
+        metadata.put(MetadataKeys.CHUNK_INDEX, chunkIndex);
+        metadata.put(MetadataKeys.CHUNK_TYPE, CHUNK_TYPE_FIGURE_CONTEXT);
+        metadata.put(MetadataKeys.ASSET_IDS, List.of(asset.assetId()));
+        metadata.put(MetadataKeys.ASSET_ID, asset.assetId());
+        metadata.put(MetadataKeys.ASSET_TYPE, asset.assetType());
+        metadata.put(MetadataKeys.ASSET_CAPTION, asset.caption());
+        if (asset.page() != null) {
+            metadata.put(MetadataKeys.PAGE_NUMBER, asset.page());
+        }
+        if (asset.bbox() != null) {
+            metadata.put(RAW_BBOX, asset.bbox());
+        }
+        metadata.put(MetadataKeys.CAPTION_START, context.captionRange().start());
+        metadata.put(MetadataKeys.CAPTION_END, context.captionRange().end());
+        metadata.put(MetadataKeys.SECTION_TITLE, context.section().title());
+        metadata.put(MetadataKeys.SECTION_TYPE, context.section().type().name());
+        metadata.put(MetadataKeys.SECTION_LEVEL, context.section().level());
+        metadata.put(MetadataKeys.CHUNK_START, chunkStart);
+        metadata.put(MetadataKeys.CHUNK_END, chunkEnd);
+        metadata.put(MetadataKeys.CHUNK_LENGTH, rendered.content().length());
+        if (rendered.includesBefore() && context.before() != null) {
+            metadata.put(MetadataKeys.CONTEXT_BEFORE_START, context.before().start());
+            metadata.put(MetadataKeys.CONTEXT_BEFORE_END, context.before().end());
+        }
+        if (rendered.includesAfter() && context.after() != null) {
+            metadata.put(MetadataKeys.CONTEXT_AFTER_START, context.after().start());
+            metadata.put(MetadataKeys.CONTEXT_AFTER_END, context.after().end());
+        }
+
+        String stableIdMaterial = source.sourceId()
+                + "::figure-context::"
+                + asset.assetId()
+                + "::"
+                + context.captionRange().start()
+                + "::"
+                + context.captionRange().end();
+        return new DocumentChunk(
+                UUID.nameUUIDFromBytes(stableIdMaterial.getBytes(StandardCharsets.UTF_8)).toString(),
+                source.sourceId(),
+                chunkIndex,
+                rendered.content(),
+                metadata
+        );
+    }
+
+    /**
+     * 合并普通 chunk 和 figure context chunk，并按原文位置重排 chunkIndex。
+     */
+    private List<DocumentChunk> mergeAndReindexChunks(List<DocumentChunk> textChunks, List<DocumentChunk> figureContextChunks) {
+        if (textChunks.isEmpty() && figureContextChunks.isEmpty()) {
+            return List.of();
+        }
+        List<DocumentChunk> merged = new ArrayList<>(textChunks.size() + figureContextChunks.size());
+        merged.addAll(textChunks);
+        merged.addAll(figureContextChunks);
+        merged.sort(Comparator
+                .comparingInt((DocumentChunk chunk) -> metadataInt(chunk.metadata(), MetadataKeys.CHUNK_START, Integer.MAX_VALUE))
+                .thenComparingInt(this::chunkTypeOrder)
+                .thenComparingInt(DocumentChunk::chunkIndex));
+
+        List<DocumentChunk> reindexed = new ArrayList<>(merged.size());
+        for (int index = 0; index < merged.size(); index++) {
+            reindexed.add(withChunkIndex(merged.get(index), index));
+        }
+        return List.copyOf(reindexed);
+    }
+
+    /**
+     * 复制来源 metadata，并过滤掉完整资产大对象。
+     */
+    private Map<String, Object> sourceMetadataWithoutDocumentAssets(DocumentSource source) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (source.metadata() != null) {
+            source.metadata().forEach((key, value) -> {
+                if (!MetadataKeys.DOCUMENT_ASSETS.equals(key)) {
+                    metadata.put(key, value);
+                }
+            });
+        }
+        return metadata;
+    }
+
+    private DocumentChunk withChunkIndex(DocumentChunk chunk, int chunkIndex) {
+        Map<String, Object> metadata = new LinkedHashMap<>(chunk.metadata());
+        metadata.put(MetadataKeys.CHUNK_INDEX, chunkIndex);
+        return new DocumentChunk(chunk.chunkId(), chunk.sourceId(), chunkIndex, chunk.content(), metadata);
+    }
+
+    private int chunkTypeOrder(DocumentChunk chunk) {
+        Object chunkType = chunk.metadata() == null ? null : chunk.metadata().get(MetadataKeys.CHUNK_TYPE);
+        return CHUNK_TYPE_FIGURE_CONTEXT.equals(chunkType) ? 1 : 0;
+    }
+
+    private int metadataInt(Map<String, Object> metadata, String key, int fallback) {
+        Integer value = metadata == null ? null : integerValue(metadata.get(key));
+        return value == null ? fallback : value;
+    }
+
+    private Optional<TextRange> validTextRange(Integer start, Integer end, int textLength) {
+        if (start == null || end == null || textLength <= 0) {
+            return Optional.empty();
+        }
+        int safeStart = Math.max(0, start);
+        int safeEnd = Math.min(textLength, end);
+        return safeStart < safeEnd ? Optional.of(new TextRange(safeStart, safeEnd)) : Optional.empty();
+    }
+
+    private List<TextRange> findCaptionMatches(String fullText, String caption) {
+        String needle = caption == null ? "" : caption.strip();
+        if (fullText == null || needle.isBlank()) {
+            return List.of();
+        }
+        List<TextRange> matches = new ArrayList<>();
+        int fromIndex = 0;
+        while (fromIndex < fullText.length()) {
+            int start = fullText.indexOf(needle, fromIndex);
+            if (start < 0) {
+                break;
+            }
+            int end = start + needle.length();
+            matches.add(new TextRange(start, end));
+            fromIndex = Math.max(end, start + 1);
+        }
+        return matches;
+    }
+
+    private Integer firstAvailableOffset(Integer... offsets) {
+        for (Integer offset : offsets) {
+            if (offset != null) {
+                return offset;
+            }
+        }
+        return null;
+    }
+
+    private int distanceToRange(int offset, TextRange range) {
+        if (offset >= range.start() && offset <= range.end()) {
+            return 0;
+        }
+        return Math.min(Math.abs(offset - range.start()), Math.abs(offset - range.end()));
+    }
+
+    private Optional<ParagraphBlock> paragraphContainingRange(List<ParagraphBlock> paragraphs, TextRange range) {
+        return paragraphs.stream()
+                .filter(paragraph -> paragraph.start() <= range.start() && paragraph.end() >= range.end())
+                .findFirst()
+                .or(() -> paragraphs.stream()
+                        .filter(paragraph -> rangesOverlap(paragraph.start(), paragraph.end(), range.start(), range.end()))
+                        .findFirst());
+    }
+
+    private ParagraphBlock nearestContextParagraph(List<ParagraphBlock> paragraphs,
+                                                   List<SectionBlock> sections,
+                                                   ParagraphBlock captionParagraph,
+                                                   TextRange captionRange,
+                                                   int direction) {
+        int captionIndex = paragraphs.indexOf(captionParagraph);
+        if (captionIndex < 0) {
+            return null;
+        }
+        for (int index = captionIndex + direction; index >= 0 && index < paragraphs.size(); index += direction) {
+            ParagraphBlock candidate = paragraphs.get(index);
+            if (isEligibleContextParagraph(candidate, sections, captionRange)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private ParagraphBlock adjacentContextParagraph(List<ParagraphBlock> paragraphs,
+                                                    List<SectionBlock> sections,
+                                                    ParagraphBlock captionParagraph,
+                                                    TextRange captionRange,
+                                                    int direction) {
+        int captionIndex = paragraphs.indexOf(captionParagraph);
+        if (captionIndex < 0) {
+            return null;
+        }
+        for (int index = captionIndex + direction; index >= 0 && index < paragraphs.size(); index += direction) {
+            ParagraphBlock candidate = paragraphs.get(index);
+            if (isAdjacentContextParagraph(candidate, sections, captionRange)) {
+                return candidate;
+            }
+            if (detectHeading(candidate, false).isPresent()) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private boolean isAdjacentContextParagraph(ParagraphBlock paragraph, List<SectionBlock> sections, TextRange captionRange) {
+        if (paragraph == null || rangesOverlap(paragraph.start(), paragraph.end(), captionRange.start(), captionRange.end())) {
+            return false;
+        }
+        String normalized = normalizeWhitespace(paragraph.content());
+        if (normalized.length() < 6) {
+            return false;
+        }
+        Optional<SectionBlock> section = sectionContainingParagraph(sections, paragraph);
+        if (section.isPresent() && (section.get().type() == SectionType.CONTENTS || section.get().type() == SectionType.REFERENCES)) {
+            return false;
+        }
+        if (section.isPresent() && standaloneSectionHeading(section.get(), paragraph)) {
+            return false;
+        }
+        if (detectHeading(paragraph, false).isPresent()) {
+            return false;
+        }
+        if (containsContentsEntries(paragraph) || looksLikeCaptionParagraph(normalized) || looksLikeReferenceEntry(normalized)) {
+            return false;
+        }
+        return !looksLikeVisualNoiseParagraph(paragraph);
+    }
+
+    private boolean isEligibleContextParagraph(ParagraphBlock paragraph, List<SectionBlock> sections, TextRange captionRange) {
+        if (paragraph == null || rangesOverlap(paragraph.start(), paragraph.end(), captionRange.start(), captionRange.end())) {
+            return false;
+        }
+        String normalized = normalizeWhitespace(paragraph.content());
+        if (normalized.length() < CONTEXT_PARAGRAPH_MIN_LENGTH) {
+            return false;
+        }
+        Optional<SectionBlock> section = sectionContainingParagraph(sections, paragraph);
+        if (section.isPresent() && (section.get().type() == SectionType.CONTENTS || section.get().type() == SectionType.REFERENCES)) {
+            return false;
+        }
+        if (section.isPresent() && standaloneSectionHeading(section.get(), paragraph)) {
+            return false;
+        }
+        if (detectHeading(paragraph, false).isPresent()) {
+            return false;
+        }
+        if (containsContentsEntries(paragraph) || looksLikeCaptionParagraph(normalized) || looksLikeReferenceEntry(normalized)) {
+            return false;
+        }
+        return !looksLikeVisualNoiseParagraph(paragraph);
+    }
+
+    private Optional<SectionBlock> sectionContainingOffset(List<SectionBlock> sections, int offset) {
+        return sections.stream()
+                .filter(section -> !section.paragraphs().isEmpty())
+                .filter(section -> section.paragraphs().get(0).start() <= offset
+                        && section.paragraphs().get(section.paragraphs().size() - 1).end() >= offset)
+                .findFirst();
+    }
+
+    private Optional<SectionBlock> sectionContainingParagraph(List<SectionBlock> sections, ParagraphBlock paragraph) {
+        return sections.stream()
+                .filter(section -> section.paragraphs().contains(paragraph)
+                        || section.paragraphs().stream().anyMatch(item -> item.start() == paragraph.start() && item.end() == paragraph.end()))
+                .findFirst();
+    }
+
+    private boolean rangesOverlap(int leftStart, int leftEnd, int rightStart, int rightEnd) {
+        return leftStart < rightEnd && leftEnd > rightStart;
+    }
+
+    private boolean looksLikeCaptionParagraph(String normalized) {
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        return lower.startsWith("figure ")
+                || lower.startsWith("fig. ")
+                || lower.startsWith("fig ")
+                || lower.startsWith("table ")
+                || normalized.matches("^[图表]\\s*[0-9一二三四五六七八九十]+[.．、:：\\s].*");
+    }
+
+    private boolean looksLikeReferenceEntry(String normalized) {
+        return normalized.matches("^\\[\\d+].*")
+                || normalized.matches("^\\d+\\.\\s+.+")
+                || normalized.matches("^[A-Z][A-Za-z-]+,\\s+.+\\(\\d{4}\\).*");
+    }
+
+    private boolean looksLikeVisualNoiseParagraph(ParagraphBlock paragraph) {
+        List<LineBlock> lines = extractLines(paragraph.content()).stream()
+                .filter(line -> !line.content().isBlank())
+                .toList();
+        return !lines.isEmpty() && lines.stream().allMatch(line -> isVisualArtifactLine(line.content()));
+    }
+
+    private String renderFigureContextContent(String sectionTitle, String caption, String before, String after) {
+        StringBuilder builder = new StringBuilder("[Figure Context]");
+        if (sectionTitle != null && !sectionTitle.isBlank()) {
+            builder.append("\nSection: ").append(sectionTitle.strip());
+        }
+        builder.append("\n\nCaption:\n").append(caption.strip());
+        if (before != null && !before.isBlank()) {
+            builder.append("\n\nBefore Context:\n").append(before.strip());
+        }
+        if (after != null && !after.isBlank()) {
+            builder.append("\n\nAfter Context:\n").append(after.strip());
+        }
+        return builder.toString();
+    }
+
+    private String sectionTitleForContent(SectionBlock section) {
+        if (section == null || section.title() == null || section.title().isBlank()) {
+            return "";
+        }
+        if (section.type() == SectionType.PREFACE && "前置内容".equals(section.title())) {
+            return "";
+        }
+        return section.title();
+    }
+
+    private String contextText(ParagraphBlock paragraph) {
+        if (paragraph == null || paragraph.content() == null || paragraph.content().isBlank()) {
+            return null;
+        }
+        return paragraph.content().strip();
+    }
+
+    private String shortenContext(String text, int excess, boolean keepEnd) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        int targetLength = text.length() - Math.max(1, excess + 1);
+        if (targetLength <= 0) {
+            return "";
+        }
+        if (targetLength <= 2) {
+            return keepEnd
+                    ? text.substring(text.length() - targetLength).strip()
+                    : text.substring(0, targetLength).strip();
+        }
+        if (keepEnd) {
+            return "…" + text.substring(text.length() - targetLength + 1).stripLeading();
+        }
+        return text.substring(0, targetLength - 1).stripTrailing() + "…";
+    }
+
+    private String normalizeAssetType(String assetType) {
+        return assetType == null ? "" : assetType.strip().toLowerCase(Locale.ROOT);
+    }
+
+    private String stableAssetId(String sourceId, String caption, Integer page, String bbox) {
+        String material = sourceId
+                + "::figure-asset::"
+                + normalizeWhitespace(caption)
+                + "::"
+                + (page == null ? "" : page)
+                + "::"
+                + (bbox == null ? "" : bbox);
+        return UUID.nameUUIDFromBytes(material.getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    private String firstNonBlankString(Object... values) {
+        for (Object value : values) {
+            if (value == null) {
+                continue;
+            }
+            String text = String.valueOf(value).strip();
+            if (!text.isBlank()) {
+                return text;
+            }
+        }
+        return null;
+    }
+
+    private Object firstPresent(Object... values) {
+        for (Object value : values) {
+            if (value == null) {
+                continue;
+            }
+            if (value instanceof CharSequence sequence && sequence.toString().isBlank()) {
+                continue;
+            }
+            return value;
+        }
+        return null;
     }
 
     /**
@@ -984,6 +1603,32 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
     }
 
     private record ChunkSlice(String content, int start, int end, String sectionTitle, SectionType sectionType, int sectionLevel) {
+    }
+
+    private record FigureAsset(String assetId,
+                               String assetType,
+                               String caption,
+                               Integer page,
+                               String bbox,
+                               Integer captionStart,
+                               Integer captionEnd,
+                               Integer textStart,
+                               Integer textEnd,
+                               Integer start,
+                               Integer end) {
+    }
+
+    private record TextRange(int start, int end) {
+    }
+
+    private record FigureContext(FigureAsset asset,
+                                 TextRange captionRange,
+                                 ParagraphBlock before,
+                                 ParagraphBlock after,
+                                 SectionBlock section) {
+    }
+
+    private record RenderedFigureContext(String content, boolean includesBefore, boolean includesAfter) {
     }
 
     private record DetectedHeading(String title, SectionType type, int level) {

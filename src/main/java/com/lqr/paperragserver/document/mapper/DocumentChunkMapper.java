@@ -2,6 +2,7 @@ package com.lqr.paperragserver.document.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.lqr.paperragserver.document.entity.DocumentChunkEntity;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -29,6 +30,7 @@ public interface DocumentChunkMapper extends BaseMapper<DocumentChunkEntity> {
             where c.owner_user_id = #{ownerUserId}
               and d.deleted_at is null
               and d.status = 'INDEXED'
+              and coalesce(d.metadata ->> 'sourceType', 'USER') = 'USER'
             order by c.source_id asc, c.chunk_index asc
             """)
     List<DocumentChunkEntity> selectSearchCandidates(@Param("ownerUserId") UUID ownerUserId);
@@ -50,4 +52,14 @@ public interface DocumentChunkMapper extends BaseMapper<DocumentChunkEntity> {
     int updateVectorStoreId(@Param("ownerUserId") UUID ownerUserId,
                             @Param("chunkId") String chunkId,
                             @Param("vectorStoreId") UUID vectorStoreId);
+
+    @Delete("""
+            delete from public.paper_document_chunk c
+            using public.paper_document d
+            where c.owner_user_id = #{ownerUserId}
+              and d.owner_user_id = c.owner_user_id
+              and d.source_id = c.source_id
+              and coalesce(d.metadata ->> 'sourceType', 'USER') = 'USER'
+            """)
+    int deleteUserDocumentChunks(@Param("ownerUserId") UUID ownerUserId);
 }

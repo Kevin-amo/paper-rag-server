@@ -6,6 +6,7 @@ package com.lqr.paperragserver.auth.security;
 public final class RoleCodes {
 
     public static final String ADMIN = "ADMIN";
+    public static final String REVIEWER = "REVIEWER";
     public static final String USER = "USER";
 
     private RoleCodes() {

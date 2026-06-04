@@ -211,6 +211,22 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
     int markDeleted(@Param("ownerUserId") UUID ownerUserId, @Param("sourceId") String sourceId);
 
     /**
+     * 软删除指定用户来源文档。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @return 影响行数
+     */
+    @Update("""
+            update public.paper_document
+            set status = 'DELETED', deleted_at = now(), updated_at = now()
+            where owner_user_id = #{ownerUserId}
+              and source_id = #{sourceId}
+              and coalesce(metadata ->> 'sourceType', 'USER') = 'USER'
+            """)
+    int markDeletedUserDocument(@Param("ownerUserId") UUID ownerUserId, @Param("sourceId") String sourceId);
+
+    /**
      * 软删除当前用户的全部有效文档。
      *
      * @param ownerUserId 文档所属用户 ID
@@ -224,6 +240,22 @@ public interface DocumentMapper extends BaseMapper<DocumentEntity> {
               and status <> 'DELETED'
             """)
     int markAllDeleted(@Param("ownerUserId") UUID ownerUserId);
+
+    /**
+     * 软删除当前用户的全部用户知识库文档。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @return 影响行数
+     */
+    @Update("""
+            update public.paper_document
+            set status = 'DELETED', deleted_at = now(), updated_at = now()
+            where owner_user_id = #{ownerUserId}
+              and deleted_at is null
+              and status <> 'DELETED'
+              and coalesce(metadata ->> 'sourceType', 'USER') = 'USER'
+            """)
+    int markAllUserDocumentsDeleted(@Param("ownerUserId") UUID ownerUserId);
 
     /**
      * 统计指定来源 ID 的有效文档数量。

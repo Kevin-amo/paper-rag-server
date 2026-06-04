@@ -5,7 +5,7 @@ export interface PageResponse<T> {
   total: number;
 }
 
-export type UserRole = 'USER' | 'ADMIN';
+export type UserRole = 'USER' | 'ADMIN' | 'REVIEWER';
 export type UserStatus = 'ACTIVE' | 'DISABLED';
 export type DocumentStatus = 'PENDING' | 'PROCESSING' | 'INDEXED' | 'READY' | 'FAILED' | string;
 export type MessageRole = 'USER' | 'ASSISTANT';
@@ -330,4 +330,103 @@ export interface UpdateAdminUserPayload {
 
 export interface ResetPasswordPayload {
   password: string;
+}
+
+export type ReviewTaskStatus = 'PENDING' | 'REVIEWING' | 'COMPLETED' | 'NEEDS_REVIEW' | string;
+export type ReviewReportStatus = 'AI_GENERATED' | 'ADJUSTED' | 'CONFIRMED' | 'COMPLETED' | string;
+
+export interface UploadReviewPaperPayload {
+  file: File;
+  sourceId?: string;
+  title?: string;
+}
+
+export interface ReviewCriterion {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  maxScore: number;
+  weight: number;
+  enabled: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewScoreItem {
+  code: string;
+  name: string;
+  score: number;
+  maxScore: number;
+  reason: string;
+  confidence?: number;
+}
+
+export interface ReviewRiskItem {
+  type: string;
+  level: 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  evidence: string;
+  suggestion: string;
+}
+
+export interface ReviewComments {
+  summary?: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  suggestions?: string[];
+  finalAdvice?: string;
+  [key: string]: unknown;
+}
+
+export interface ReviewReport {
+  id: string;
+  taskId: string;
+  documentId: string;
+  reviewerUserId: string | null;
+  paperSections: Record<string, unknown>;
+  scores: ReviewScoreItem[] | unknown;
+  comments: ReviewComments | Record<string, unknown>;
+  risks: ReviewRiskItem[] | unknown;
+  totalScore: number | null;
+  finalRecommendation: string | null;
+  status: ReviewReportStatus;
+  generatedAt: string | null;
+  adjustedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewTask {
+  id: string;
+  documentId: string;
+  submitterUserId: string;
+  reviewerUserId: string | null;
+  sourceId: string;
+  title: string;
+  status: ReviewTaskStatus;
+  assignedAt: string | null;
+  dueAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  document: DocumentDetail | null;
+  report: ReviewReport | null;
+}
+
+export interface ListReviewTasksParams {
+  keyword?: string;
+  status?: ReviewTaskStatus | '';
+  page?: number;
+  size?: number;
+}
+
+export interface UpdateReviewReportPayload {
+  paperSections?: Record<string, unknown>;
+  scores?: ReviewScoreItem[] | unknown;
+  comments?: ReviewComments | Record<string, unknown>;
+  risks?: ReviewRiskItem[] | unknown;
+  totalScore?: number | null;
+  finalRecommendation?: string | null;
+  status?: ReviewReportStatus;
 }

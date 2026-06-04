@@ -118,6 +118,7 @@ function userInitial(user: AdminUser) {
             @change="(roles: UserRole[]) => admin.changeRoles(row, roles)"
           >
             <el-option label="管理员" value="ADMIN" />
+            <el-option label="评审员" value="REVIEWER" />
             <el-option label="普通用户" value="USER" />
           </el-select>
           <div class="role-preview">
@@ -185,6 +186,7 @@ function userInitial(user: AdminUser) {
         <el-form-item label="角色" required>
           <el-select v-model="admin.userForm.roles" multiple class="full-select">
             <el-option label="管理员" value="ADMIN" />
+            <el-option label="评审员" value="REVIEWER" />
             <el-option label="普通用户" value="USER" />
           </el-select>
         </el-form-item>

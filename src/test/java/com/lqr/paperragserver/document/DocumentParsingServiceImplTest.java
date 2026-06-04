@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.document;
 
+import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.model.ParsedDocument;
 import com.lqr.paperragserver.document.service.impl.DocumentParsingServiceImpl;
 import com.lqr.paperragserver.document.service.DocumentMultimodalExtractionService;
@@ -158,6 +159,12 @@ class DocumentParsingServiceImplTest {
         assertThat(parsedDocument.assets().getFirst().textStart()).isNotNull();
         assertThat(parsedDocument.assets().getFirst().textEnd()).isGreaterThan(parsedDocument.assets().getFirst().textStart());
         assertThat(parsedDocument.source().metadata()).containsEntry("assetCount", 1);
+        assertThat((java.util.List<?>) parsedDocument.source().metadata().get(MetadataKeys.DOCUMENT_ASSETS))
+                .hasSize(1)
+                .first()
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry(MetadataKeys.ASSET_TYPE, "IMAGE")
+                .containsEntry(MetadataKeys.ASSET_CAPTION, "图中展示系统架构");
         verify(documentMultimodalExtractionService).extract(any(), any());
     }
 

@@ -4,12 +4,16 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.lqr.paperragserver.common.constant.MetadataKeys;
 import com.lqr.paperragserver.common.model.DocumentSource;
 import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
+import com.lqr.paperragserver.document.event.DocumentIndexedEvent;
 import com.lqr.paperragserver.document.mapper.DocumentIngestionJobMapper;
 import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -27,6 +31,7 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
 
     private final DocumentIngestionJobMapper jobMapper;
     private final DocumentPersistenceService documentPersistenceService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 创建入库任务并持久化，同时初始化文档解析状态。
@@ -41,8 +46,16 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
      */
     @Override
     @Transactional
-    public DocumentIngestionJob createJob(UUID jobId, UUID ownerUserId, String sourceId, String fileName, String filePath, String title) {
+    public DocumentIngestionJob createJob(UUID jobId,
+                                          UUID ownerUserId,
+                                          String sourceId,
+                                          String fileName,
+                                          String filePath,
+                                          String title,
+                                          Map<String, Object> extraMetadata) {
         String safeTitle = hasText(title) ? title.trim() : fileName;
+        String requestedSourceType = sourceType(extraMetadata);
+        assertSourceTypeCompatible(ownerUserId, sourceId, requestedSourceType);
         DocumentIngestionJob job = new DocumentIngestionJob();
         job.setId(jobId);
         job.setOwnerUserId(ownerUserId);
@@ -56,9 +69,13 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
         jobMapper.insert(job);
 
         Map<String, Object> metadata = new LinkedHashMap<>();
+        if (extraMetadata != null) {
+            metadata.putAll(extraMetadata);
+        }
         metadata.put(MetadataKeys.SOURCE_ID, sourceId);
         metadata.put(MetadataKeys.FILE_NAME, fileName);
         metadata.put(MetadataKeys.TITLE, safeTitle);
+        metadata.put(MetadataKeys.SOURCE_TYPE, requestedSourceType);
         documentPersistenceService.markParsing(
                 ownerUserId,
                 new DocumentSource(sourceId, safeTitle, fileName, metadata),
@@ -124,6 +141,7 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
     public void markIndexed(UUID ownerUserId, UUID jobId, String sourceId) {
         jobMapper.markIndexed(ownerUserId, jobId);
         documentPersistenceService.markStatus(ownerUserId, sourceId, STATUS_INDEXED, 100);
+        eventPublisher.publishEvent(new DocumentIndexedEvent(ownerUserId, jobId, sourceId));
     }
 
     /**
@@ -169,6 +187,26 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
         return Optional.ofNullable(jobMapper.selectOne(new LambdaQueryWrapper<DocumentIngestionJob>()
                 .eq(DocumentIngestionJob::getOwnerUserId, ownerUserId)
                 .eq(DocumentIngestionJob::getId, jobId)));
+    }
+
+    private void assertSourceTypeCompatible(UUID ownerUserId, String sourceId, String requestedSourceType) {
+        documentPersistenceService.findAnyDocument(ownerUserId, sourceId)
+                .ifPresent(document -> {
+                    Map<String, Object> metadata = document.metadata();
+                    Object sourceType = metadata == null ? null : metadata.get(MetadataKeys.SOURCE_TYPE);
+                    String existingSourceType = sourceType == null ? MetadataKeys.SOURCE_TYPE_USER : String.valueOf(sourceType);
+                    if (!requestedSourceType.equalsIgnoreCase(existingSourceType)) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "文档标识已被其他来源类型使用");
+                    }
+                });
+    }
+
+    private String sourceType(Map<String, Object> metadata) {
+        Object sourceType = metadata == null ? null : metadata.get(MetadataKeys.SOURCE_TYPE);
+        if (MetadataKeys.SOURCE_TYPE_REVIEW.equalsIgnoreCase(sourceType == null ? null : String.valueOf(sourceType))) {
+            return MetadataKeys.SOURCE_TYPE_REVIEW;
+        }
+        return MetadataKeys.SOURCE_TYPE_USER;
     }
 
     /**

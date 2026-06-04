@@ -31,6 +31,10 @@ export default defineConfig(({ mode }) => {
           target,
           changeOrigin: true,
         },
+        '/reviews': {
+          target,
+          changeOrigin: true,
+        },
         '/api': {
           target,
           changeOrigin: true,

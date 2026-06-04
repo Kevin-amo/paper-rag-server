@@ -97,19 +97,31 @@ public class VectorWriteServiceImpl implements VectorWriteService {
         log.info("vector.delete.done ownerUserId={} sourceId={} costMs={}", ownerUserId, sourceId, elapsedMs(startNanos));
     }
 
+    @Override
+    @Transactional
+    public void deleteUserVectorsBySourceId(UUID ownerUserId, String sourceId) {
+        if (ownerUserId == null || sourceId == null || sourceId.isBlank()) {
+            log.warn("vector.delete-user-source.skipped ownerUserId={} sourceId={} reason=INVALID_ARGUMENT", ownerUserId, sourceId);
+            return;
+        }
+        long startNanos = System.nanoTime();
+        vectorStoreMapper.deleteUserVectorsBySourceId(ownerUserId.toString(), sourceId);
+        log.info("vector.delete-user-source.done ownerUserId={} sourceId={} costMs={}", ownerUserId, sourceId, elapsedMs(startNanos));
+    }
+
     /**
      * 删除当前用户的全部向量记录。
      */
     @Override
     @Transactional
-    public void deleteByOwnerUserId(UUID ownerUserId) {
+    public void deleteUserVectorsByOwnerUserId(UUID ownerUserId) {
         if (ownerUserId == null) {
-            log.warn("vector.delete-all.skipped ownerUserId={} reason=INVALID_ARGUMENT", ownerUserId);
+            log.warn("vector.delete-user-all.skipped ownerUserId={} reason=INVALID_ARGUMENT", ownerUserId);
             return;
         }
         long startNanos = System.nanoTime();
-        vectorStoreMapper.deleteByOwnerUserId(ownerUserId.toString());
-        log.info("vector.delete-all.done ownerUserId={} costMs={}", ownerUserId, elapsedMs(startNanos));
+        vectorStoreMapper.deleteUserVectorsByOwnerUserId(ownerUserId.toString());
+        log.info("vector.delete-user-all.done ownerUserId={} costMs={}", ownerUserId, elapsedMs(startNanos));
     }
 
     /**

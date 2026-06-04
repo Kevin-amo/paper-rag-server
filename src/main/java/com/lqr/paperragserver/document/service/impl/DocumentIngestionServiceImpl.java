@@ -87,8 +87,12 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
                 job.getOwnerUserId(), job.getId(), job.getSourceId(), job.getFileName());
         try {
             Map<String, Object> metadata = new LinkedHashMap<>();
+            documentPersistenceService.findAnyDocument(job.getOwnerUserId(), job.getSourceId())
+                    .map(DocumentPersistenceService.DocumentDetail::metadata)
+                    .ifPresent(metadata::putAll);
             metadata.put(MetadataKeys.SOURCE_ID, job.getSourceId());
             metadata.put(MetadataKeys.FILE_NAME, job.getFileName());
+            metadata.putIfAbsent(MetadataKeys.SOURCE_TYPE, MetadataKeys.SOURCE_TYPE_USER);
             if (job.getTitle() != null && !job.getTitle().isBlank()) {
                 metadata.put(MetadataKeys.TITLE, job.getTitle());
             }
@@ -267,7 +271,7 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
     @Transactional
     public void deleteBySourceId(UUID ownerUserId, String sourceId) {
         documentPersistenceService.markDeleted(ownerUserId, sourceId);
-        vectorWriteService.deleteBySourceId(ownerUserId, sourceId);
+        vectorWriteService.deleteUserVectorsBySourceId(ownerUserId, sourceId);
     }
 
     /**
@@ -279,6 +283,6 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
     @Transactional
     public void deleteAll(UUID ownerUserId) {
         documentPersistenceService.markAllDeleted(ownerUserId);
-        vectorWriteService.deleteByOwnerUserId(ownerUserId);
+        vectorWriteService.deleteUserVectorsByOwnerUserId(ownerUserId);
     }
 }

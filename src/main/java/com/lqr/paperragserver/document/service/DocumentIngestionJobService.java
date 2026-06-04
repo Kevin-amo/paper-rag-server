@@ -2,6 +2,7 @@ package com.lqr.paperragserver.document.service;
 
 import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,7 +31,13 @@ public interface DocumentIngestionJobService {
      * @param title 文档标题
      * @return 创建的入库任务实体
      */
-    DocumentIngestionJob createJob(UUID jobId, UUID ownerUserId, String sourceId, String fileName, String filePath, String title);
+    DocumentIngestionJob createJob(UUID jobId,
+                                   UUID ownerUserId,
+                                   String sourceId,
+                                   String fileName,
+                                   String filePath,
+                                   String title,
+                                   Map<String, Object> metadata);
 
     /**
      * 将任务标记为已入队状态。

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node .claude/rewrite-uc001-mdj.js)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('Paper Mind UC-001注册与登录用例图.mdj','utf8'\\)\\); console.log\\('valid json'\\)\")",
+      "Bash(python *)"
+    ]
+  }
+}

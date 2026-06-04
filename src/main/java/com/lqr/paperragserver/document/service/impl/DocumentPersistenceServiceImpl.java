@@ -85,9 +85,25 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
      */
     @Override
     public Optional<DocumentDetail> findDocument(UUID ownerUserId, String sourceId) {
-        return Optional.ofNullable(documentMapper.selectOne(new LambdaQueryWrapper<DocumentEntity>()
-                        .eq(DocumentEntity::getOwnerUserId, ownerUserId)
-                        .eq(DocumentEntity::getSourceId, sourceId)))
+        return findDocument(ownerUserId, sourceId, MetadataKeys.SOURCE_TYPE_USER);
+    }
+
+    @Override
+    public Optional<DocumentDetail> findAnyDocument(UUID ownerUserId, String sourceId) {
+        return findDocument(ownerUserId, sourceId, null);
+    }
+
+    @Override
+    public Optional<DocumentDetail> findReviewDocument(UUID ownerUserId, String sourceId) {
+        return findDocument(ownerUserId, sourceId, MetadataKeys.SOURCE_TYPE_REVIEW);
+    }
+
+    private Optional<DocumentDetail> findDocument(UUID ownerUserId, String sourceId, String sourceType) {
+        LambdaQueryWrapper<DocumentEntity> wrapper = new LambdaQueryWrapper<DocumentEntity>()
+                .eq(DocumentEntity::getOwnerUserId, ownerUserId)
+                .eq(DocumentEntity::getSourceId, sourceId);
+        applySourceTypeFilter(wrapper, sourceType);
+        return Optional.ofNullable(documentMapper.selectOne(wrapper))
                 .map(this::toDocumentDetail);
     }
 
@@ -103,12 +119,14 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
         if (sourceIds == null || sourceIds.isEmpty()) {
             return Map.of();
         }
-        List<DocumentEntity> entities = documentMapper.selectList(new LambdaQueryWrapper<DocumentEntity>()
+        LambdaQueryWrapper<DocumentEntity> wrapper = new LambdaQueryWrapper<DocumentEntity>()
                 .select(DocumentEntity::getSourceId, DocumentEntity::getStatus, DocumentEntity::getDeletedAt)
                 .eq(DocumentEntity::getOwnerUserId, ownerUserId)
                 .in(DocumentEntity::getSourceId, sourceIds)
                 .isNull(DocumentEntity::getDeletedAt)
-                .eq(DocumentEntity::getStatus, "INDEXED"));
+                .eq(DocumentEntity::getStatus, "INDEXED");
+        applySourceTypeFilter(wrapper, MetadataKeys.SOURCE_TYPE_USER);
+        List<DocumentEntity> entities = documentMapper.selectList(wrapper);
         return entities.stream()
                 .collect(Collectors.toMap(DocumentEntity::getSourceId, e -> Boolean.TRUE));
     }
@@ -126,6 +144,9 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
     public PageResult<DocumentChunkView> listChunks(UUID ownerUserId, String sourceId, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = clamp(size, 1, 200);
+        if (findDocument(ownerUserId, sourceId).isEmpty()) {
+            return new PageResult<>(List.of(), safePage, safeSize, 0);
+        }
         Page<DocumentChunkEntity> result = chunkMapper.selectPage(new Page<>(safePage + 1L, safeSize),
                 new LambdaQueryWrapper<DocumentChunkEntity>()
                         .eq(DocumentChunkEntity::getOwnerUserId, ownerUserId)
@@ -181,7 +202,10 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
      */
     @Override
     public void updateMetadata(UUID ownerUserId, String sourceId, DocumentMetadataUpdate update) {
-        Map<String, Object> metadata = update.metadata() == null ? Map.of() : update.metadata();
+        if (findDocument(ownerUserId, sourceId).isEmpty()) {
+            return;
+        }
+        Map<String, Object> metadata = userMetadataUpdate(update.metadata());
         documentMapper.updateMetadata(
                 ownerUserId,
                 sourceId,
@@ -204,6 +228,9 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
      */
     @Override
     public void restore(UUID ownerUserId, String sourceId) {
+        if (findDocument(ownerUserId, sourceId).isEmpty()) {
+            return;
+        }
         documentMapper.restore(ownerUserId, sourceId);
     }
 
@@ -231,6 +258,7 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
     @Transactional
     public void markParsing(UUID ownerUserId, DocumentSource source, String contentText) {
         Map<String, Object> metadata = ownerMetadata(ownerUserId, source.metadata());
+        metadata.putIfAbsent(MetadataKeys.SOURCE_TYPE, MetadataKeys.SOURCE_TYPE_USER);
         documentMapper.upsertParsing(
                 ownerUserId,
                 source.sourceId(),
@@ -292,6 +320,9 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
      */
     @Override
     public List<DocumentAssetView> listAssets(UUID ownerUserId, String sourceId, List<String> assetIds) {
+        if (findDocument(ownerUserId, sourceId).isEmpty()) {
+            return List.of();
+        }
         LambdaQueryWrapper<DocumentAssetEntity> wrapper = new LambdaQueryWrapper<DocumentAssetEntity>()
                 .select(DocumentAssetEntity::getAssetId,
                         DocumentAssetEntity::getSourceId,
@@ -328,6 +359,9 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
      */
     @Override
     public Optional<DocumentAssetView> findAsset(UUID ownerUserId, String sourceId, String assetId) {
+        if (findDocument(ownerUserId, sourceId).isEmpty()) {
+            return Optional.empty();
+        }
         return Optional.ofNullable(assetMapper.selectOne(new LambdaQueryWrapper<DocumentAssetEntity>()
                         .eq(DocumentAssetEntity::getOwnerUserId, ownerUserId)
                         .eq(DocumentAssetEntity::getSourceId, sourceId)
@@ -396,13 +430,16 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
     @Override
     @Transactional
     public void markDeleted(UUID ownerUserId, String sourceId) {
+        if (findDocument(ownerUserId, sourceId).isEmpty()) {
+            return;
+        }
         assetMapper.delete(new LambdaQueryWrapper<DocumentAssetEntity>()
                 .eq(DocumentAssetEntity::getOwnerUserId, ownerUserId)
                 .eq(DocumentAssetEntity::getSourceId, sourceId));
         chunkMapper.delete(new LambdaQueryWrapper<DocumentChunkEntity>()
                 .eq(DocumentChunkEntity::getOwnerUserId, ownerUserId)
                 .eq(DocumentChunkEntity::getSourceId, sourceId));
-        documentMapper.markDeleted(ownerUserId, sourceId);
+        documentMapper.markDeletedUserDocument(ownerUserId, sourceId);
     }
 
     /**
@@ -413,11 +450,9 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
     @Override
     @Transactional
     public void markAllDeleted(UUID ownerUserId) {
-        assetMapper.delete(new LambdaQueryWrapper<DocumentAssetEntity>()
-                .eq(DocumentAssetEntity::getOwnerUserId, ownerUserId));
-        chunkMapper.delete(new LambdaQueryWrapper<DocumentChunkEntity>()
-                .eq(DocumentChunkEntity::getOwnerUserId, ownerUserId));
-        documentMapper.markAllDeleted(ownerUserId);
+        assetMapper.deleteUserDocumentAssets(ownerUserId);
+        chunkMapper.deleteUserDocumentChunks(ownerUserId);
+        documentMapper.markAllUserDocumentsDeleted(ownerUserId);
     }
 
     /**
@@ -426,6 +461,7 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
     private LambdaQueryWrapper<DocumentEntity> documentListWrapper(UUID ownerUserId, String keyword, String status) {
         LambdaQueryWrapper<DocumentEntity> wrapper = new LambdaQueryWrapper<DocumentEntity>()
                 .eq(DocumentEntity::getOwnerUserId, ownerUserId);
+        applySourceTypeFilter(wrapper, MetadataKeys.SOURCE_TYPE_USER);
         if (status == null || status.isBlank()) {
             wrapper.ne(DocumentEntity::getStatus, "DELETED")
                     .isNull(DocumentEntity::getDeletedAt);
@@ -589,6 +625,32 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
      */
     private Map<String, Object> safeMetadata(Map<String, Object> metadata) {
         return metadata == null ? Map.of() : metadata;
+    }
+
+    private void applySourceTypeFilter(LambdaQueryWrapper<DocumentEntity> wrapper, String sourceType) {
+        if (sourceType == null || sourceType.isBlank()) {
+            return;
+        }
+        if (MetadataKeys.SOURCE_TYPE_USER.equals(sourceType)) {
+            wrapper.and(query -> query.apply("metadata ->> 'sourceType' is null")
+                    .or().apply("metadata ->> 'sourceType' = {0}", MetadataKeys.SOURCE_TYPE_USER));
+            return;
+        }
+        wrapper.apply("metadata ->> 'sourceType' = {0}", sourceType);
+    }
+
+    /**
+     * 只保留用户端允许写入的 metadata，避免通过普通文档接口改写来源边界。
+     */
+    private Map<String, Object> userMetadataUpdate(Map<String, Object> metadata) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (metadata != null) {
+            result.putAll(metadata);
+        }
+        result.remove(MetadataKeys.SOURCE_TYPE);
+        result.remove(MetadataKeys.SOURCE_ID);
+        result.remove(MetadataKeys.OWNER_USER_ID);
+        return result;
     }
 
     /**

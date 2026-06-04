@@ -223,7 +223,7 @@ public class UserAdminServiceImpl implements UserAdminService {
                 .map(role -> requireText(role, "角色不能为空").toUpperCase())
                 .collect(LinkedHashSet::new, LinkedHashSet::add, LinkedHashSet::addAll);
         uniqueRoles.forEach(role -> {
-            if (!Set.of(RoleCodes.ADMIN, RoleCodes.USER).contains(role)) {
+            if (!Set.of(RoleCodes.ADMIN, RoleCodes.USER, RoleCodes.REVIEWER).contains(role)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "角色不合法：" + role);
             }
         });

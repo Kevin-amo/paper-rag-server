@@ -21,16 +21,23 @@ create table if not exists public.sys_role (
     description varchar(255),
     created_at timestamptz not null default now(),
 
-    constraint chk_sys_role_code check (code in ('ADMIN', 'USER'))
+    constraint chk_sys_role_code check (code in ('ADMIN', 'USER', 'REVIEWER'))
 );
 
 comment on table public.sys_role is '系统角色表';
-comment on column public.sys_role.code is '角色编码：ADMIN、USER';
+comment on column public.sys_role.code is '角色编码：ADMIN、USER、REVIEWER';
+
+alter table if exists public.sys_role
+    drop constraint if exists chk_sys_role_code;
+
+alter table if exists public.sys_role
+    add constraint chk_sys_role_code check (code in ('ADMIN', 'USER', 'REVIEWER'));
 
 insert into public.sys_role (code, name, description)
 values
     ('ADMIN', '管理员', '拥有文档管理和用户管理权限'),
-    ('USER', '普通用户', '拥有文档读取和 RAG 问答权限')
+    ('USER', '普通用户', '拥有文档读取和 RAG 问答权限'),
+    ('REVIEWER', '评审员', '拥有论文辅助评审和评审报告调整权限')
 on conflict (code) do update set
     name = excluded.name,
     description = excluded.description;
@@ -447,6 +454,126 @@ create index if not exists idx_document_ingestion_job_owner_source
 
 create index if not exists idx_document_ingestion_job_status
     on public.document_ingestion_job using btree (status);
+
+-- ===== 12_review.sql =====
+-- 论文辅助评审数据表。
+
+create extension if not exists "uuid-ossp";
+
+create table if not exists public.review_criterion (
+    id uuid primary key default uuid_generate_v4(),
+    code varchar(64) not null unique,
+    name varchar(128) not null,
+    description text,
+    max_score int not null default 100,
+    weight int not null default 20,
+    enabled boolean not null default true,
+    sort_order int not null default 0,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+
+    constraint chk_review_criterion_max_score check (max_score between 1 and 100),
+    constraint chk_review_criterion_weight check (weight between 1 and 100)
+);
+
+comment on table public.review_criterion is '论文评审指标配置表';
+comment on column public.review_criterion.code is '评审指标编码';
+comment on column public.review_criterion.weight is '指标权重，用于页面展示和评分参考';
+
+insert into public.review_criterion (code, name, description, max_score, weight, enabled, sort_order)
+values
+    ('POLICY', '政策导向', '检查论文是否存在政治不当表述、价值导向偏差或敏感风险。', 100, 20, true, 10),
+    ('MATCH', '专业匹配', '判断研究主题、研究对象和方法路径是否符合申报方向或评审场景。', 100, 20, true, 20),
+    ('INNOVATION', '创新性', '评价选题、方法、数据、结论或应用场景是否具有新意。', 100, 20, true, 30),
+    ('LOGIC', '逻辑性', '评价论文结构、论证链路、方法与结论之间的连贯性。', 100, 20, true, 40),
+    ('LANGUAGE', '语言质量', '评价表达准确性、学术规范性、语句流畅度和错别字风险。', 100, 20, true, 50),
+    ('REFERENCE', '参考文献规范', '检查参考文献格式、引用完整性和明显缺失问题。', 100, 10, true, 60)
+on conflict (code) do update set
+    name = excluded.name,
+    description = excluded.description,
+    max_score = excluded.max_score,
+    weight = excluded.weight,
+    enabled = excluded.enabled,
+    sort_order = excluded.sort_order,
+    updated_at = now();
+
+create table if not exists public.review_task (
+    id uuid primary key default uuid_generate_v4(),
+    document_id uuid not null references public.paper_document(id) on delete cascade,
+    submitter_user_id uuid not null references public.sys_user(id) on delete cascade,
+    reviewer_user_id uuid references public.sys_user(id) on delete set null,
+    source_id varchar(128) not null,
+    title varchar(512) not null,
+    status varchar(32) not null default 'PENDING',
+    assigned_at timestamptz,
+    due_at timestamptz,
+    completed_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+
+    constraint uq_review_task_document unique (document_id),
+    constraint chk_review_task_status check (status in ('PENDING', 'REVIEWING', 'COMPLETED', 'NEEDS_REVIEW'))
+);
+
+comment on table public.review_task is '论文评审任务表';
+comment on column public.review_task.status is '评审状态：PENDING、REVIEWING、COMPLETED、NEEDS_REVIEW';
+
+create index if not exists idx_review_task_status_updated_at
+    on public.review_task using btree (status, updated_at desc);
+
+create index if not exists idx_review_task_submitter
+    on public.review_task using btree (submitter_user_id, updated_at desc);
+
+create index if not exists idx_review_task_reviewer
+    on public.review_task using btree (reviewer_user_id, updated_at desc);
+
+create table if not exists public.review_report (
+    id uuid primary key default uuid_generate_v4(),
+    task_id uuid not null references public.review_task(id) on delete cascade,
+    document_id uuid not null references public.paper_document(id) on delete cascade,
+    reviewer_user_id uuid references public.sys_user(id) on delete set null,
+    paper_sections jsonb not null default '{}'::jsonb,
+    scores jsonb not null default '[]'::jsonb,
+    comments jsonb not null default '{}'::jsonb,
+    risks jsonb not null default '[]'::jsonb,
+    raw_model_output jsonb not null default '{}'::jsonb,
+    total_score int,
+    final_recommendation text,
+    status varchar(32) not null default 'AI_GENERATED',
+    generated_at timestamptz,
+    adjusted_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+
+    constraint chk_review_report_total_score check (total_score is null or total_score between 0 and 100),
+    constraint chk_review_report_status check (status in ('AI_GENERATED', 'ADJUSTED', 'CONFIRMED', 'COMPLETED'))
+);
+
+comment on table public.review_report is '论文辅助评审报告表';
+comment on column public.review_report.paper_sections is '模型结构化解析结果';
+comment on column public.review_report.scores is '多维评分结果';
+comment on column public.review_report.risks is '风险提示结果';
+
+create index if not exists idx_review_report_task_updated_at
+    on public.review_report using btree (task_id, updated_at desc);
+
+create index if not exists idx_review_report_reviewer
+    on public.review_report using btree (reviewer_user_id, updated_at desc);
+
+create table if not exists public.review_audit_log (
+    id uuid primary key default uuid_generate_v4(),
+    task_id uuid not null references public.review_task(id) on delete cascade,
+    operator_user_id uuid references public.sys_user(id) on delete set null,
+    action varchar(64) not null,
+    note text,
+    snapshot jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now()
+);
+
+comment on table public.review_audit_log is '论文评审操作留档表';
+
+create index if not exists idx_review_audit_log_task_created_at
+    on public.review_audit_log using btree (task_id, created_at desc);
 
 -- ===== README.sql =====
 -- RAG 数据表总入口。
