@@ -61,6 +61,61 @@ export interface DocumentDetail {
   deletedAt: string | null;
 }
 
+export type StructuredParseStatus = 'PENDING' | 'RULE_PARSED' | 'MODEL_COMPLETED' | 'COMPLETED' | 'FAILED' | string;
+
+export interface PaperStructuredContent {
+  title: string | null;
+  abstract: string | null;
+  introduction: string | null;
+  literatureReview: string | null;
+  methodology: string | null;
+  experimentResults: string | null;
+  discussion: string | null;
+  conclusion: string | null;
+  references: string | null;
+  keywords: string[];
+  researchObject: string | null;
+  researchQuestion: string | null;
+  innovationPoints: string[];
+  methodPath: string | null;
+  experimentDataSummary: string | null;
+  mainConclusions: string[];
+}
+
+export interface StructuredFieldConfidence {
+  source: string;
+  confidence: number;
+  missing: boolean;
+  evidence: string | null;
+}
+
+export interface PaperStructuredParse {
+  id: string;
+  documentId: string;
+  sourceId: string;
+  status: StructuredParseStatus;
+  ruleResult: PaperStructuredContent | Record<string, unknown> | null;
+  modelResult: PaperStructuredContent | Record<string, unknown> | null;
+  mergedResult: PaperStructuredContent | Record<string, unknown> | null;
+  fieldConfidence: Record<string, StructuredFieldConfidence> | Record<string, unknown> | null;
+  missingFields: string[];
+  lowConfidenceFields: string[];
+  rawModelOutput: string | null;
+  errorMessage: string | null;
+  parsedAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PaperStructuredParseStatus {
+  sourceId: string;
+  status: StructuredParseStatus;
+  missingFields: string[];
+  lowConfidenceFields: string[];
+  errorMessage: string | null;
+  parsedAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface DocumentChunk {
   chunkId: string;
   ownerUserId: string;

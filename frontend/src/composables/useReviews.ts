@@ -8,8 +8,13 @@ import {
   uploadReviewPaper,
   updateReviewReport,
 } from '../api/reviews';
+import {
+  getPaperStructuredParse,
+  regeneratePaperStructuredParse,
+} from '../api/documents';
 import { getErrorMessage } from '../api/http';
 import type {
+  PaperStructuredParse,
   ReviewCriterion,
   ReviewReport,
   ReviewReportStatus,
@@ -26,9 +31,12 @@ export function useReviews() {
   const generating = ref(false);
   const saving = ref(false);
   const uploading = ref(false);
+  const structuredParseLoading = ref(false);
+  const regeneratingStructuredParse = ref(false);
   const tasks = ref<ReviewTask[]>([]);
   const criteria = ref<ReviewCriterion[]>([]);
   const selectedTask = ref<ReviewTask | null>(null);
+  const structuredParse = ref<PaperStructuredParse | null>(null);
   const keyword = ref('');
   const statusFilter = ref<ReviewTaskStatus | ''>('');
   const pagination = reactive({ page: 0, size: 20, total: 0 });
@@ -81,13 +89,44 @@ export function useReviews() {
 
   async function selectTask(taskId: string) {
     detailLoading.value = true;
+    structuredParse.value = null;
     try {
       selectedTask.value = await getReviewTask(taskId);
       syncReportForm(selectedTask.value.report);
+      await loadStructuredParse(selectedTask.value.sourceId, false);
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
     } finally {
       detailLoading.value = false;
+    }
+  }
+
+  async function loadStructuredParse(sourceId: string, showError = true) {
+    structuredParseLoading.value = true;
+    try {
+      structuredParse.value = await getPaperStructuredParse(sourceId);
+    } catch (error) {
+      structuredParse.value = null;
+      if (showError) {
+        ElMessage.error(getErrorMessage(error));
+      }
+    } finally {
+      structuredParseLoading.value = false;
+    }
+  }
+
+  async function rerunStructuredParse() {
+    if (!selectedTask.value) {
+      return;
+    }
+    regeneratingStructuredParse.value = true;
+    try {
+      structuredParse.value = await regeneratePaperStructuredParse(selectedTask.value.sourceId);
+      ElMessage.success('结构化解析已重新生成');
+    } catch (error) {
+      ElMessage.error(getErrorMessage(error));
+    } finally {
+      regeneratingStructuredParse.value = false;
     }
   }
 
@@ -195,9 +234,12 @@ export function useReviews() {
     generating,
     saving,
     uploading,
+    structuredParseLoading,
+    regeneratingStructuredParse,
     tasks,
     criteria,
     selectedTask,
+    structuredParse,
     selectedReport,
     keyword,
     statusFilter,
@@ -212,6 +254,8 @@ export function useReviews() {
     runAiReview,
     saveReport,
     uploadPaper,
+    loadStructuredParse,
+    rerunStructuredParse,
     updateScore,
   };
 }

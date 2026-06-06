@@ -8,7 +8,7 @@ import PageHeader from '../../components/common/PageHeader.vue';
 import { getErrorMessage } from '../../api/http';
 import { useAuth } from '../../composables/useAuth';
 import { useReviews } from '../../composables/useReviews';
-import type { ReviewRiskItem, ReviewScoreItem } from '../../types';
+import type { PaperStructuredContent, ReviewRiskItem, ReviewScoreItem } from '../../types';
 
 const router = useRouter();
 const auth = useAuth();
@@ -20,7 +20,16 @@ const uploadTitle = ref('');
 const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '评审员');
 const selectedTask = computed(() => reviews.selectedTask.value);
 const selectedReport = computed(() => reviews.selectedReport.value);
-const paperSections = computed(() => selectedReport.value?.paperSections ?? {});
+const structuredParse = computed(() => reviews.structuredParse.value);
+const structuredContent = computed(() => {
+  const merged = structuredParse.value?.mergedResult;
+  if (merged && typeof merged === 'object') {
+    return merged as PaperStructuredContent;
+  }
+  return selectedReport.value?.paperSections as Partial<PaperStructuredContent> ?? {};
+});
+const missingFields = computed(() => structuredParse.value?.missingFields ?? []);
+const lowConfidenceFields = computed(() => structuredParse.value?.lowConfidenceFields ?? []);
 const scoreItems = computed(() => (Array.isArray(selectedReport.value?.scores) ? selectedReport.value?.scores as ReviewScoreItem[] : []));
 const riskItems = computed(() => (Array.isArray(selectedReport.value?.risks) ? selectedReport.value?.risks as ReviewRiskItem[] : []));
 const comments = computed(() => selectedReport.value?.comments && typeof selectedReport.value.comments === 'object'
@@ -226,42 +235,92 @@ onMounted(async () => {
             </div>
           </div>
 
-          <section class="detail-section">
+          <section class="detail-section" v-loading="reviews.structuredParseLoading.value">
             <div class="section-title">
-              <h3>结构化理解与内容解析</h3>
-              <span>标题、摘要、章节、关键词、研究对象与方法路径</span>
+              <div>
+                <h3>结构化理解与内容解析</h3>
+                <span>独立于 AI 评审报告的论文结构化解析结果</span>
+              </div>
+              <div class="section-actions">
+                <el-tag :type="structuredParse?.status === 'FAILED' ? 'danger' : structuredParse ? 'success' : 'info'" effect="plain">
+                  {{ structuredParse?.status || '未生成' }}
+                </el-tag>
+                <el-button size="small" :loading="reviews.regeneratingStructuredParse.value" @click="reviews.rerunStructuredParse">
+                  重新解析
+                </el-button>
+              </div>
+            </div>
+            <div v-if="structuredParse?.errorMessage" class="parse-alert">
+              {{ structuredParse.errorMessage }}
+            </div>
+            <div class="parse-tags">
+              <el-tag v-if="structuredParse?.updatedAt" type="info" effect="plain">
+                更新时间：{{ formatDate(structuredParse.updatedAt) }}
+              </el-tag>
+              <el-tag v-for="field in missingFields" :key="`missing-${field}`" type="warning" effect="plain">
+                缺失：{{ field }}
+              </el-tag>
+              <el-tag v-for="field in lowConfidenceFields" :key="`low-${field}`" type="danger" effect="plain">
+                低置信：{{ field }}
+              </el-tag>
             </div>
             <div class="section-grid">
               <article>
                 <span>标题</span>
-                <strong>{{ textValue(paperSections.title, selectedTask.document?.title || '暂未识别') }}</strong>
+                <strong>{{ textValue(structuredContent.title, selectedTask.document?.title || '暂未识别') }}</strong>
               </article>
               <article>
                 <span>关键词</span>
-                <strong>{{ textValue(paperSections.keywords || selectedTask.document?.keywords) }}</strong>
+                <strong>{{ textValue(structuredContent.keywords || selectedTask.document?.keywords) }}</strong>
               </article>
               <article>
                 <span>研究对象</span>
-                <strong>{{ textValue(paperSections.researchObject) }}</strong>
+                <strong>{{ textValue(structuredContent.researchObject) }}</strong>
+              </article>
+              <article>
+                <span>研究问题</span>
+                <strong>{{ textValue(structuredContent.researchQuestion) }}</strong>
               </article>
               <article>
                 <span>方法路径</span>
-                <strong>{{ textValue(paperSections.methodPath) }}</strong>
+                <strong>{{ textValue(structuredContent.methodPath) }}</strong>
+              </article>
+              <article>
+                <span>创新点</span>
+                <strong>{{ textValue(structuredContent.innovationPoints) }}</strong>
               </article>
             </div>
             <div class="paper-sections">
               <el-collapse>
                 <el-collapse-item title="摘要" name="abstract">
-                  <p>{{ textValue(paperSections.abstract, selectedTask.document?.abstractText || '暂无摘要') }}</p>
+                  <p>{{ textValue(structuredContent.abstract, selectedTask.document?.abstractText || '暂无摘要') }}</p>
                 </el-collapse-item>
-                <el-collapse-item title="引言识别" name="introduction">
-                  <p>{{ textValue(paperSections.introduction) }}</p>
+                <el-collapse-item title="引言" name="introduction">
+                  <p>{{ textValue(structuredContent.introduction) }}</p>
                 </el-collapse-item>
-                <el-collapse-item title="方法识别" name="method">
-                  <p>{{ textValue(paperSections.method) }}</p>
+                <el-collapse-item title="文献综述 / 相关研究" name="literatureReview">
+                  <p>{{ textValue(structuredContent.literatureReview) }}</p>
                 </el-collapse-item>
-                <el-collapse-item title="结论识别" name="conclusion">
-                  <p>{{ textValue(paperSections.conclusion) }}</p>
+                <el-collapse-item title="研究方法" name="methodology">
+                  <p>{{ textValue(structuredContent.methodology) }}</p>
+                </el-collapse-item>
+                <el-collapse-item title="实验与结果" name="experimentResults">
+                  <p>{{ textValue(structuredContent.experimentResults) }}</p>
+                </el-collapse-item>
+                <el-collapse-item title="讨论" name="discussion">
+                  <p>{{ textValue(structuredContent.discussion) }}</p>
+                </el-collapse-item>
+                <el-collapse-item title="结论" name="conclusion">
+                  <p>{{ textValue(structuredContent.conclusion) }}</p>
+                </el-collapse-item>
+                <el-collapse-item title="实验数据摘要" name="experimentDataSummary">
+                  <p>{{ textValue(structuredContent.experimentDataSummary) }}</p>
+                </el-collapse-item>
+                <el-collapse-item title="主要结论" name="mainConclusions">
+                  <p>{{ textValue(structuredContent.mainConclusions) }}</p>
+                </el-collapse-item>
+                <el-collapse-item title="参考文献" name="references">
+                  <p>{{ textValue(structuredContent.references) }}</p>
                 </el-collapse-item>
               </el-collapse>
             </div>
@@ -566,6 +625,28 @@ onMounted(async () => {
   align-items: flex-start;
   flex-direction: column;
   gap: 2px;
+}
+
+.section-actions,
+.parse-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.parse-tags {
+  margin-top: 12px;
+}
+
+.parse-alert {
+  margin-top: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+  line-height: 1.6;
 }
 
 .section-grid {

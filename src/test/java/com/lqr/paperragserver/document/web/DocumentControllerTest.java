@@ -15,6 +15,8 @@ import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.service.DocumentManagementService;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
+import com.lqr.paperragserver.document.structured.entity.PaperStructuredParseEntity;
+import com.lqr.paperragserver.document.structured.service.PaperStructuredParseService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -22,6 +24,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -46,6 +49,7 @@ class DocumentControllerTest {
     private final DocumentIngestionJobService documentIngestionJobService = mock(DocumentIngestionJobService.class);
     private final DocumentUploadStorageService documentUploadStorageService = mock(DocumentUploadStorageService.class);
     private final DocumentIngestionProducer documentIngestionProducer = mock(DocumentIngestionProducer.class);
+    private final PaperStructuredParseService paperStructuredParseService = mock(PaperStructuredParseService.class);
     private DocumentController controller;
     private UUID ownerUserId;
     private SecurityUserPrincipal principal;
@@ -59,6 +63,7 @@ class DocumentControllerTest {
                 documentIngestionJobService,
                 documentUploadStorageService,
                 documentIngestionProducer,
+                paperStructuredParseService,
                 new ObjectMapper()
         );
         ownerUserId = UUID.randomUUID();
@@ -166,6 +171,69 @@ class DocumentControllerTest {
     }
 
     @Test
+    void structuredParseShouldReturnPersistedResultForAnyOwnedDocument() {
+        PaperStructuredParseEntity entity = structuredParse("source-a");
+        when(documentPersistenceService.findAnyDocument(ownerUserId, "source-a"))
+                .thenReturn(Optional.of(documentDetail("source-a")));
+        when(paperStructuredParseService.find(ownerUserId, "source-a"))
+                .thenReturn(Optional.of(entity));
+
+        var response = controller.structuredParse(principal, "source-a");
+
+        assertThat(response.sourceId()).isEqualTo("source-a");
+        assertThat(response.status()).isEqualTo("COMPLETED");
+        assertThat(response.mergedResult()).isEqualTo(Map.of("title", "Paper A", "abstract", "摘要内容"));
+        assertThat(response.missingFields()).containsExactly("discussion");
+        assertThat(response.lowConfidenceFields()).containsExactly("references");
+        assertThat(response.rawModelOutput()).isEqualTo("{\"abstract\":\"摘要内容\"}");
+        verify(paperStructuredParseService).find(ownerUserId, "source-a");
+    }
+
+    @Test
+    void structuredParseStatusShouldReturnCompactStatus() {
+        PaperStructuredParseEntity entity = structuredParse("source-a");
+        when(documentPersistenceService.findAnyDocument(ownerUserId, "source-a"))
+                .thenReturn(Optional.of(documentDetail("source-a")));
+        when(paperStructuredParseService.find(ownerUserId, "source-a"))
+                .thenReturn(Optional.of(entity));
+
+        var response = controller.structuredParseStatus(principal, "source-a");
+
+        assertThat(response.sourceId()).isEqualTo("source-a");
+        assertThat(response.status()).isEqualTo("COMPLETED");
+        assertThat(response.missingFields()).containsExactly("discussion");
+        assertThat(response.lowConfidenceFields()).containsExactly("references");
+        assertThat(response.errorMessage()).isNull();
+    }
+
+    @Test
+    void regenerateStructuredParseShouldRequireOwnedDocumentAndDelegate() {
+        PaperStructuredParseEntity entity = structuredParse("source-a");
+        when(documentPersistenceService.findAnyDocument(ownerUserId, "source-a"))
+                .thenReturn(Optional.of(documentDetail("source-a")));
+        when(paperStructuredParseService.regenerate(ownerUserId, "source-a"))
+                .thenReturn(entity);
+
+        var response = controller.regenerateStructuredParse(principal, "source-a");
+
+        assertThat(response.sourceId()).isEqualTo("source-a");
+        assertThat(response.status()).isEqualTo("COMPLETED");
+        verify(paperStructuredParseService).regenerate(ownerUserId, "source-a");
+    }
+
+    @Test
+    void structuredParseShouldRejectMissingDocumentBeforeServiceLookup() {
+        when(documentPersistenceService.findAnyDocument(ownerUserId, "missing-source"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.structuredParse(principal, "missing-source"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("文档不存在");
+        verify(paperStructuredParseService, never()).find(any(), any());
+        verify(paperStructuredParseService, never()).regenerate(any(), any());
+    }
+
+    @Test
     void deleteBySourceIdShouldDelegateToIngestionService() {
         controller.deleteBySourceId(principal, "source-1");
 
@@ -186,6 +254,51 @@ class DocumentControllerTest {
         job.setCreatedAt(OffsetDateTime.now());
         job.setUpdatedAt(OffsetDateTime.now());
         return job;
+    }
+
+    private PaperStructuredParseEntity structuredParse(String sourceId) {
+        PaperStructuredParseEntity entity = new PaperStructuredParseEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setOwnerUserId(ownerUserId);
+        entity.setDocumentId(UUID.randomUUID());
+        entity.setSourceId(sourceId);
+        entity.setStatus("COMPLETED");
+        entity.setRuleResult(Map.of("title", "Paper A"));
+        entity.setModelResult(Map.of("abstract", "摘要内容"));
+        entity.setMergedResult(Map.of("title", "Paper A", "abstract", "摘要内容"));
+        entity.setFieldConfidence(Map.of("title", Map.of("source", "RULE", "confidence", 0.9)));
+        entity.setMissingFields(List.of("discussion"));
+        entity.setLowConfidenceFields(List.of("references"));
+        entity.setRawModelOutput("{\"abstract\":\"摘要内容\"}");
+        entity.setParsedAt(OffsetDateTime.now());
+        entity.setUpdatedAt(OffsetDateTime.now());
+        return entity;
+    }
+
+    private DocumentPersistenceService.DocumentDetail documentDetail(String sourceId) {
+        return new DocumentPersistenceService.DocumentDetail(
+                sourceId,
+                ownerUserId,
+                "Paper A",
+                "upload",
+                "paper-a.pdf",
+                "application/pdf",
+                1024L,
+                List.of("Author A"),
+                "摘要内容",
+                null,
+                null,
+                2026,
+                List.of("keyword"),
+                "论文全文",
+                Map.of(),
+                "INDEXED",
+                3,
+                null,
+                OffsetDateTime.now(),
+                OffsetDateTime.now(),
+                null
+        );
     }
 
     private SecurityUserPrincipal principal(UUID userId) {

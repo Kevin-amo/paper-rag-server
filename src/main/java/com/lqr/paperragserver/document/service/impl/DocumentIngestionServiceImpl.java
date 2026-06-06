@@ -14,6 +14,7 @@ import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
 import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
 import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
+import com.lqr.paperragserver.document.structured.service.PaperStructuredParseService;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
     private final DocumentIngestionJobService documentIngestionJobService;
     private final DocumentUploadStorageService documentUploadStorageService;
     private final DocumentIngestionProperties documentIngestionProperties;
+    private final PaperStructuredParseService paperStructuredParseService;
 
     /**
      * 执行文档解析、切分、持久化和向量写入的完整入库流程。
@@ -149,6 +151,7 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
             vectorWriteService.upsert(ownerUserId, vectors);
             log.info("document.ingest.vector.done ownerUserId={} sourceId={} vectorCount={}", ownerUserId, source.sourceId(), vectors.size());
             documentPersistenceService.markIndexed(ownerUserId, source.sourceId(), chunks.size());
+            generateStructuredParseQuietly(ownerUserId, source.sourceId());
             log.info("document.ingest.status ownerUserId={} sourceId={} status=INDEXED progress={}", ownerUserId, source.sourceId(), 100);
             return new DocumentIngestionResult(source, chunks.size());
         } catch (RuntimeException ex) {
@@ -196,6 +199,17 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         log.info("document.ingest.status ownerUserId={} jobId={} sourceId={} status=INDEXED progress={}",
                 job.getOwnerUserId(), job.getId(), source.sourceId(), 100);
         return new DocumentIngestionResult(source, chunks.size());
+    }
+
+    /**
+     * 同步入库完成后触发结构化解析，失败时不影响文档入库结果。
+     */
+    private void generateStructuredParseQuietly(UUID ownerUserId, String sourceId) {
+        try {
+            paperStructuredParseService.generate(ownerUserId, sourceId);
+        } catch (RuntimeException ex) {
+            log.warn("paper.structured.parse.sync.failed ownerUserId={} sourceId={}", ownerUserId, sourceId, ex);
+        }
     }
 
     /**

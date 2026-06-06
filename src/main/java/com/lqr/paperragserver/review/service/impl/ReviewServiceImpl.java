@@ -13,6 +13,7 @@ import com.lqr.paperragserver.document.dto.PageResponse;
 import com.lqr.paperragserver.document.entity.DocumentEntity;
 import com.lqr.paperragserver.document.mapper.DocumentMapper;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
+import com.lqr.paperragserver.document.structured.service.PaperStructuredParseService;
 import com.lqr.paperragserver.review.dto.ReviewCriterionRequest;
 import com.lqr.paperragserver.review.dto.ReviewCriterionResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportResponse;
@@ -46,7 +47,7 @@ import java.util.UUID;
 public class ReviewServiceImpl implements ReviewService {
 
     private static final int MAX_PAGE_SIZE = 100;
-    private static final int PAPER_TEXT_LIMIT = 18000;
+    private static final int PAPER_TEXT_LIMIT = 10000;
 
     private final ReviewTaskMapper taskMapper;
     private final ReviewReportMapper reportMapper;
@@ -54,6 +55,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewAuditLogMapper auditLogMapper;
     private final DocumentMapper documentMapper;
     private final DocumentPersistenceService documentPersistenceService;
+    private final PaperStructuredParseService paperStructuredParseService;
     private final LlmService llmService;
     private final ObjectMapper objectMapper;
 
@@ -269,25 +271,35 @@ public class ReviewServiceImpl implements ReviewService {
         String criteriaText = criteria.stream()
                 .map(item -> "- " + item.code() + " / " + item.name() + "：满分 " + item.maxScore() + "，权重 " + item.weight() + "。" + nullToEmpty(item.description()))
                 .toList()
-                .toString();
+                .stream()
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("");
         String paperText = truncate(document.contentText(), PAPER_TEXT_LIMIT);
-        String systemMessage = "你是论文辅助评审平台的评审助手。你需要依据论文文本和评审标准输出严格 JSON，不要输出 Markdown，不要输出解释性前后缀。";
+        String structuredText = structuredParseText(document);
+        String systemMessage = "你是论文辅助评审平台的评审助手。只输出一个严格 JSON 对象；第一个字符必须是 {，最后一个字符必须是 }。禁止 Markdown、代码围栏、解释文字、前后缀。";
         String userMessage = "请对以下论文进行辅助评审。\n"
                 + "论文标题：" + nullToEmpty(document.title()) + "\n"
                 + "摘要：" + nullToEmpty(document.abstractText()) + "\n"
                 + "关键词：" + toJsonText(document.keywords()) + "\n\n"
+                + "独立结构化解析结果：\n" + structuredText + "\n\n"
                 + "评审标准：\n" + criteriaText + "\n\n"
-                + "论文全文：\n" + paperText + "\n\n"
-                + "请输出如下 JSON 结构：\n"
+                + "论文全文片段：\n" + paperText + "\n\n"
+                + "输出要求：\n"
+                + "1. 只能输出 JSON 对象，不能输出 ```json 或任何说明。\n"
+                + "2. JSON 中不能出现尾逗号，字符串必须正确转义。\n"
+                + "3. scores 必须覆盖每个评审标准；score 为 0 到 maxScore 的整数。\n"
+                + "4. risks 可以为空数组；没有证据不要编造。\n"
+                + "5. finalRecommendation 只能取：建议通过、建议修改后通过、建议复核、不建议通过。\n\n"
+                + "JSON 模板：\n"
                 + "{\n"
                 + "  \"paperSections\": {\"title\": \"\", \"abstract\": \"\", \"introduction\": \"\", \"method\": \"\", \"conclusion\": \"\", \"keywords\": [], \"researchObject\": \"\", \"methodPath\": \"\"},\n"
-                + "  \"scores\": [{\"code\": \"POLICY\", \"name\": \"政策导向\", \"score\": 0, \"maxScore\": 100, \"reason\": \"\", \"confidence\": 0.8}],\n"
+                + "  \"scores\": [{\"code\": \"\", \"name\": \"\", \"score\": 0, \"maxScore\": 100, \"reason\": \"\", \"confidence\": 0.8}],\n"
                 + "  \"comments\": {\"summary\": \"\", \"strengths\": [], \"weaknesses\": [], \"suggestions\": [], \"finalAdvice\": \"\"},\n"
-                + "  \"risks\": [{\"type\": \"参考文献规范\", \"level\": \"LOW\", \"evidence\": \"\", \"suggestion\": \"\"}],\n"
+                + "  \"risks\": [{\"type\": \"\", \"level\": \"LOW\", \"evidence\": \"\", \"suggestion\": \"\"}],\n"
                 + "  \"totalScore\": 0,\n"
-                + "  \"finalRecommendation\": \"建议通过/建议修改后通过/建议复核/不建议通过\"\n"
+                + "  \"finalRecommendation\": \"建议复核\"\n"
                 + "}\n"
-                + "必须覆盖政策导向、专业匹配、创新性、逻辑性、语言质量；风险项必须检查政治不当表述、参考文献不规范、结构缺失和语言问题。";
+                + "评审维度必须覆盖政策导向、专业匹配、创新性、逻辑性、语言质量；风险项必须检查政治不当表述、参考文献不规范、结构缺失和语言问题。";
         return new PromptConstructionService.Prompt(systemMessage, userMessage);
     }
 
@@ -297,7 +309,13 @@ public class ReviewServiceImpl implements ReviewService {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
             });
         } catch (JsonProcessingException ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果不是有效 JSON，请重试");
+            String repairedJson = repairJson(json);
+            try {
+                return objectMapper.readValue(repairedJson, new TypeReference<Map<String, Object>>() {
+                });
+            } catch (JsonProcessingException ignored) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果不是有效 JSON，请重试");
+            }
         }
     }
 
@@ -305,16 +323,61 @@ public class ReviewServiceImpl implements ReviewService {
         if (value == null || value.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果为空");
         }
-        String text = value.trim();
-        if (text.startsWith("```")) {
-            text = text.replaceFirst("^```[a-zA-Z]*", "").replaceFirst("```$", "").trim();
-        }
+        String text = stripCodeFence(value.trim());
         int start = text.indexOf('{');
-        int end = text.lastIndexOf('}');
-        if (start < 0 || end <= start) {
+        if (start < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果缺少 JSON 对象");
         }
+        int end = balancedObjectEnd(text, start);
+        if (end < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果 JSON 对象不完整");
+        }
         return text.substring(start, end + 1);
+    }
+
+    private String stripCodeFence(String value) {
+        String text = value.trim();
+        if (text.startsWith("```")) {
+            text = text.replaceFirst("^```[a-zA-Z]*\\s*", "").replaceFirst("\\s*```$", "").trim();
+        }
+        return text;
+    }
+
+    private int balancedObjectEnd(String text, int start) {
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        for (int index = start; index < text.length(); index++) {
+            char ch = text.charAt(index);
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (ch == '\\' && inString) {
+                escaped = true;
+                continue;
+            }
+            if (ch == '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString) {
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+                if (depth == 0) {
+                    return index;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private String repairJson(String json) {
+        return json.replaceAll(",\\s*([}\\]])", "$1");
     }
 
     private ReviewTaskEntity requireTask(UUID taskId) {
@@ -377,6 +440,12 @@ public class ReviewServiceImpl implements ReviewService {
         Map<String, Object> raw = new LinkedHashMap<>(parsed);
         raw.put("rawText", modelText);
         return raw;
+    }
+
+    private String structuredParseText(DocumentPersistenceService.DocumentDetail document) {
+        return paperStructuredParseService.find(document.ownerUserId(), document.sourceId())
+                .map(result -> toJsonText(result.getMergedResult()))
+                .orElse("{}");
     }
 
     private Map<String, Object> mapValue(Object value) {

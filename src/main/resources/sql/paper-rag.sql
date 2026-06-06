@@ -455,7 +455,60 @@ create index if not exists idx_document_ingestion_job_owner_source
 create index if not exists idx_document_ingestion_job_status
     on public.document_ingestion_job using btree (status);
 
--- ===== 12_review.sql =====
+-- ===== 12_paper_structured_parse.sql =====
+-- 论文结构化解析结果表。
+
+create extension if not exists "uuid-ossp";
+
+create table if not exists public.paper_structured_parse (
+    id uuid primary key default uuid_generate_v4(),
+    owner_user_id uuid not null references public.sys_user(id) on delete cascade,
+    document_id uuid not null references public.paper_document(id) on delete cascade,
+    source_id varchar(128) not null,
+    raw_text text,
+
+    rule_result jsonb not null default '{}'::jsonb,
+    model_result jsonb not null default '{}'::jsonb,
+    merged_result jsonb not null default '{}'::jsonb,
+    field_confidence jsonb not null default '{}'::jsonb,
+    missing_fields jsonb not null default '[]'::jsonb,
+    low_confidence_fields jsonb not null default '[]'::jsonb,
+    raw_model_output text,
+
+    status varchar(32) not null default 'PENDING',
+    error_message text,
+    parsed_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+
+    constraint fk_paper_structured_parse_source
+        foreign key (owner_user_id, source_id)
+        references public.paper_document (owner_user_id, source_id)
+        on update cascade
+        on delete cascade,
+
+    constraint uq_paper_structured_parse_owner_source unique (owner_user_id, source_id),
+    constraint chk_paper_structured_parse_status check (status in ('PENDING', 'RULE_PARSED', 'MODEL_COMPLETED', 'COMPLETED', 'FAILED'))
+);
+
+comment on table public.paper_structured_parse is '论文结构化解析结果表';
+comment on column public.paper_structured_parse.raw_text is '结构化解析所依据的全文快照';
+comment on column public.paper_structured_parse.rule_result is '规则章节识别结果 JSON';
+comment on column public.paper_structured_parse.model_result is '模型补全结果 JSON';
+comment on column public.paper_structured_parse.merged_result is '最终合并后的结构化解析结果 JSON';
+comment on column public.paper_structured_parse.field_confidence is '字段级来源、置信度和证据 JSON';
+comment on column public.paper_structured_parse.status is '解析状态：PENDING、RULE_PARSED、MODEL_COMPLETED、COMPLETED、FAILED';
+
+create index if not exists idx_paper_structured_parse_owner_source
+    on public.paper_structured_parse using btree (owner_user_id, source_id);
+
+create index if not exists idx_paper_structured_parse_document_id
+    on public.paper_structured_parse using btree (document_id);
+
+create index if not exists idx_paper_structured_parse_status
+    on public.paper_structured_parse using btree (status);
+
+-- ===== 13_review.sql =====
 -- 论文辅助评审数据表。
 
 create extension if not exists "uuid-ossp";

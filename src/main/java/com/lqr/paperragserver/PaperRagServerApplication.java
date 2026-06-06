@@ -8,7 +8,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * 论文 RAG 服务启动类。
  */
-@MapperScan("com.lqr.paperragserver.*.mapper")
+@MapperScan(basePackages = {
+        "com.lqr.paperragserver.auth.mapper",
+        "com.lqr.paperragserver.conversation.mapper",
+        "com.lqr.paperragserver.document.mapper",
+        "com.lqr.paperragserver.document.structured.mapper",
+        "com.lqr.paperragserver.review.mapper",
+        "com.lqr.paperragserver.vector.mapper"
+})
 @EnableScheduling
 @SpringBootApplication
 public class PaperRagServerApplication {

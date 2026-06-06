@@ -11,6 +11,8 @@ import type {
   ListChunksParams,
   ListDocumentsParams,
   PageResponse,
+  PaperStructuredParse,
+  PaperStructuredParseStatus,
   UploadDocumentPayload,
 } from '../types';
 
@@ -78,6 +80,21 @@ export async function listDocuments(params: ListDocumentsParams) {
 
 export async function getDocumentDetail(sourceId: string) {
   const { data } = await http.get<DocumentDetail>(`/documents/${sourceId}`);
+  return data;
+}
+
+export async function getPaperStructuredParse(sourceId: string) {
+  const { data } = await http.get<PaperStructuredParse>(`/documents/${sourceId}/structured-parse`);
+  return data;
+}
+
+export async function getPaperStructuredParseStatus(sourceId: string) {
+  const { data } = await http.get<PaperStructuredParseStatus>(`/documents/${sourceId}/structured-parse/status`);
+  return data;
+}
+
+export async function regeneratePaperStructuredParse(sourceId: string) {
+  const { data } = await http.post<PaperStructuredParse>(`/documents/${sourceId}/structured-parse/regenerate`);
   return data;
 }
 

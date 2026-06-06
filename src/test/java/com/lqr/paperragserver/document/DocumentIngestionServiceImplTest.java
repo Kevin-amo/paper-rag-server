@@ -15,6 +15,7 @@ import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
 import com.lqr.paperragserver.document.entity.DocumentIngestionJob;
 import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
+import com.lqr.paperragserver.document.structured.service.PaperStructuredParseService;
 import com.lqr.paperragserver.vector.service.VectorWriteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,7 @@ class DocumentIngestionServiceImplTest {
     private final DocumentPersistenceService documentPersistenceService = mock(DocumentPersistenceService.class);
     private final DocumentIngestionJobService documentIngestionJobService = mock(DocumentIngestionJobService.class);
     private final DocumentUploadStorageService documentUploadStorageService = mock(DocumentUploadStorageService.class);
+    private final PaperStructuredParseService paperStructuredParseService = mock(PaperStructuredParseService.class);
     private DocumentIngestionServiceImpl service;
 
     @BeforeEach
@@ -54,7 +56,8 @@ class DocumentIngestionServiceImplTest {
                 documentPersistenceService,
                 documentIngestionJobService,
                 documentUploadStorageService,
-                new DocumentIngestionProperties("storage", true, 3, new DocumentIngestionProperties.Listener(2, 4), null)
+                new DocumentIngestionProperties("storage", true, 3, new DocumentIngestionProperties.Listener(2, 4), null),
+                paperStructuredParseService
         );
     }
 
@@ -118,7 +121,8 @@ class DocumentIngestionServiceImplTest {
                 documentPersistenceService,
                 documentIngestionJobService,
                 documentUploadStorageService,
-                new DocumentIngestionProperties("storage", false, 3, new DocumentIngestionProperties.Listener(2, 4), null)
+                new DocumentIngestionProperties("storage", false, 3, new DocumentIngestionProperties.Listener(2, 4), null),
+                paperStructuredParseService
         );
         Fixture fixture = fixture();
         UUID ownerUserId = UUID.randomUUID();

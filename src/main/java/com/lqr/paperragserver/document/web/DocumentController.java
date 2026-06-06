@@ -24,6 +24,9 @@ import com.lqr.paperragserver.document.service.DocumentIngestionService;
 import com.lqr.paperragserver.document.service.DocumentManagementService;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
+import com.lqr.paperragserver.document.structured.dto.PaperStructuredParseResponse;
+import com.lqr.paperragserver.document.structured.dto.PaperStructuredParseStatusResponse;
+import com.lqr.paperragserver.document.structured.service.PaperStructuredParseService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -67,6 +70,7 @@ public class DocumentController {
     private final DocumentIngestionJobService documentIngestionJobService;
     private final DocumentUploadStorageService documentUploadStorageService;
     private final DocumentIngestionProducer documentIngestionProducer;
+    private final PaperStructuredParseService paperStructuredParseService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -206,6 +210,40 @@ public class DocumentController {
     }
 
     /**
+     * 查询指定论文的结构化解析结果。
+     */
+    @GetMapping("/{sourceId}/structured-parse")
+    public PaperStructuredParseResponse structuredParse(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                        @PathVariable String sourceId) {
+        ensureAnyDocumentExists(principal.getId(), sourceId);
+        return paperStructuredParseService.find(principal.getId(), sourceId)
+                .map(PaperStructuredParseResponse::from)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "结构化解析结果不存在"));
+    }
+
+    /**
+     * 查询指定论文的结构化解析状态。
+     */
+    @GetMapping("/{sourceId}/structured-parse/status")
+    public PaperStructuredParseStatusResponse structuredParseStatus(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                                    @PathVariable String sourceId) {
+        ensureAnyDocumentExists(principal.getId(), sourceId);
+        return paperStructuredParseService.find(principal.getId(), sourceId)
+                .map(PaperStructuredParseStatusResponse::from)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "结构化解析结果不存在"));
+    }
+
+    /**
+     * 重新生成指定论文的结构化解析结果。
+     */
+    @PostMapping("/{sourceId}/structured-parse/regenerate")
+    public PaperStructuredParseResponse regenerateStructuredParse(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                                  @PathVariable String sourceId) {
+        ensureAnyDocumentExists(principal.getId(), sourceId);
+        return PaperStructuredParseResponse.from(paperStructuredParseService.regenerate(principal.getId(), sourceId));
+    }
+
+    /**
      * 分页查询指定文档的分块列表。
      *
      * @param principal 当前登录用户
@@ -336,6 +374,14 @@ public class DocumentController {
                                    @PathVariable String sourceId) {
         DocumentManagementService.ReindexResult result = documentManagementService.reindex(principal.getId(), sourceId);
         return new ReindexResponse(result.sourceId(), result.chunkCount());
+    }
+
+    /**
+     * 确认当前用户拥有该来源文档，兼容普通文档与评审文档。
+     */
+    private void ensureAnyDocumentExists(UUID ownerUserId, String sourceId) {
+        documentPersistenceService.findAnyDocument(ownerUserId, sourceId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文档不存在"));
     }
 
     /**
