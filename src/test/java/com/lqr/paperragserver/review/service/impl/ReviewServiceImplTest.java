@@ -3,6 +3,7 @@ package com.lqr.paperragserver.review.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
+import com.lqr.paperragserver.document.structured.entity.PaperStructuredParseEntity;
 import com.lqr.paperragserver.document.structured.service.PaperStructuredParseService;
 import com.lqr.paperragserver.review.assessment.ReviewOutputParser;
 import com.lqr.paperragserver.review.audit.ReviewAuditService;
@@ -23,7 +24,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.lang.reflect.Method;
@@ -39,6 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -108,7 +109,8 @@ class ReviewServiceImplTest {
                 new ReviewOutputParser(objectMapper),
                 new ReferenceFormatChecker(),
                 objectMapper,
-                mock(ReviewAuditService.class)
+                mock(ReviewAuditService.class),
+                mock(ReviewRiskService.class)
         );
 
         assertThat(service).isNotNull();
@@ -188,7 +190,8 @@ class ReviewServiceImplTest {
                 reviewOutputParser,
                 new ReferenceFormatChecker(),
                 objectMapper,
-                mock(ReviewAuditService.class)
+                mock(ReviewAuditService.class),
+                mock(ReviewRiskService.class)
         );
 
         assertThatThrownBy(() -> service.generateAiReview(userId, false, taskId))
@@ -199,6 +202,103 @@ class ReviewServiceImplTest {
                     assertThat(response.getReason()).contains("\u7f3a\u5c11 JSON \u5bf9\u8c61");
                     assertThat(response.getCause()).isInstanceOf(IllegalArgumentException.class);
                 });
+    }
+
+    @Test
+    void generateAiReviewShouldRejectTaskAssignedToAnotherReviewer() {
+        UUID currentUserId = UUID.randomUUID();
+        UUID otherReviewerId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
+        ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
+        LlmService llmService = mock(LlmService.class);
+        ReviewServiceImpl service = serviceWithDependencies(
+                taskMapper,
+                reportMapper,
+                null,
+                null,
+                null,
+                null,
+                mock(PaperStructuredParseService.class),
+                llmService,
+                mock(ReviewOutputParser.class),
+                new ReferenceFormatChecker(),
+                mock(ReviewRiskService.class),
+                mock(ReviewAuditService.class)
+        );
+        when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task(taskId, otherReviewerId));
+
+        assertThatThrownBy(() -> service.generateAiReview(currentUserId, false, taskId))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+
+        verify(llmService, never()).generate(any());
+        verify(reportMapper, never()).insert(org.mockito.ArgumentMatchers.any(ReviewReportEntity.class));
+        verify(reportMapper, never()).updateById(org.mockito.ArgumentMatchers.any(ReviewReportEntity.class));
+    }
+
+    @Test
+    void generateAiReviewShouldMergeReferenceRisksFromStructuredParseWhenModelSectionsLackReferences() {
+        UUID currentUserId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
+        ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
+        ReviewCriterionMapper criterionMapper = mock(ReviewCriterionMapper.class);
+        ReviewAuditLogMapper auditLogMapper = mock(ReviewAuditLogMapper.class);
+        DocumentPersistenceService documentPersistenceService = mock(DocumentPersistenceService.class);
+        PaperStructuredParseService paperStructuredParseService = mock(PaperStructuredParseService.class);
+        LlmService llmService = mock(LlmService.class);
+        ReviewOutputParser reviewOutputParser = mock(ReviewOutputParser.class);
+        ReviewRiskService reviewRiskService = mock(ReviewRiskService.class);
+        ReviewServiceImpl service = serviceWithDependencies(
+                taskMapper,
+                reportMapper,
+                criterionMapper,
+                auditLogMapper,
+                null,
+                documentPersistenceService,
+                paperStructuredParseService,
+                llmService,
+                reviewOutputParser,
+                new ReferenceFormatChecker(),
+                reviewRiskService,
+                mock(ReviewAuditService.class)
+        );
+        ReviewTaskEntity task = task(taskId, null);
+        task.setDocumentId(documentId);
+        task.setSubmitterUserId(currentUserId);
+        task.setSourceId("source-1");
+        when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task);
+        DocumentPersistenceService.DocumentDetail document = document(currentUserId, "source-1");
+        when(documentPersistenceService.findReviewDocument(currentUserId, "source-1")).thenReturn(Optional.of(document));
+        ReviewCriterionEntity criterion = criterion();
+        when(criterionMapper.selectList(any())).thenReturn(List.of(criterion));
+        PaperStructuredParseEntity structuredParse = new PaperStructuredParseEntity();
+        structuredParse.setMergedResult(Map.of("references", List.of("[1] Missing publication year")));
+        when(paperStructuredParseService.find(currentUserId, "source-1")).thenReturn(Optional.of(structuredParse));
+        when(llmService.generate(any())).thenReturn("{}");
+        when(reviewOutputParser.parse("{}")).thenReturn(Map.of(
+                "paperSections", Map.of("title", "title"),
+                "risks", List.of()
+        ));
+        when(reportMapper.selectLatestByTaskId(taskId))
+                .thenReturn(null)
+                .thenAnswer(invocation -> {
+                    ReviewReportEntity response = report(UUID.randomUUID(), taskId);
+                    response.setRisks(List.of());
+                    return response;
+                });
+
+        service.generateAiReview(currentUserId, false, taskId);
+
+        ArgumentCaptor<Object> risksCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(reviewRiskService).replaceReportRisks(any(), org.mockito.ArgumentMatchers.eq(taskId), risksCaptor.capture());
+        assertThat((List<?>) risksCaptor.getValue()).anySatisfy(item -> {
+            Map<?, ?> risk = (Map<?, ?>) item;
+            assertThat(risk.get("detector")).isEqualTo("REFERENCE_RULE");
+            assertThat(risk.get("type")).isEqualTo("REFERENCE_FORMAT");
+        });
     }
 
     @Test
@@ -223,7 +323,8 @@ class ReviewServiceImplTest {
                 null,
                 new ReferenceFormatChecker(),
                 objectMapper,
-                reviewAuditService
+                reviewAuditService,
+                mock(ReviewRiskService.class)
         );
         ReviewReportEntity report = report(reportId, taskId);
         report.setScores(List.of(Map.of("code", "LOGIC", "score", 70)));
@@ -271,6 +372,59 @@ class ReviewServiceImplTest {
         assertThat(afterCaptor.getValue())
                 .containsEntry("reportId", reportId.toString())
                 .containsEntry("status", "CONFIRMED");
+    }
+
+    @Test
+    void updateReportShouldRejectTaskAssignedToAnotherReviewer() {
+        UUID currentUserId = UUID.randomUUID();
+        UUID otherReviewerId = UUID.randomUUID();
+        UUID reportId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
+        ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
+        ReviewRiskService reviewRiskService = mock(ReviewRiskService.class);
+        ReviewAuditService reviewAuditService = mock(ReviewAuditService.class);
+        ReviewServiceImpl service = serviceWithRiskAccess(taskMapper, reportMapper, reviewRiskService);
+        when(reportMapper.selectById(reportId)).thenReturn(report(reportId, taskId));
+        when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task(taskId, otherReviewerId));
+
+        assertThatThrownBy(() -> service.updateReport(currentUserId, false, reportId,
+                new ReviewReportUpdateRequest(null, null, null, null, null, null, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+
+        verify(reportMapper, never()).updateById(org.mockito.ArgumentMatchers.any(ReviewReportEntity.class));
+        verify(reviewRiskService, never()).replaceReportRisks(any(), any(), any());
+        verify(reviewAuditService, never()).append(any(), any(), anyString(), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void updateReportShouldSyncNormalizedRisksWhenRisksProvided() {
+        UUID currentUserId = UUID.randomUUID();
+        UUID reportId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
+        ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
+        ReviewRiskService reviewRiskService = mock(ReviewRiskService.class);
+        ReviewServiceImpl service = serviceWithRiskAccess(taskMapper, reportMapper, reviewRiskService);
+        ReviewReportEntity report = report(reportId, taskId);
+        report.setStatus("AI_GENERATED");
+        when(reportMapper.selectById(reportId)).thenReturn(report);
+        when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task(taskId, null));
+        List<Map<String, Object>> updatedRisks = List.of(Map.of("type", "REFERENCE_FORMAT", "level", "MEDIUM"));
+        ReviewReportUpdateRequest request = new ReviewReportUpdateRequest(
+                null,
+                null,
+                null,
+                updatedRisks,
+                null,
+                null,
+                null
+        );
+
+        service.updateReport(currentUserId, false, reportId, request);
+
+        verify(reviewRiskService).replaceReportRisks(reportId, taskId, updatedRisks);
     }
 
     @Test
@@ -338,7 +492,7 @@ class ReviewServiceImplTest {
     private ReviewServiceImpl serviceWithRiskAccess(ReviewTaskMapper taskMapper,
                                                     ReviewReportMapper reportMapper,
                                                     ReviewRiskService riskService) {
-        ReviewServiceImpl service = new ReviewServiceImpl(
+        ReviewServiceImpl service = serviceWithDependencies(
                 taskMapper,
                 reportMapper,
                 null,
@@ -349,11 +503,77 @@ class ReviewServiceImplTest {
                 null,
                 null,
                 new ReferenceFormatChecker(),
-                new ObjectMapper(),
+                riskService,
                 mock(ReviewAuditService.class)
         );
-        ReflectionTestUtils.setField(service, "reviewRiskService", riskService);
         return service;
+    }
+
+    private ReviewServiceImpl serviceWithDependencies(ReviewTaskMapper taskMapper,
+                                                      ReviewReportMapper reportMapper,
+                                                      ReviewCriterionMapper criterionMapper,
+                                                      ReviewAuditLogMapper auditLogMapper,
+                                                      com.lqr.paperragserver.document.mapper.DocumentMapper documentMapper,
+                                                      DocumentPersistenceService documentPersistenceService,
+                                                      PaperStructuredParseService paperStructuredParseService,
+                                                      LlmService llmService,
+                                                      ReviewOutputParser reviewOutputParser,
+                                                      ReferenceFormatChecker referenceFormatChecker,
+                                                      ReviewRiskService riskService,
+                                                      ReviewAuditService auditService) {
+        return new ReviewServiceImpl(
+                taskMapper,
+                reportMapper,
+                criterionMapper,
+                auditLogMapper,
+                documentMapper,
+                documentPersistenceService,
+                paperStructuredParseService,
+                llmService,
+                reviewOutputParser,
+                referenceFormatChecker,
+                new ObjectMapper(),
+                auditService,
+                riskService
+        );
+    }
+
+    private ReviewCriterionEntity criterion() {
+        ReviewCriterionEntity criterion = new ReviewCriterionEntity();
+        criterion.setId(UUID.randomUUID());
+        criterion.setCode("LOGIC");
+        criterion.setName("Logic");
+        criterion.setMaxScore(100);
+        criterion.setWeight(20);
+        criterion.setEnabled(true);
+        criterion.setSortOrder(1);
+        return criterion;
+    }
+
+    private DocumentPersistenceService.DocumentDetail document(UUID ownerUserId, String sourceId) {
+        return new DocumentPersistenceService.DocumentDetail(
+                sourceId,
+                ownerUserId,
+                "title",
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                "abstract",
+                null,
+                null,
+                2024,
+                List.of(),
+                "content",
+                Map.of(),
+                "INDEXED",
+                1,
+                null,
+                OffsetDateTime.now(),
+                OffsetDateTime.now(),
+                null
+        );
     }
 
     private ReviewReportEntity report(UUID reportId, UUID taskId) {
