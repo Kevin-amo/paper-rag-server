@@ -3,10 +3,12 @@ import { ElMessage } from 'element-plus';
 import {
   generateReviewReport,
   getReviewTask,
+  listReviewRisks,
   listReviewCriteria,
   listReviewTasks,
   uploadReviewPaper,
   updateReviewReport,
+  updateReviewRisk,
 } from '../api/reviews';
 import {
   getPaperStructuredParse,
@@ -17,6 +19,7 @@ import type {
   PaperStructuredParse,
   ReviewCriterion,
   ReviewReport,
+  ReviewRiskRecord,
   ReviewReportStatus,
   ReviewScoreItem,
   ReviewTask,
@@ -33,6 +36,8 @@ export function useReviews() {
   const uploading = ref(false);
   const structuredParseLoading = ref(false);
   const regeneratingStructuredParse = ref(false);
+  const riskRecords = ref<ReviewRiskRecord[]>([]);
+  const riskLoading = ref(false);
   const tasks = ref<ReviewTask[]>([]);
   const criteria = ref<ReviewCriterion[]>([]);
   const selectedTask = ref<ReviewTask | null>(null);
@@ -94,6 +99,7 @@ export function useReviews() {
       selectedTask.value = await getReviewTask(taskId);
       syncReportForm(selectedTask.value.report);
       await loadStructuredParse(selectedTask.value.sourceId, false);
+      await loadRisks(selectedTask.value.report?.id ?? null);
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
     } finally {
@@ -139,6 +145,7 @@ export function useReviews() {
       const report = await generateReviewReport(selectedTask.value.id);
       selectedTask.value = { ...selectedTask.value, status: 'REVIEWING', report };
       syncReportForm(report);
+      await loadRisks(report.id);
       await loadTasks();
       ElMessage.success('辅助评审报告已生成');
     } catch (error) {
@@ -196,6 +203,33 @@ export function useReviews() {
     }
   }
 
+  async function loadRisks(reportId: string | null) {
+    riskRecords.value = [];
+    if (!reportId) return;
+    riskLoading.value = true;
+    try {
+      riskRecords.value = await listReviewRisks(reportId);
+    } catch (error) {
+      ElMessage.error(getErrorMessage(error));
+    } finally {
+      riskLoading.value = false;
+    }
+  }
+
+  async function setRiskStatus(
+    riskId: string,
+    status: 'CONFIRMED' | 'IGNORED' | 'RESOLVED' | 'OPEN',
+    reviewerNote?: string,
+  ) {
+    try {
+      const updated = await updateReviewRisk(riskId, { status, reviewerNote: reviewerNote ?? null });
+      riskRecords.value = riskRecords.value.map((item) => (item.id === riskId ? updated : item));
+      ElMessage.success('风险状态已更新');
+    } catch (error) {
+      ElMessage.error(getErrorMessage(error));
+    }
+  }
+
   function updateScore(code: string, score: number) {
     const report = selectedReport.value;
     if (!report || !Array.isArray(report.scores)) {
@@ -236,6 +270,8 @@ export function useReviews() {
     uploading,
     structuredParseLoading,
     regeneratingStructuredParse,
+    riskRecords,
+    riskLoading,
     tasks,
     criteria,
     selectedTask,
@@ -255,6 +291,8 @@ export function useReviews() {
     saveReport,
     uploadPaper,
     loadStructuredParse,
+    loadRisks,
+    setRiskStatus,
     rerunStructuredParse,
     updateScore,
   };
