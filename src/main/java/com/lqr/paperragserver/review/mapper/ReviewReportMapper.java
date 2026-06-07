@@ -24,7 +24,8 @@ public interface ReviewReportMapper extends BaseMapper<ReviewReportEntity> {
             @Result(column = "scores", property = "scores", typeHandler = JsonbTypeHandler.class),
             @Result(column = "comments", property = "comments", typeHandler = JsonbTypeHandler.class),
             @Result(column = "risks", property = "risks", typeHandler = JsonbTypeHandler.class),
-            @Result(column = "raw_model_output", property = "rawModelOutput", typeHandler = JsonbTypeHandler.class)
+            @Result(column = "raw_model_output", property = "rawModelOutput", typeHandler = JsonbTypeHandler.class),
+            @Result(column = "manual_delta", property = "manualDelta", typeHandler = JsonbTypeHandler.class)
     })
     ReviewReportEntity selectLatestByTaskId(@Param("taskId") UUID taskId);
 }
