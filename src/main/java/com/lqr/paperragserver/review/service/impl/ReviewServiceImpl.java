@@ -3,7 +3,6 @@ package com.lqr.paperragserver.review.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
@@ -18,16 +17,23 @@ import com.lqr.paperragserver.review.dto.ReviewCriterionRequest;
 import com.lqr.paperragserver.review.dto.ReviewCriterionResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportUpdateRequest;
+import com.lqr.paperragserver.review.dto.ReviewRiskItemResponse;
+import com.lqr.paperragserver.review.dto.ReviewRiskUpdateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskCreateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskResponse;
+import com.lqr.paperragserver.review.audit.ReviewAuditService;
 import com.lqr.paperragserver.review.entity.ReviewAuditLogEntity;
 import com.lqr.paperragserver.review.entity.ReviewCriterionEntity;
 import com.lqr.paperragserver.review.entity.ReviewReportEntity;
+import com.lqr.paperragserver.review.entity.ReviewRiskItemEntity;
 import com.lqr.paperragserver.review.entity.ReviewTaskEntity;
 import com.lqr.paperragserver.review.mapper.ReviewAuditLogMapper;
 import com.lqr.paperragserver.review.mapper.ReviewCriterionMapper;
 import com.lqr.paperragserver.review.mapper.ReviewReportMapper;
 import com.lqr.paperragserver.review.mapper.ReviewTaskMapper;
+import com.lqr.paperragserver.review.assessment.ReviewOutputParser;
+import com.lqr.paperragserver.review.risk.ReferenceFormatChecker;
+import com.lqr.paperragserver.review.risk.ReviewRiskService;
 import com.lqr.paperragserver.review.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,11 +41,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.lang.reflect.Array;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -57,7 +65,11 @@ public class ReviewServiceImpl implements ReviewService {
     private final DocumentPersistenceService documentPersistenceService;
     private final PaperStructuredParseService paperStructuredParseService;
     private final LlmService llmService;
+    private final ReviewOutputParser reviewOutputParser;
+    private final ReferenceFormatChecker referenceFormatChecker;
     private final ObjectMapper objectMapper;
+    private final ReviewAuditService reviewAuditService;
+    private final ReviewRiskService reviewRiskService;
 
     @Override
     public PageResponse<ReviewTaskResponse> listTasks(UUID currentUserId, boolean admin, String keyword, String status, int page, int size) {
@@ -142,6 +154,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Transactional
     public ReviewReportResponse generateAiReview(UUID currentUserId, boolean admin, UUID taskId) {
         ReviewTaskEntity task = requireTask(taskId);
+        assertTaskAccess(currentUserId, admin, task);
         DocumentPersistenceService.DocumentDetail document = requireDocument(task);
         List<ReviewCriterionResponse> criteria = listCriteria(false);
         if (criteria.isEmpty()) {
@@ -150,7 +163,13 @@ public class ReviewServiceImpl implements ReviewService {
 
         taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
         String modelText = llmService.generate(buildReviewPrompt(document, criteria));
-        Map<String, Object> parsed = parseModelOutput(modelText);
+        Map<String, Object> parsed;
+        try {
+            parsed = reviewOutputParser.parse(modelText);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
+        }
+        List<ReferenceFormatChecker.ReferenceRisk> referenceRisks = referenceFormatChecker.check(referenceCheckerInput(document, parsed));
         ReviewReportEntity report = reportMapper.selectLatestByTaskId(task.getId());
         boolean creating = report == null;
         OffsetDateTime now = OffsetDateTime.now();
@@ -165,7 +184,7 @@ public class ReviewServiceImpl implements ReviewService {
         report.setPaperSections(mapValue(parsed.get("paperSections")));
         report.setScores(valueOrDefault(parsed.get("scores"), List.of()));
         report.setComments(mapValue(parsed.get("comments")));
-        report.setRisks(valueOrDefault(parsed.get("risks"), List.of()));
+        report.setRisks(mergeRisks(valueOrDefault(parsed.get("risks"), List.of()), referenceRisks));
         report.setRawModelOutput(rawOutput(parsed, modelText));
         report.setTotalScore(intValue(parsed.get("totalScore"), calculateTotalScore(parsed.get("scores"))));
         report.setFinalRecommendation(stringValue(parsed.get("finalRecommendation"), "建议人工复核后进入下一评审环节"));
@@ -177,6 +196,7 @@ public class ReviewServiceImpl implements ReviewService {
         } else {
             reportMapper.updateById(report);
         }
+        reviewRiskService.replaceReportRisks(report.getId(), task.getId(), report.getRisks());
         appendAudit(task.getId(), currentUserId, "AI_REVIEW", "生成 AI 辅助评审报告", Map.of("reportId", report.getId().toString()));
         return ReviewReportResponse.from(reportMapper.selectLatestByTaskId(task.getId()));
     }
@@ -189,6 +209,9 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "评审报告不存在");
         }
         ReviewTaskEntity task = requireTask(report.getTaskId());
+        assertTaskAccess(currentUserId, admin, task);
+        Map<String, Object> beforeSnapshot = reportSnapshot(report);
+        boolean risksProvided = request.risks() != null;
         report.setReviewerUserId(currentUserId);
         if (request.paperSections() != null) {
             report.setPaperSections(request.paperSections());
@@ -212,14 +235,40 @@ public class ReviewServiceImpl implements ReviewService {
         report.setStatus(nextStatus);
         report.setAdjustedAt(OffsetDateTime.now());
         report.setUpdatedAt(OffsetDateTime.now());
+        Map<String, Object> afterSnapshot = reportSnapshot(report);
+        report.setManualDelta(manualDelta(beforeSnapshot, afterSnapshot));
         reportMapper.updateById(report);
         if ("CONFIRMED".equals(nextStatus) || "COMPLETED".equals(nextStatus)) {
             taskMapper.updateStatus(task.getId(), currentUserId, "COMPLETED");
         } else {
             taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
         }
-        appendAudit(task.getId(), currentUserId, "ADJUST_REPORT", "人工调整评审报告", Map.of("reportId", reportId.toString(), "status", nextStatus));
+        if (risksProvided) {
+            reviewRiskService.replaceReportRisks(report.getId(), task.getId(), report.getRisks());
+        }
+        reviewAuditService.append(task.getId(), currentUserId, "ADJUST_REPORT", "人工调整评审报告", beforeSnapshot, afterSnapshot, Map.of());
         return ReviewReportResponse.from(reportMapper.selectById(reportId));
+    }
+
+    @Override
+    public List<ReviewRiskItemResponse> listRisks(UUID currentUserId, boolean admin, UUID reportId) {
+        ReviewReportEntity report = requireReport(reportId);
+        ReviewTaskEntity task = requireTask(report.getTaskId());
+        assertTaskAccess(currentUserId, admin, task);
+        return reviewRiskService.listByReportId(reportId);
+    }
+
+    @Override
+    public ReviewRiskItemResponse updateRisk(UUID currentUserId, boolean admin, UUID riskId, ReviewRiskUpdateRequest request) {
+        ReviewRiskItemEntity risk = reviewRiskService.findById(riskId);
+        if (risk == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u98ce\u9669\u9879\u4e0d\u5b58\u5728");
+        }
+        ReviewReportEntity report = requireReport(risk.getReportId());
+        UUID taskId = risk.getTaskId() == null ? report.getTaskId() : risk.getTaskId();
+        ReviewTaskEntity task = requireTask(taskId);
+        assertTaskAccess(currentUserId, admin, task);
+        return reviewRiskService.updateStatus(riskId, request.status(), request.reviewerNote());
     }
 
     @Override
@@ -303,81 +352,19 @@ public class ReviewServiceImpl implements ReviewService {
         return new PromptConstructionService.Prompt(systemMessage, userMessage);
     }
 
-    private Map<String, Object> parseModelOutput(String modelText) {
-        String json = extractJson(modelText);
-        try {
-            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
-            });
-        } catch (JsonProcessingException ex) {
-            String repairedJson = repairJson(json);
-            try {
-                return objectMapper.readValue(repairedJson, new TypeReference<Map<String, Object>>() {
-                });
-            } catch (JsonProcessingException ignored) {
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果不是有效 JSON，请重试");
-            }
+    private ReviewReportEntity requireReport(UUID reportId) {
+        ReviewReportEntity report = reportMapper.selectById(reportId);
+        if (report == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u8bc4\u5ba1\u62a5\u544a\u4e0d\u5b58\u5728");
         }
+        return report;
     }
 
-    private String extractJson(String value) {
-        if (value == null || value.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果为空");
+    private void assertTaskAccess(UUID currentUserId, boolean admin, ReviewTaskEntity task) {
+        if (admin || task.getReviewerUserId() == null || task.getReviewerUserId().equals(currentUserId)) {
+            return;
         }
-        String text = stripCodeFence(value.trim());
-        int start = text.indexOf('{');
-        if (start < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果缺少 JSON 对象");
-        }
-        int end = balancedObjectEnd(text, start);
-        if (end < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果 JSON 对象不完整");
-        }
-        return text.substring(start, end + 1);
-    }
-
-    private String stripCodeFence(String value) {
-        String text = value.trim();
-        if (text.startsWith("```")) {
-            text = text.replaceFirst("^```[a-zA-Z]*\\s*", "").replaceFirst("\\s*```$", "").trim();
-        }
-        return text;
-    }
-
-    private int balancedObjectEnd(String text, int start) {
-        int depth = 0;
-        boolean inString = false;
-        boolean escaped = false;
-        for (int index = start; index < text.length(); index++) {
-            char ch = text.charAt(index);
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-            if (ch == '\\' && inString) {
-                escaped = true;
-                continue;
-            }
-            if (ch == '"') {
-                inString = !inString;
-                continue;
-            }
-            if (inString) {
-                continue;
-            }
-            if (ch == '{') {
-                depth++;
-            } else if (ch == '}') {
-                depth--;
-                if (depth == 0) {
-                    return index;
-                }
-            }
-        }
-        return -1;
-    }
-
-    private String repairJson(String json) {
-        return json.replaceAll(",\\s*([}\\]])", "$1");
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u65e0\u6743\u8bbf\u95ee\u8be5\u8bc4\u5ba1\u4efb\u52a1");
     }
 
     private ReviewTaskEntity requireTask(UUID taskId) {
@@ -420,6 +407,10 @@ public class ReviewServiceImpl implements ReviewService {
         entity.setDescription(blankToNull(request.description()));
         entity.setMaxScore(request.maxScore() == null ? 100 : request.maxScore());
         entity.setWeight(request.weight() == null ? 20 : request.weight());
+        entity.setVersion(request.version() == null ? 1 : request.version());
+        entity.setCategory(blankToNull(request.category()));
+        entity.setEvidenceRequired(request.evidenceRequired() == null || request.evidenceRequired());
+        entity.setScoringRules(request.scoringRules() == null ? List.of() : request.scoringRules());
         entity.setEnabled(request.enabled() == null || request.enabled());
         entity.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
     }
@@ -434,6 +425,28 @@ public class ReviewServiceImpl implements ReviewService {
         log.setSnapshot(snapshot);
         log.setCreatedAt(OffsetDateTime.now());
         auditLogMapper.insert(log);
+    }
+
+    private Map<String, Object> reportSnapshot(ReviewReportEntity report) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("reportId", report.getId() == null ? null : report.getId().toString());
+        snapshot.put("paperSections", report.getPaperSections());
+        snapshot.put("scores", report.getScores());
+        snapshot.put("comments", report.getComments());
+        snapshot.put("risks", report.getRisks());
+        snapshot.put("totalScore", report.getTotalScore());
+        snapshot.put("finalRecommendation", report.getFinalRecommendation());
+        snapshot.put("status", report.getStatus());
+        return snapshot;
+    }
+
+    private Map<String, Object> manualDelta(Map<String, Object> before, Map<String, Object> after) {
+        return Map.of(
+                "scoreChanged", !Objects.equals(before.get("scores"), after.get("scores")) || !Objects.equals(before.get("totalScore"), after.get("totalScore")),
+                "commentEdited", !Objects.equals(before.get("comments"), after.get("comments")),
+                "riskOverridden", !Objects.equals(before.get("risks"), after.get("risks")),
+                "finalRecommendationChanged", !Objects.equals(before.get("finalRecommendation"), after.get("finalRecommendation"))
+        );
     }
 
     private Map<String, Object> rawOutput(Map<String, Object> parsed, String modelText) {
@@ -459,6 +472,70 @@ public class ReviewServiceImpl implements ReviewService {
 
     private Object valueOrDefault(Object value, Object fallback) {
         return value == null ? fallback : value;
+    }
+
+    private String structuredReferences(Map<String, Object> parsed) {
+        Object sections = parsed.get("paperSections");
+        if (sections instanceof Map<?, ?> map) {
+            return referencesText(map.get("references"));
+        }
+        return "";
+    }
+
+    private String referenceCheckerInput(DocumentPersistenceService.DocumentDetail document, Map<String, Object> parsed) {
+        String structuredParseReferences = paperStructuredParseService.find(document.ownerUserId(), document.sourceId())
+                .map(result -> referencesFromStructuredParse(result.getMergedResult()))
+                .orElse("");
+        return structuredParseReferences.isBlank() ? structuredReferences(parsed) : structuredParseReferences;
+    }
+
+    private String referencesFromStructuredParse(Object mergedResult) {
+        if (mergedResult instanceof Map<?, ?> map) {
+            String directReferences = referencesText(map.get("references"));
+            if (!directReferences.isBlank()) {
+                return directReferences;
+            }
+            Object sections = map.get("paperSections");
+            if (sections instanceof Map<?, ?> sectionMap) {
+                return referencesText(sectionMap.get("references"));
+            }
+        }
+        return "";
+    }
+
+    private String referencesText(Object references) {
+        if (references == null) {
+            return "";
+        }
+        if (references instanceof List<?> list) {
+            return String.join(System.lineSeparator(), list.stream().map(String::valueOf).toList());
+        }
+        if (references.getClass().isArray()) {
+            List<String> entries = new ArrayList<>();
+            for (int i = 0; i < Array.getLength(references); i++) {
+                entries.add(String.valueOf(Array.get(references, i)));
+            }
+            return String.join(System.lineSeparator(), entries);
+        }
+        return String.valueOf(references);
+    }
+
+    private Object mergeRisks(Object modelRisks, List<ReferenceFormatChecker.ReferenceRisk> referenceRisks) {
+        List<Object> merged = new ArrayList<>();
+        if (modelRisks instanceof List<?> list) {
+            merged.addAll(list);
+        }
+        for (ReferenceFormatChecker.ReferenceRisk risk : referenceRisks) {
+            merged.add(Map.of(
+                    "type", risk.riskType(),
+                    "level", risk.riskLevel(),
+                    "evidence", risk.evidence(),
+                    "suggestion", risk.suggestion(),
+                    "detector", "REFERENCE_RULE",
+                    "confidence", risk.confidence()
+            ));
+        }
+        return merged;
     }
 
     private int calculateTotalScore(Object scores) {

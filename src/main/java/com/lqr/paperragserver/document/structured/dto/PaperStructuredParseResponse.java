@@ -22,6 +22,10 @@ public record PaperStructuredParseResponse(
         List<String> missingFields,
         List<String> lowConfidenceFields,
         String rawModelOutput,
+        String parserVersion,
+        String modelVersion,
+        String promptVersion,
+        Object qualityMetrics,
         String errorMessage,
         OffsetDateTime parsedAt,
         OffsetDateTime updatedAt
@@ -42,6 +46,10 @@ public record PaperStructuredParseResponse(
                 stringList(entity.getMissingFields()),
                 stringList(entity.getLowConfidenceFields()),
                 entity.getRawModelOutput(),
+                entity.getParserVersion(),
+                entity.getModelVersion(),
+                entity.getPromptVersion(),
+                entity.getQualityMetrics(),
                 entity.getErrorMessage(),
                 entity.getParsedAt(),
                 entity.getUpdatedAt()

@@ -8,7 +8,7 @@ import PageHeader from '../../components/common/PageHeader.vue';
 import { getErrorMessage } from '../../api/http';
 import { useAuth } from '../../composables/useAuth';
 import { useReviews } from '../../composables/useReviews';
-import type { PaperStructuredContent, ReviewRiskItem, ReviewScoreItem } from '../../types';
+import type { PaperStructuredContent, ReviewRiskRecord, ReviewScoreItem } from '../../types';
 
 const router = useRouter();
 const auth = useAuth();
@@ -16,6 +16,7 @@ const reviews = useReviews();
 const uploadDialogVisible = ref(false);
 const uploadFileList = ref<UploadUserFile[]>([]);
 const uploadTitle = ref('');
+const activeReviewTab = ref('parse');
 
 const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '评审员');
 const selectedTask = computed(() => reviews.selectedTask.value);
@@ -31,7 +32,7 @@ const structuredContent = computed(() => {
 const missingFields = computed(() => structuredParse.value?.missingFields ?? []);
 const lowConfidenceFields = computed(() => structuredParse.value?.lowConfidenceFields ?? []);
 const scoreItems = computed(() => (Array.isArray(selectedReport.value?.scores) ? selectedReport.value?.scores as ReviewScoreItem[] : []));
-const riskItems = computed(() => (Array.isArray(selectedReport.value?.risks) ? selectedReport.value?.risks as ReviewRiskItem[] : []));
+const riskRecords = computed(() => reviews.riskRecords.value);
 const comments = computed(() => selectedReport.value?.comments && typeof selectedReport.value.comments === 'object'
   ? selectedReport.value.comments as Record<string, unknown>
   : {});
@@ -47,6 +48,14 @@ const riskTypeMap: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
   LOW: 'success',
   MEDIUM: 'warning',
   HIGH: 'danger',
+  CRITICAL: 'danger',
+};
+
+const riskStatusMap: Record<string, string> = {
+  OPEN: '待处理',
+  CONFIRMED: '已确认',
+  IGNORED: '已忽略',
+  RESOLVED: '已解决',
 };
 
 function statusLabel(status: string) {
@@ -70,6 +79,28 @@ function textValue(value: unknown, fallback = '暂未识别') {
 
 function listValue(value: unknown) {
   return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
+}
+
+function formatJson(value: unknown) {
+  if (!value) {
+    return '{}';
+  }
+  return JSON.stringify(value, null, 2);
+}
+
+function riskStatusLabel(status: ReviewRiskRecord['status']) {
+  return riskStatusMap[status] ?? status;
+}
+
+function isRiskUpdating(riskId: string) {
+  return reviews.riskStatusUpdatingIds.value.includes(riskId);
+}
+
+function isRiskActionDisabled(
+  risk: ReviewRiskRecord,
+  status: 'CONFIRMED' | 'IGNORED' | 'RESOLVED',
+) {
+  return isRiskUpdating(risk.id) || risk.status === status;
 }
 
 function buildReviewSourceId(file: File) {
@@ -235,179 +266,262 @@ onMounted(async () => {
             </div>
           </div>
 
-          <section class="detail-section" v-loading="reviews.structuredParseLoading.value">
-            <div class="section-title">
-              <div>
-                <h3>结构化理解与内容解析</h3>
-                <span>独立于 AI 评审报告的论文结构化解析结果</span>
+          <el-tabs v-model="activeReviewTab" class="review-tabs">
+            <el-tab-pane label="结构化解析" name="parse">
+            <section class="detail-section" v-loading="reviews.structuredParseLoading.value">
+              <div class="section-title">
+                <div>
+                  <h3>结构化理解与内容解析</h3>
+                  <span>独立于 AI 评审报告的论文结构化解析结果</span>
+                </div>
+                <div class="section-actions">
+                  <el-tag :type="structuredParse?.status === 'FAILED' ? 'danger' : structuredParse ? 'success' : 'info'" effect="plain">
+                    {{ structuredParse?.status || '未生成' }}
+                  </el-tag>
+                  <el-button size="small" :loading="reviews.regeneratingStructuredParse.value" @click="reviews.rerunStructuredParse">
+                    重新解析
+                  </el-button>
+                </div>
               </div>
-              <div class="section-actions">
-                <el-tag :type="structuredParse?.status === 'FAILED' ? 'danger' : structuredParse ? 'success' : 'info'" effect="plain">
-                  {{ structuredParse?.status || '未生成' }}
+              <div v-if="structuredParse?.errorMessage" class="parse-alert">
+                {{ structuredParse.errorMessage }}
+              </div>
+              <div class="parse-tags">
+                <el-tag v-if="structuredParse?.updatedAt" type="info" effect="plain">
+                  更新时间：{{ formatDate(structuredParse.updatedAt) }}
                 </el-tag>
-                <el-button size="small" :loading="reviews.regeneratingStructuredParse.value" @click="reviews.rerunStructuredParse">
-                  重新解析
-                </el-button>
+                <el-tag v-for="field in missingFields" :key="`missing-${field}`" type="warning" effect="plain">
+                  缺失：{{ field }}
+                </el-tag>
+                <el-tag v-for="field in lowConfidenceFields" :key="`low-${field}`" type="danger" effect="plain">
+                  低置信：{{ field }}
+                </el-tag>
               </div>
-            </div>
-            <div v-if="structuredParse?.errorMessage" class="parse-alert">
-              {{ structuredParse.errorMessage }}
-            </div>
-            <div class="parse-tags">
-              <el-tag v-if="structuredParse?.updatedAt" type="info" effect="plain">
-                更新时间：{{ formatDate(structuredParse.updatedAt) }}
-              </el-tag>
-              <el-tag v-for="field in missingFields" :key="`missing-${field}`" type="warning" effect="plain">
-                缺失：{{ field }}
-              </el-tag>
-              <el-tag v-for="field in lowConfidenceFields" :key="`low-${field}`" type="danger" effect="plain">
-                低置信：{{ field }}
-              </el-tag>
-            </div>
-            <div class="section-grid">
-              <article>
-                <span>标题</span>
-                <strong>{{ textValue(structuredContent.title, selectedTask.document?.title || '暂未识别') }}</strong>
-              </article>
-              <article>
-                <span>关键词</span>
-                <strong>{{ textValue(structuredContent.keywords || selectedTask.document?.keywords) }}</strong>
-              </article>
-              <article>
-                <span>研究对象</span>
-                <strong>{{ textValue(structuredContent.researchObject) }}</strong>
-              </article>
-              <article>
-                <span>研究问题</span>
-                <strong>{{ textValue(structuredContent.researchQuestion) }}</strong>
-              </article>
-              <article>
-                <span>方法路径</span>
-                <strong>{{ textValue(structuredContent.methodPath) }}</strong>
-              </article>
-              <article>
-                <span>创新点</span>
-                <strong>{{ textValue(structuredContent.innovationPoints) }}</strong>
-              </article>
-            </div>
-            <div class="paper-sections">
-              <el-collapse>
-                <el-collapse-item title="摘要" name="abstract">
-                  <p>{{ textValue(structuredContent.abstract, selectedTask.document?.abstractText || '暂无摘要') }}</p>
-                </el-collapse-item>
-                <el-collapse-item title="引言" name="introduction">
-                  <p>{{ textValue(structuredContent.introduction) }}</p>
-                </el-collapse-item>
-                <el-collapse-item title="文献综述 / 相关研究" name="literatureReview">
-                  <p>{{ textValue(structuredContent.literatureReview) }}</p>
-                </el-collapse-item>
-                <el-collapse-item title="研究方法" name="methodology">
-                  <p>{{ textValue(structuredContent.methodology) }}</p>
-                </el-collapse-item>
-                <el-collapse-item title="实验与结果" name="experimentResults">
-                  <p>{{ textValue(structuredContent.experimentResults) }}</p>
-                </el-collapse-item>
-                <el-collapse-item title="讨论" name="discussion">
-                  <p>{{ textValue(structuredContent.discussion) }}</p>
-                </el-collapse-item>
-                <el-collapse-item title="结论" name="conclusion">
-                  <p>{{ textValue(structuredContent.conclusion) }}</p>
-                </el-collapse-item>
-                <el-collapse-item title="实验数据摘要" name="experimentDataSummary">
-                  <p>{{ textValue(structuredContent.experimentDataSummary) }}</p>
-                </el-collapse-item>
-                <el-collapse-item title="主要结论" name="mainConclusions">
-                  <p>{{ textValue(structuredContent.mainConclusions) }}</p>
-                </el-collapse-item>
-                <el-collapse-item title="参考文献" name="references">
-                  <p>{{ textValue(structuredContent.references) }}</p>
-                </el-collapse-item>
-              </el-collapse>
-            </div>
-          </section>
-
-          <section class="detail-section">
-            <div class="section-title">
-              <h3>维度化辅助评分</h3>
-              <span>评委可在 AI 建议基础上手动调整总分和最终意见</span>
-            </div>
-            <div v-if="scoreItems.length" class="score-list">
-              <article v-for="item in scoreItems" :key="item.code" class="score-card">
-                <div class="score-head">
-                  <strong>{{ item.name }}</strong>
-                  <span>{{ item.score }} / {{ item.maxScore }}</span>
-                </div>
-                <el-slider
-                  :model-value="Number(item.score)"
-                  :min="0"
-                  :max="Number(item.maxScore || 100)"
-                  @input="handleScoreInput(item, $event)"
-                />
-                <p>{{ item.reason }}</p>
-              </article>
-            </div>
-            <el-empty v-else description="生成辅助评审后展示评分建议" />
-
-            <div class="manual-form">
-              <el-input-number v-model="reviews.reportForm.totalScore" :min="0" :max="100" controls-position="right" />
-              <el-input
-                v-model="reviews.reportForm.finalRecommendation"
-                type="textarea"
-                :rows="3"
-                placeholder="填写或调整最终评审意见"
-              />
-              <div class="manual-actions">
-                <el-button :disabled="!selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport('ADJUSTED')">
-                  保存调整
-                </el-button>
-                <el-button type="primary" :disabled="!selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport('CONFIRMED')">
-                  确认评审结果
-                </el-button>
-              </div>
-            </div>
-          </section>
-
-          <section class="detail-section comments-risk-grid">
-            <div class="comments-card">
-              <div class="section-title compact">
-                <h3>个性化评语</h3>
-                <span>优点、不足与修改建议</span>
-              </div>
-              <p class="comment-summary">{{ textValue(comments.summary || comments.finalAdvice, selectedReport?.finalRecommendation || '暂无评语') }}</p>
-              <div class="comment-columns">
-                <div>
-                  <strong>主要优点</strong>
-                  <ul>
-                    <li v-for="item in listValue(comments.strengths)" :key="item">{{ item }}</li>
-                    <li v-if="!listValue(comments.strengths).length">暂无</li>
-                  </ul>
-                </div>
-                <div>
-                  <strong>问题与建议</strong>
-                  <ul>
-                    <li v-for="item in [...listValue(comments.weaknesses), ...listValue(comments.suggestions)]" :key="item">{{ item }}</li>
-                    <li v-if="![...listValue(comments.weaknesses), ...listValue(comments.suggestions)].length">暂无</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div class="risk-card">
-              <div class="section-title compact">
-                <h3>风险提示</h3>
-                <span>政治表述、参考文献、结构与语言风险</span>
-              </div>
-              <div v-if="riskItems.length" class="risk-list">
-                <article v-for="risk in riskItems" :key="`${risk.type}-${risk.evidence}`">
-                  <el-tag :type="riskTypeMap[risk.level] || 'info'" effect="plain">{{ risk.level }}</el-tag>
-                  <strong>{{ risk.type }}</strong>
-                  <p>{{ risk.evidence || '未给出证据' }}</p>
-                  <span>{{ risk.suggestion || '建议人工复核' }}</span>
+              <div class="section-grid">
+                <article>
+                  <span>标题</span>
+                  <strong>{{ textValue(structuredContent.title, selectedTask.document?.title || '暂未识别') }}</strong>
+                </article>
+                <article>
+                  <span>关键词</span>
+                  <strong>{{ textValue(structuredContent.keywords || selectedTask.document?.keywords) }}</strong>
+                </article>
+                <article>
+                  <span>研究对象</span>
+                  <strong>{{ textValue(structuredContent.researchObject) }}</strong>
+                </article>
+                <article>
+                  <span>研究问题</span>
+                  <strong>{{ textValue(structuredContent.researchQuestion) }}</strong>
+                </article>
+                <article>
+                  <span>方法路径</span>
+                  <strong>{{ textValue(structuredContent.methodPath) }}</strong>
+                </article>
+                <article>
+                  <span>创新点</span>
+                  <strong>{{ textValue(structuredContent.innovationPoints) }}</strong>
                 </article>
               </div>
-              <el-empty v-else description="暂无风险提示" />
-            </div>
-          </section>
+              <div class="paper-sections">
+                <el-collapse>
+                  <el-collapse-item title="摘要" name="abstract">
+                    <p>{{ textValue(structuredContent.abstract, selectedTask.document?.abstractText || '暂无摘要') }}</p>
+                  </el-collapse-item>
+                  <el-collapse-item title="引言" name="introduction">
+                    <p>{{ textValue(structuredContent.introduction) }}</p>
+                  </el-collapse-item>
+                  <el-collapse-item title="文献综述 / 相关研究" name="literatureReview">
+                    <p>{{ textValue(structuredContent.literatureReview) }}</p>
+                  </el-collapse-item>
+                  <el-collapse-item title="研究方法" name="methodology">
+                    <p>{{ textValue(structuredContent.methodology) }}</p>
+                  </el-collapse-item>
+                  <el-collapse-item title="实验与结果" name="experimentResults">
+                    <p>{{ textValue(structuredContent.experimentResults) }}</p>
+                  </el-collapse-item>
+                  <el-collapse-item title="讨论" name="discussion">
+                    <p>{{ textValue(structuredContent.discussion) }}</p>
+                  </el-collapse-item>
+                  <el-collapse-item title="结论" name="conclusion">
+                    <p>{{ textValue(structuredContent.conclusion) }}</p>
+                  </el-collapse-item>
+                  <el-collapse-item title="实验数据摘要" name="experimentDataSummary">
+                    <p>{{ textValue(structuredContent.experimentDataSummary) }}</p>
+                  </el-collapse-item>
+                  <el-collapse-item title="主要结论" name="mainConclusions">
+                    <p>{{ textValue(structuredContent.mainConclusions) }}</p>
+                  </el-collapse-item>
+                  <el-collapse-item title="参考文献" name="references">
+                    <p>{{ textValue(structuredContent.references) }}</p>
+                  </el-collapse-item>
+                </el-collapse>
+              </div>
+            </section>
+
+            </el-tab-pane>
+
+            <el-tab-pane label="多维评分" name="scores">
+            <section class="detail-section">
+              <div class="section-title">
+                <h3>维度化辅助评分</h3>
+                <span>评委可在 AI 建议基础上手动调整总分和最终意见</span>
+              </div>
+              <div v-if="scoreItems.length" class="score-list">
+                <article v-for="item in scoreItems" :key="item.code" class="score-card">
+                  <div class="score-head">
+                    <strong>{{ item.name }}</strong>
+                    <span>{{ item.score }} / {{ item.maxScore }}</span>
+                  </div>
+                  <el-slider
+                    :model-value="Number(item.score)"
+                    :min="0"
+                    :max="Number(item.maxScore || 100)"
+                    @input="handleScoreInput(item, $event)"
+                  />
+                  <p>{{ item.reason }}</p>
+                </article>
+              </div>
+              <el-empty v-else description="生成辅助评审后展示评分建议" />
+
+              <div class="manual-form">
+                <el-input-number v-model="reviews.reportForm.totalScore" :min="0" :max="100" controls-position="right" />
+                <el-input
+                  v-model="reviews.reportForm.finalRecommendation"
+                  type="textarea"
+                  :rows="3"
+                  placeholder="填写或调整最终评审意见"
+                />
+                <div class="manual-actions">
+                  <el-button :disabled="!selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport('ADJUSTED')">
+                    保存调整
+                  </el-button>
+                  <el-button type="primary" :disabled="!selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport('CONFIRMED')">
+                    确认评审结果
+                  </el-button>
+                </div>
+              </div>
+            </section>
+
+            </el-tab-pane>
+
+            <el-tab-pane label="风险预警" name="risks">
+              <section class="detail-section">
+                <div class="section-title">
+                  <div>
+                    <h3>风险提示</h3>
+                    <span>政治表述、参考文献、结构与语言风险的规范化记录</span>
+                  </div>
+                </div>
+                <div v-loading="reviews.riskLoading.value">
+                  <div v-if="riskRecords.length" class="risk-list normalized-risk-list">
+                    <article v-for="risk in riskRecords" :key="risk.id">
+                      <el-tag :type="riskTypeMap[risk.riskLevel] || 'info'" effect="plain">{{ risk.riskLevel }}</el-tag>
+                      <div>
+                        <div class="risk-heading">
+                          <strong>{{ risk.riskType }}</strong>
+                          <el-tag size="small" effect="plain">{{ riskStatusLabel(risk.status) }}</el-tag>
+                        </div>
+                        <p>{{ risk.evidence || '未给出证据' }}</p>
+                        <span>{{ risk.suggestion || '建议人工复核' }}</span>
+                        <span v-if="risk.confidence != null">置信度：{{ risk.confidence }}</span>
+                        <span v-if="risk.detector">检测器：{{ risk.detector }}</span>
+                        <div class="risk-actions">
+                          <el-button
+                            size="small"
+                            type="primary"
+                            plain
+                            :loading="isRiskUpdating(risk.id)"
+                            :disabled="isRiskActionDisabled(risk, 'CONFIRMED')"
+                            @click="reviews.setRiskStatus(risk.id, 'CONFIRMED')"
+                          >
+                            确认
+                          </el-button>
+                          <el-button
+                            size="small"
+                            plain
+                            :loading="isRiskUpdating(risk.id)"
+                            :disabled="isRiskActionDisabled(risk, 'IGNORED')"
+                            @click="reviews.setRiskStatus(risk.id, 'IGNORED')"
+                          >
+                            忽略
+                          </el-button>
+                          <el-button
+                            size="small"
+                            type="success"
+                            plain
+                            :loading="isRiskUpdating(risk.id)"
+                            :disabled="isRiskActionDisabled(risk, 'RESOLVED')"
+                            @click="reviews.setRiskStatus(risk.id, 'RESOLVED')"
+                          >
+                            标记解决
+                          </el-button>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+                  <el-empty v-else description="暂无风险提示" />
+                </div>
+              </section>
+            </el-tab-pane>
+
+            <el-tab-pane label="评语意见" name="comments">
+              <section class="detail-section">
+                <div class="comments-card">
+                  <div class="section-title compact">
+                    <h3>个性化评语</h3>
+                    <span>优点、不足与修改建议</span>
+                  </div>
+                  <p class="comment-summary">{{ textValue(comments.summary || comments.finalAdvice, selectedReport?.finalRecommendation || '暂无评语') }}</p>
+                  <div class="comment-columns">
+                    <div>
+                      <strong>主要优点</strong>
+                      <ul>
+                        <li v-for="item in listValue(comments.strengths)" :key="item">{{ item }}</li>
+                        <li v-if="!listValue(comments.strengths).length">暂无</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <strong>问题与建议</strong>
+                      <ul>
+                        <li v-for="item in [...listValue(comments.weaknesses), ...listValue(comments.suggestions)]" :key="item">{{ item }}</li>
+                        <li v-if="![...listValue(comments.weaknesses), ...listValue(comments.suggestions)].length">暂无</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </el-tab-pane>
+
+            <el-tab-pane label="留档信息" name="audit">
+              <section class="detail-section">
+                <div class="section-title">
+                  <h3>评审留档信息</h3>
+                  <span>模型、提示词、指标版本与人工调整记录</span>
+                </div>
+                <div v-if="selectedReport" class="audit-grid">
+                  <article>
+                    <span>模型版本</span>
+                    <strong>{{ selectedReport.modelVersion || '-' }}</strong>
+                  </article>
+                  <article>
+                    <span>Prompt 版本</span>
+                    <strong>{{ selectedReport.promptVersion || '-' }}</strong>
+                  </article>
+                  <article>
+                    <span>指标版本</span>
+                    <strong>{{ selectedReport.criterionVersion ?? '-' }}</strong>
+                  </article>
+                  <article>
+                    <span>置信度</span>
+                    <strong>{{ selectedReport.confidence ?? '-' }}</strong>
+                  </article>
+                </div>
+                <pre v-if="selectedReport" class="manual-delta">{{ formatJson(selectedReport.manualDelta) }}</pre>
+                <el-empty v-else description="生成辅助评审后展示留档信息" />
+              </section>
+            </el-tab-pane>
+          </el-tabs>
         </template>
 
         <el-empty v-else description="请选择一篇论文进行评审" />
@@ -621,6 +735,10 @@ onMounted(async () => {
   margin-top: 22px;
 }
 
+.review-tabs {
+  margin-top: 18px;
+}
+
 .section-title.compact {
   align-items: flex-start;
   flex-direction: column;
@@ -767,6 +885,67 @@ onMounted(async () => {
   font-size: 12px;
 }
 
+.risk-list p,
+.risk-list span,
+.risk-heading {
+  overflow-wrap: anywhere;
+}
+
+.normalized-risk-list article {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.risk-heading,
+.risk-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.risk-actions {
+  margin-top: 10px;
+}
+
+.audit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.audit-grid article {
+  border: 1px solid rgba(209, 213, 219, 0.7);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.audit-grid span {
+  display: block;
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.audit-grid strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--app-text);
+  line-height: 1.6;
+}
+
+.manual-delta {
+  margin: 14px 0 0;
+  border: 1px solid rgba(209, 213, 219, 0.7);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--app-text);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 1180px) {
   .review-layout,
   .review-upload-card,
@@ -777,7 +956,8 @@ onMounted(async () => {
 
   .summary-grid,
   .section-grid,
-  .score-list {
+  .score-list,
+  .audit-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -790,7 +970,8 @@ onMounted(async () => {
   .summary-grid,
   .section-grid,
   .score-list,
-  .comment-columns {
+  .comment-columns,
+  .audit-grid {
     grid-template-columns: 1fr;
   }
 

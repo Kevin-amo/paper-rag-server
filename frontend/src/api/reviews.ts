@@ -5,8 +5,10 @@ import type {
   PageResponse,
   ReviewCriterion,
   ReviewReport,
+  ReviewRiskRecord,
   ReviewTask,
   UpdateReviewReportPayload,
+  UpdateReviewRiskPayload,
   UploadReviewPaperPayload,
 } from '../types';
 
@@ -61,6 +63,31 @@ export async function generateReviewReport(taskId: string) {
 
 export async function updateReviewReport(reportId: string, payload: UpdateReviewReportPayload) {
   const { data } = await http.patch<ReviewReport>(`/reviews/reports/${reportId}`, payload);
+  return data;
+}
+
+export async function listReviewRisks(reportId: string) {
+  const { data } = await http.get<ReviewRiskRecord[]>(`/reviews/reports/${reportId}/risks`);
+  return data;
+}
+
+export async function updateReviewRisk(riskId: string, payload: UpdateReviewRiskPayload) {
+  const { data } = await http.put<ReviewRiskRecord>(`/reviews/risks/${riskId}`, payload);
+  return data;
+}
+
+export async function confirmReviewRisk(riskId: string) {
+  const { data } = await http.post<ReviewRiskRecord>(`/reviews/risks/${riskId}/confirm`);
+  return data;
+}
+
+export async function ignoreReviewRisk(riskId: string) {
+  const { data } = await http.post<ReviewRiskRecord>(`/reviews/risks/${riskId}/ignore`);
+  return data;
+}
+
+export async function resolveReviewRisk(riskId: string) {
+  const { data } = await http.post<ReviewRiskRecord>(`/reviews/risks/${riskId}/resolve`);
   return data;
 }
 

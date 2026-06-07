@@ -5,6 +5,8 @@ import com.lqr.paperragserver.review.dto.ReviewCriterionRequest;
 import com.lqr.paperragserver.review.dto.ReviewCriterionResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportUpdateRequest;
+import com.lqr.paperragserver.review.dto.ReviewRiskItemResponse;
+import com.lqr.paperragserver.review.dto.ReviewRiskUpdateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskCreateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskResponse;
 
@@ -24,6 +26,10 @@ public interface ReviewService {
     ReviewReportResponse generateAiReview(UUID currentUserId, boolean admin, UUID taskId);
 
     ReviewReportResponse updateReport(UUID currentUserId, boolean admin, UUID reportId, ReviewReportUpdateRequest request);
+
+    List<ReviewRiskItemResponse> listRisks(UUID currentUserId, boolean admin, UUID reportId);
+
+    ReviewRiskItemResponse updateRisk(UUID currentUserId, boolean admin, UUID riskId, ReviewRiskUpdateRequest request);
 
     List<ReviewCriterionResponse> listCriteria(boolean includeDisabled);
 

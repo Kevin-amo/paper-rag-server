@@ -26,5 +26,17 @@ public class ReviewAuditLogEntity {
     @TableField(value = "snapshot", typeHandler = JsonbTypeHandler.class)
     private Map<String, Object> snapshot;
 
+    @TableField(value = "before_snapshot", typeHandler = JsonbTypeHandler.class)
+    private Map<String, Object> beforeSnapshot;
+
+    @TableField(value = "after_snapshot", typeHandler = JsonbTypeHandler.class)
+    private Map<String, Object> afterSnapshot;
+
+    @TableField(value = "diff", typeHandler = JsonbTypeHandler.class)
+    private Map<String, Object> diff;
+
+    @TableField(value = "client_info", typeHandler = JsonbTypeHandler.class)
+    private Map<String, Object> clientInfo;
+
     private OffsetDateTime createdAt;
 }
