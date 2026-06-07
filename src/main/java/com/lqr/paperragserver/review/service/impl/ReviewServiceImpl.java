@@ -24,6 +24,7 @@ import com.lqr.paperragserver.review.dto.ReviewTaskResponse;
 import com.lqr.paperragserver.review.entity.ReviewAuditLogEntity;
 import com.lqr.paperragserver.review.entity.ReviewCriterionEntity;
 import com.lqr.paperragserver.review.entity.ReviewReportEntity;
+import com.lqr.paperragserver.review.entity.ReviewRiskItemEntity;
 import com.lqr.paperragserver.review.entity.ReviewTaskEntity;
 import com.lqr.paperragserver.review.mapper.ReviewAuditLogMapper;
 import com.lqr.paperragserver.review.mapper.ReviewCriterionMapper;
@@ -238,15 +239,22 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     public List<ReviewRiskItemResponse> listRisks(UUID currentUserId, boolean admin, UUID reportId) {
-        ReviewReportEntity report = reportMapper.selectById(reportId);
-        if (report == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "风险报告不存在");
-        }
+        ReviewReportEntity report = requireReport(reportId);
+        ReviewTaskEntity task = requireTask(report.getTaskId());
+        assertTaskAccess(currentUserId, admin, task);
         return reviewRiskService.listByReportId(reportId);
     }
 
     @Override
     public ReviewRiskItemResponse updateRisk(UUID currentUserId, boolean admin, UUID riskId, ReviewRiskUpdateRequest request) {
+        ReviewRiskItemEntity risk = reviewRiskService.findById(riskId);
+        if (risk == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u98ce\u9669\u9879\u4e0d\u5b58\u5728");
+        }
+        ReviewReportEntity report = requireReport(risk.getReportId());
+        UUID taskId = risk.getTaskId() == null ? report.getTaskId() : risk.getTaskId();
+        ReviewTaskEntity task = requireTask(taskId);
+        assertTaskAccess(currentUserId, admin, task);
         return reviewRiskService.updateStatus(riskId, request.status(), request.reviewerNote());
     }
 
@@ -329,6 +337,21 @@ public class ReviewServiceImpl implements ReviewService {
                 + "}\n"
                 + "评审维度必须覆盖政策导向、专业匹配、创新性、逻辑性、语言质量；风险项必须检查政治不当表述、参考文献不规范、结构缺失和语言问题。";
         return new PromptConstructionService.Prompt(systemMessage, userMessage);
+    }
+
+    private ReviewReportEntity requireReport(UUID reportId) {
+        ReviewReportEntity report = reportMapper.selectById(reportId);
+        if (report == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u8bc4\u5ba1\u62a5\u544a\u4e0d\u5b58\u5728");
+        }
+        return report;
+    }
+
+    private void assertTaskAccess(UUID currentUserId, boolean admin, ReviewTaskEntity task) {
+        if (admin || task.getReviewerUserId() == null || task.getReviewerUserId().equals(currentUserId)) {
+            return;
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u65e0\u6743\u8bbf\u95ee\u8be5\u8bc4\u5ba1\u4efb\u52a1");
     }
 
     private ReviewTaskEntity requireTask(UUID taskId) {
