@@ -17,6 +17,8 @@ import com.lqr.paperragserver.review.dto.ReviewCriterionRequest;
 import com.lqr.paperragserver.review.dto.ReviewCriterionResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportUpdateRequest;
+import com.lqr.paperragserver.review.dto.ReviewRiskItemResponse;
+import com.lqr.paperragserver.review.dto.ReviewRiskUpdateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskCreateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskResponse;
 import com.lqr.paperragserver.review.entity.ReviewAuditLogEntity;
@@ -28,8 +30,10 @@ import com.lqr.paperragserver.review.mapper.ReviewCriterionMapper;
 import com.lqr.paperragserver.review.mapper.ReviewReportMapper;
 import com.lqr.paperragserver.review.mapper.ReviewTaskMapper;
 import com.lqr.paperragserver.review.assessment.ReviewOutputParser;
+import com.lqr.paperragserver.review.risk.ReviewRiskService;
 import com.lqr.paperragserver.review.service.ReviewService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +63,9 @@ public class ReviewServiceImpl implements ReviewService {
     private final LlmService llmService;
     private final ReviewOutputParser reviewOutputParser;
     private final ObjectMapper objectMapper;
+
+    @Autowired
+    private ReviewRiskService reviewRiskService;
 
     @Override
     public PageResponse<ReviewTaskResponse> listTasks(UUID currentUserId, boolean admin, String keyword, String status, int page, int size) {
@@ -183,6 +190,7 @@ public class ReviewServiceImpl implements ReviewService {
         } else {
             reportMapper.updateById(report);
         }
+        reviewRiskService.replaceReportRisks(report.getId(), task.getId(), report.getRisks());
         appendAudit(task.getId(), currentUserId, "AI_REVIEW", "生成 AI 辅助评审报告", Map.of("reportId", report.getId().toString()));
         return ReviewReportResponse.from(reportMapper.selectLatestByTaskId(task.getId()));
     }
@@ -226,6 +234,20 @@ public class ReviewServiceImpl implements ReviewService {
         }
         appendAudit(task.getId(), currentUserId, "ADJUST_REPORT", "人工调整评审报告", Map.of("reportId", reportId.toString(), "status", nextStatus));
         return ReviewReportResponse.from(reportMapper.selectById(reportId));
+    }
+
+    @Override
+    public List<ReviewRiskItemResponse> listRisks(UUID currentUserId, boolean admin, UUID reportId) {
+        ReviewReportEntity report = reportMapper.selectById(reportId);
+        if (report == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "风险报告不存在");
+        }
+        return reviewRiskService.listByReportId(reportId);
+    }
+
+    @Override
+    public ReviewRiskItemResponse updateRisk(UUID currentUserId, boolean admin, UUID riskId, ReviewRiskUpdateRequest request) {
+        return reviewRiskService.updateStatus(riskId, request.status(), request.reviewerNote());
     }
 
     @Override
