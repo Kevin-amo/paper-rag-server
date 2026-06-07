@@ -396,6 +396,12 @@ export interface UploadReviewPaperPayload {
   title?: string;
 }
 
+export interface ReviewScoringRule {
+  level: string;
+  range: [number, number];
+  description: string;
+}
+
 export interface ReviewCriterion {
   id: string;
   code: string;
@@ -403,6 +409,10 @@ export interface ReviewCriterion {
   description: string | null;
   maxScore: number;
   weight: number;
+  version: number;
+  category: string | null;
+  evidenceRequired: boolean;
+  scoringRules: ReviewScoringRule[] | Record<string, unknown> | null;
   enabled: boolean;
   sortOrder: number;
   createdAt: string;
@@ -425,6 +435,28 @@ export interface ReviewRiskItem {
   suggestion: string;
 }
 
+export interface ReviewRiskRecord {
+  id: string;
+  reportId: string;
+  taskId: string;
+  riskType: string;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string;
+  evidence: string | null;
+  evidenceLocation: Record<string, unknown>;
+  suggestion: string | null;
+  detector: string | null;
+  confidence: number | null;
+  status: 'OPEN' | 'CONFIRMED' | 'IGNORED' | 'RESOLVED' | string;
+  reviewerNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateReviewRiskPayload {
+  status: 'OPEN' | 'CONFIRMED' | 'IGNORED' | 'RESOLVED';
+  reviewerNote?: string | null;
+}
+
 export interface ReviewComments {
   summary?: string;
   strengths?: string[];
@@ -443,6 +475,11 @@ export interface ReviewReport {
   scores: ReviewScoreItem[] | unknown;
   comments: ReviewComments | Record<string, unknown>;
   risks: ReviewRiskItem[] | unknown;
+  criterionVersion: number | null;
+  modelVersion: string | null;
+  promptVersion: string | null;
+  confidence: number | null;
+  manualDelta: Record<string, unknown> | null;
   totalScore: number | null;
   finalRecommendation: string | null;
   status: ReviewReportStatus;
