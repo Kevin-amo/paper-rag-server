@@ -92,6 +92,17 @@ function riskStatusLabel(status: ReviewRiskRecord['status']) {
   return riskStatusMap[status] ?? status;
 }
 
+function isRiskUpdating(riskId: string) {
+  return reviews.riskStatusUpdatingIds.value.includes(riskId);
+}
+
+function isRiskActionDisabled(
+  risk: ReviewRiskRecord,
+  status: 'CONFIRMED' | 'IGNORED' | 'RESOLVED',
+) {
+  return isRiskUpdating(risk.id) || risk.status === status;
+}
+
 function buildReviewSourceId(file: File) {
   return `review-${file.name}-${file.size}-${file.lastModified}`.replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 128);
 }
@@ -413,16 +424,36 @@ onMounted(async () => {
                         </div>
                         <p>{{ risk.evidence || '未给出证据' }}</p>
                         <span>{{ risk.suggestion || '建议人工复核' }}</span>
-                        <span v-if="risk.confidence !== null">置信度：{{ risk.confidence }}</span>
+                        <span v-if="risk.confidence != null">置信度：{{ risk.confidence }}</span>
                         <span v-if="risk.detector">检测器：{{ risk.detector }}</span>
                         <div class="risk-actions">
-                          <el-button size="small" type="primary" plain @click="reviews.setRiskStatus(risk.id, 'CONFIRMED')">
+                          <el-button
+                            size="small"
+                            type="primary"
+                            plain
+                            :loading="isRiskUpdating(risk.id)"
+                            :disabled="isRiskActionDisabled(risk, 'CONFIRMED')"
+                            @click="reviews.setRiskStatus(risk.id, 'CONFIRMED')"
+                          >
                             确认
                           </el-button>
-                          <el-button size="small" plain @click="reviews.setRiskStatus(risk.id, 'IGNORED')">
+                          <el-button
+                            size="small"
+                            plain
+                            :loading="isRiskUpdating(risk.id)"
+                            :disabled="isRiskActionDisabled(risk, 'IGNORED')"
+                            @click="reviews.setRiskStatus(risk.id, 'IGNORED')"
+                          >
                             忽略
                           </el-button>
-                          <el-button size="small" type="success" plain @click="reviews.setRiskStatus(risk.id, 'RESOLVED')">
+                          <el-button
+                            size="small"
+                            type="success"
+                            plain
+                            :loading="isRiskUpdating(risk.id)"
+                            :disabled="isRiskActionDisabled(risk, 'RESOLVED')"
+                            @click="reviews.setRiskStatus(risk.id, 'RESOLVED')"
+                          >
                             标记解决
                           </el-button>
                         </div>
@@ -854,6 +885,12 @@ onMounted(async () => {
   font-size: 12px;
 }
 
+.risk-list p,
+.risk-list span,
+.risk-heading {
+  overflow-wrap: anywhere;
+}
+
 .normalized-risk-list article {
   grid-template-columns: auto minmax(0, 1fr);
 }
@@ -906,6 +943,7 @@ onMounted(async () => {
   color: var(--app-text);
   line-height: 1.6;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 1180px) {
