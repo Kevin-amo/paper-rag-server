@@ -420,6 +420,10 @@ public class ReviewServiceImpl implements ReviewService {
         entity.setDescription(blankToNull(request.description()));
         entity.setMaxScore(request.maxScore() == null ? 100 : request.maxScore());
         entity.setWeight(request.weight() == null ? 20 : request.weight());
+        entity.setVersion(request.version() == null ? 1 : request.version());
+        entity.setCategory(blankToNull(request.category()));
+        entity.setEvidenceRequired(request.evidenceRequired() == null || request.evidenceRequired());
+        entity.setScoringRules(request.scoringRules() == null ? List.of() : request.scoringRules());
         entity.setEnabled(request.enabled() == null || request.enabled());
         entity.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
     }

@@ -44,6 +44,13 @@ public class PaperStructuredParseEntity {
     private Object lowConfidenceFields;
 
     private String rawModelOutput;
+    private String parserVersion;
+    private String modelVersion;
+    private String promptVersion;
+
+    @TableField(value = "quality_metrics", typeHandler = JsonbTypeHandler.class)
+    private Object qualityMetrics;
+
     private String status;
     private String errorMessage;
     private OffsetDateTime parsedAt;

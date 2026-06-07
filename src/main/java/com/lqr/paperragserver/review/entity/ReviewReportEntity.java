@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.lqr.paperragserver.common.typehandler.JsonbTypeHandler;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -36,6 +37,14 @@ public class ReviewReportEntity {
 
     @TableField(value = "raw_model_output", typeHandler = JsonbTypeHandler.class)
     private Map<String, Object> rawModelOutput;
+
+    private Integer criterionVersion;
+    private String modelVersion;
+    private String promptVersion;
+    private BigDecimal confidence;
+
+    @TableField(value = "manual_delta", typeHandler = JsonbTypeHandler.class)
+    private Map<String, Object> manualDelta;
 
     private Integer totalScore;
     private String finalRecommendation;
