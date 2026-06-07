@@ -412,7 +412,7 @@ export interface ReviewCriterion {
   version: number;
   category: string | null;
   evidenceRequired: boolean;
-  scoringRules: ReviewScoringRule[] | Record<string, unknown> | null;
+  scoringRules: Array<Record<string, unknown>> | Record<string, unknown> | null;
   enabled: boolean;
   sortOrder: number;
   createdAt: string;
