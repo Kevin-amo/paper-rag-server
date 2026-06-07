@@ -56,6 +56,35 @@ class ReviewServiceImplTest {
         Object merged = method.invoke(service, modelRisks, referenceRisks);
 
         assertThat((List<?>) merged).hasSize(2);
+        assertThat((List<?>) merged).first().isEqualTo(modelRisks.get(0));
+        assertThat((List<?>) merged).element(1).satisfies(item -> {
+            Map<?, ?> referenceRisk = (Map<?, ?>) item;
+            assertThat(referenceRisk.get("type")).isEqualTo("REFERENCE_FORMAT");
+            assertThat(referenceRisk.get("level")).isEqualTo("MEDIUM");
+            assertThat(referenceRisk.get("evidence")).isEqualTo("[1] 缺少年份");
+            assertThat(referenceRisk.get("suggestion")).isEqualTo("补全年份");
+            assertThat(referenceRisk.get("detector")).isEqualTo("REFERENCE_RULE");
+            assertThat(referenceRisk.get("confidence")).isEqualTo(0.82);
+        });
+    }
+
+    @Test
+    void structuredReferencesShouldJoinListAndArrayEntriesWithNewlines() throws Exception {
+        ReviewServiceImpl service = serviceWithRiskAccess(null, null, null);
+        Method method = ReviewServiceImpl.class.getDeclaredMethod("structuredReferences", Map.class);
+        method.setAccessible(true);
+
+        Object fromList = method.invoke(service, Map.of(
+                "paperSections", Map.of("references", List.of("[1] Missing year", "[2] Smith. 2024. Title"))
+        ));
+        Object fromArray = method.invoke(service, Map.of(
+                "paperSections", Map.of("references", new String[]{"[1] Missing year", "[2] Smith. 2024. Title"})
+        ));
+
+        String expected = "[1] Missing year" + System.lineSeparator() + "[2] Smith. 2024. Title";
+        assertThat(fromList).isEqualTo(expected);
+        assertThat(fromArray).isEqualTo(expected);
+        assertThat((String) fromList).doesNotStartWith("[[").doesNotContain(", ");
     }
 
     @Test
