@@ -15,12 +15,14 @@ import com.lqr.paperragserver.review.mapper.ReviewAuditLogMapper;
 import com.lqr.paperragserver.review.mapper.ReviewCriterionMapper;
 import com.lqr.paperragserver.review.mapper.ReviewReportMapper;
 import com.lqr.paperragserver.review.mapper.ReviewTaskMapper;
+import com.lqr.paperragserver.review.risk.ReferenceFormatChecker;
 import com.lqr.paperragserver.review.risk.ReviewRiskService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.lang.reflect.Method;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +39,26 @@ import static org.mockito.Mockito.when;
 class ReviewServiceImplTest {
 
     @Test
+    void mergeRisksShouldAppendReferenceRisksWithoutDroppingModelRisks() throws Exception {
+        List<Map<String, Object>> modelRisks = List.of(Map.of(
+                "type", "STRUCTURE_MISSING",
+                "level", "LOW",
+                "evidence", "缺少讨论章节",
+                "suggestion", "补充讨论"
+        ));
+        List<ReferenceFormatChecker.ReferenceRisk> referenceRisks = List.of(
+                new ReferenceFormatChecker.ReferenceRisk("REFERENCE_FORMAT", "MEDIUM", "[1] 缺少年份", "补全年份", 0.82)
+        );
+        ReviewServiceImpl service = serviceWithRiskAccess(null, null, null);
+
+        Method method = ReviewServiceImpl.class.getDeclaredMethod("mergeRisks", Object.class, List.class);
+        method.setAccessible(true);
+        Object merged = method.invoke(service, modelRisks, referenceRisks);
+
+        assertThat((List<?>) merged).hasSize(2);
+    }
+
+    @Test
     void constructorShouldAcceptReviewOutputParserDependency() {
         ObjectMapper objectMapper = new ObjectMapper();
         ReviewServiceImpl service = new ReviewServiceImpl(
@@ -49,6 +71,7 @@ class ReviewServiceImplTest {
                 null,
                 null,
                 new ReviewOutputParser(objectMapper),
+                new ReferenceFormatChecker(),
                 objectMapper
         );
 
@@ -127,6 +150,7 @@ class ReviewServiceImplTest {
                 paperStructuredParseService,
                 llmService,
                 reviewOutputParser,
+                new ReferenceFormatChecker(),
                 objectMapper
         );
 
@@ -215,6 +239,7 @@ class ReviewServiceImplTest {
                 null,
                 null,
                 null,
+                new ReferenceFormatChecker(),
                 new ObjectMapper()
         );
         ReflectionTestUtils.setField(service, "reviewRiskService", riskService);
