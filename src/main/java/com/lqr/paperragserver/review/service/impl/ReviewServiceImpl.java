@@ -3,7 +3,6 @@ package com.lqr.paperragserver.review.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
@@ -28,6 +27,7 @@ import com.lqr.paperragserver.review.mapper.ReviewAuditLogMapper;
 import com.lqr.paperragserver.review.mapper.ReviewCriterionMapper;
 import com.lqr.paperragserver.review.mapper.ReviewReportMapper;
 import com.lqr.paperragserver.review.mapper.ReviewTaskMapper;
+import com.lqr.paperragserver.review.assessment.ReviewOutputParser;
 import com.lqr.paperragserver.review.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -57,6 +57,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final DocumentPersistenceService documentPersistenceService;
     private final PaperStructuredParseService paperStructuredParseService;
     private final LlmService llmService;
+    private final ReviewOutputParser reviewOutputParser;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -150,7 +151,7 @@ public class ReviewServiceImpl implements ReviewService {
 
         taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
         String modelText = llmService.generate(buildReviewPrompt(document, criteria));
-        Map<String, Object> parsed = parseModelOutput(modelText);
+        Map<String, Object> parsed = reviewOutputParser.parse(modelText);
         ReviewReportEntity report = reportMapper.selectLatestByTaskId(task.getId());
         boolean creating = report == null;
         OffsetDateTime now = OffsetDateTime.now();
@@ -301,83 +302,6 @@ public class ReviewServiceImpl implements ReviewService {
                 + "}\n"
                 + "评审维度必须覆盖政策导向、专业匹配、创新性、逻辑性、语言质量；风险项必须检查政治不当表述、参考文献不规范、结构缺失和语言问题。";
         return new PromptConstructionService.Prompt(systemMessage, userMessage);
-    }
-
-    private Map<String, Object> parseModelOutput(String modelText) {
-        String json = extractJson(modelText);
-        try {
-            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
-            });
-        } catch (JsonProcessingException ex) {
-            String repairedJson = repairJson(json);
-            try {
-                return objectMapper.readValue(repairedJson, new TypeReference<Map<String, Object>>() {
-                });
-            } catch (JsonProcessingException ignored) {
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果不是有效 JSON，请重试");
-            }
-        }
-    }
-
-    private String extractJson(String value) {
-        if (value == null || value.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果为空");
-        }
-        String text = stripCodeFence(value.trim());
-        int start = text.indexOf('{');
-        if (start < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果缺少 JSON 对象");
-        }
-        int end = balancedObjectEnd(text, start);
-        if (end < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果 JSON 对象不完整");
-        }
-        return text.substring(start, end + 1);
-    }
-
-    private String stripCodeFence(String value) {
-        String text = value.trim();
-        if (text.startsWith("```")) {
-            text = text.replaceFirst("^```[a-zA-Z]*\\s*", "").replaceFirst("\\s*```$", "").trim();
-        }
-        return text;
-    }
-
-    private int balancedObjectEnd(String text, int start) {
-        int depth = 0;
-        boolean inString = false;
-        boolean escaped = false;
-        for (int index = start; index < text.length(); index++) {
-            char ch = text.charAt(index);
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-            if (ch == '\\' && inString) {
-                escaped = true;
-                continue;
-            }
-            if (ch == '"') {
-                inString = !inString;
-                continue;
-            }
-            if (inString) {
-                continue;
-            }
-            if (ch == '{') {
-                depth++;
-            } else if (ch == '}') {
-                depth--;
-                if (depth == 0) {
-                    return index;
-                }
-            }
-        }
-        return -1;
-    }
-
-    private String repairJson(String json) {
-        return json.replaceAll(",\\s*([}\\]])", "$1");
     }
 
     private ReviewTaskEntity requireTask(UUID taskId) {
