@@ -14,6 +14,8 @@ import com.lqr.paperragserver.review.dto.ReviewCriterionRequest;
 import com.lqr.paperragserver.review.dto.ReviewCriterionResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportUpdateRequest;
+import com.lqr.paperragserver.review.dto.ReviewRiskItemResponse;
+import com.lqr.paperragserver.review.dto.ReviewRiskUpdateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskCreateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskResponse;
 import com.lqr.paperragserver.review.service.ReviewService;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -120,6 +123,45 @@ public class ReviewController {
         return reviewService.updateReport(principal.getId(), isAdmin(principal), reportId, request);
     }
 
+    @GetMapping("/reports/{reportId}/risks")
+    public List<ReviewRiskItemResponse> listRisks(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                  @PathVariable UUID reportId) {
+        requireReviewer(principal);
+        return reviewService.listRisks(principal.getId(), isAdmin(principal), reportId);
+    }
+
+    @PutMapping("/risks/{riskId}")
+    public ReviewRiskItemResponse updateRisk(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                             @PathVariable UUID riskId,
+                                             @Valid @RequestBody ReviewRiskUpdateRequest request) {
+        requireReviewer(principal);
+        return reviewService.updateRisk(principal.getId(), isAdmin(principal), riskId, request);
+    }
+
+    @PostMapping("/risks/{riskId}/confirm")
+    public ReviewRiskItemResponse confirmRisk(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                              @PathVariable UUID riskId,
+                                              @RequestBody(required = false) ReviewRiskUpdateRequest request) {
+        requireReviewer(principal);
+        return reviewService.updateRisk(principal.getId(), isAdmin(principal), riskId, statusRequest("CONFIRMED", request));
+    }
+
+    @PostMapping("/risks/{riskId}/ignore")
+    public ReviewRiskItemResponse ignoreRisk(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                             @PathVariable UUID riskId,
+                                             @RequestBody(required = false) ReviewRiskUpdateRequest request) {
+        requireReviewer(principal);
+        return reviewService.updateRisk(principal.getId(), isAdmin(principal), riskId, statusRequest("IGNORED", request));
+    }
+
+    @PostMapping("/risks/{riskId}/resolve")
+    public ReviewRiskItemResponse resolveRisk(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                              @PathVariable UUID riskId,
+                                              @RequestBody(required = false) ReviewRiskUpdateRequest request) {
+        requireReviewer(principal);
+        return reviewService.updateRisk(principal.getId(), isAdmin(principal), riskId, statusRequest("RESOLVED", request));
+    }
+
     @GetMapping("/criteria")
     public List<ReviewCriterionResponse> listCriteria(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                       @RequestParam(value = "includeDisabled", defaultValue = "false") boolean includeDisabled) {
@@ -140,6 +182,10 @@ public class ReviewController {
                                                    @Valid @RequestBody ReviewCriterionRequest request) {
         requireAdmin(principal);
         return reviewService.updateCriterion(id, request);
+    }
+
+    private ReviewRiskUpdateRequest statusRequest(String status, ReviewRiskUpdateRequest request) {
+        return new ReviewRiskUpdateRequest(status, request == null ? null : request.reviewerNote());
     }
 
     private void requireReviewer(SecurityUserPrincipal principal) {
