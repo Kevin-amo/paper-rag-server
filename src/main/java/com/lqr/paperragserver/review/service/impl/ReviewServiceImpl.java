@@ -41,6 +41,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.lang.reflect.Array;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -446,7 +447,20 @@ public class ReviewServiceImpl implements ReviewService {
         Object sections = parsed.get("paperSections");
         if (sections instanceof Map<?, ?> map) {
             Object references = map.get("references");
-            return references == null ? "" : String.valueOf(references);
+            if (references == null) {
+                return "";
+            }
+            if (references instanceof List<?> list) {
+                return String.join(System.lineSeparator(), list.stream().map(String::valueOf).toList());
+            }
+            if (references.getClass().isArray()) {
+                List<String> entries = new ArrayList<>();
+                for (int i = 0; i < Array.getLength(references); i++) {
+                    entries.add(String.valueOf(Array.get(references, i)));
+                }
+                return String.join(System.lineSeparator(), entries);
+            }
+            return String.valueOf(references);
         }
         return "";
     }
