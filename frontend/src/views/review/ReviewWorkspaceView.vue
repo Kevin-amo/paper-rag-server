@@ -401,9 +401,6 @@ onMounted(async () => {
                     <h3>风险提示</h3>
                     <span>政治表述、参考文献、结构与语言风险的规范化记录</span>
                   </div>
-                  <el-button size="small" :disabled="!selectedReport" :loading="reviews.riskLoading.value" @click="reviews.loadRisks(selectedReport?.id ?? null)">
-                    刷新风险
-                  </el-button>
                 </div>
                 <div v-loading="reviews.riskLoading.value">
                   <div v-if="riskRecords.length" class="risk-list normalized-risk-list">
