@@ -36,7 +36,6 @@ import com.lqr.paperragserver.review.risk.ReferenceFormatChecker;
 import com.lqr.paperragserver.review.risk.ReviewRiskService;
 import com.lqr.paperragserver.review.service.ReviewService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,9 +69,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReferenceFormatChecker referenceFormatChecker;
     private final ObjectMapper objectMapper;
     private final ReviewAuditService reviewAuditService;
-
-    @Autowired
-    private ReviewRiskService reviewRiskService;
+    private final ReviewRiskService reviewRiskService;
 
     @Override
     public PageResponse<ReviewTaskResponse> listTasks(UUID currentUserId, boolean admin, String keyword, String status, int page, int size) {
@@ -157,6 +154,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Transactional
     public ReviewReportResponse generateAiReview(UUID currentUserId, boolean admin, UUID taskId) {
         ReviewTaskEntity task = requireTask(taskId);
+        assertTaskAccess(currentUserId, admin, task);
         DocumentPersistenceService.DocumentDetail document = requireDocument(task);
         List<ReviewCriterionResponse> criteria = listCriteria(false);
         if (criteria.isEmpty()) {
@@ -171,7 +169,7 @@ public class ReviewServiceImpl implements ReviewService {
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
         }
-        List<ReferenceFormatChecker.ReferenceRisk> referenceRisks = referenceFormatChecker.check(structuredReferences(parsed));
+        List<ReferenceFormatChecker.ReferenceRisk> referenceRisks = referenceFormatChecker.check(referenceCheckerInput(document, parsed));
         ReviewReportEntity report = reportMapper.selectLatestByTaskId(task.getId());
         boolean creating = report == null;
         OffsetDateTime now = OffsetDateTime.now();
@@ -211,7 +209,9 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "评审报告不存在");
         }
         ReviewTaskEntity task = requireTask(report.getTaskId());
+        assertTaskAccess(currentUserId, admin, task);
         Map<String, Object> beforeSnapshot = reportSnapshot(report);
+        boolean risksProvided = request.risks() != null;
         report.setReviewerUserId(currentUserId);
         if (request.paperSections() != null) {
             report.setPaperSections(request.paperSections());
@@ -242,6 +242,9 @@ public class ReviewServiceImpl implements ReviewService {
             taskMapper.updateStatus(task.getId(), currentUserId, "COMPLETED");
         } else {
             taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
+        }
+        if (risksProvided) {
+            reviewRiskService.replaceReportRisks(report.getId(), task.getId(), report.getRisks());
         }
         reviewAuditService.append(task.getId(), currentUserId, "ADJUST_REPORT", "人工调整评审报告", beforeSnapshot, afterSnapshot, Map.of());
         return ReviewReportResponse.from(reportMapper.selectById(reportId));
@@ -474,23 +477,47 @@ public class ReviewServiceImpl implements ReviewService {
     private String structuredReferences(Map<String, Object> parsed) {
         Object sections = parsed.get("paperSections");
         if (sections instanceof Map<?, ?> map) {
-            Object references = map.get("references");
-            if (references == null) {
-                return "";
-            }
-            if (references instanceof List<?> list) {
-                return String.join(System.lineSeparator(), list.stream().map(String::valueOf).toList());
-            }
-            if (references.getClass().isArray()) {
-                List<String> entries = new ArrayList<>();
-                for (int i = 0; i < Array.getLength(references); i++) {
-                    entries.add(String.valueOf(Array.get(references, i)));
-                }
-                return String.join(System.lineSeparator(), entries);
-            }
-            return String.valueOf(references);
+            return referencesText(map.get("references"));
         }
         return "";
+    }
+
+    private String referenceCheckerInput(DocumentPersistenceService.DocumentDetail document, Map<String, Object> parsed) {
+        String structuredParseReferences = paperStructuredParseService.find(document.ownerUserId(), document.sourceId())
+                .map(result -> referencesFromStructuredParse(result.getMergedResult()))
+                .orElse("");
+        return structuredParseReferences.isBlank() ? structuredReferences(parsed) : structuredParseReferences;
+    }
+
+    private String referencesFromStructuredParse(Object mergedResult) {
+        if (mergedResult instanceof Map<?, ?> map) {
+            String directReferences = referencesText(map.get("references"));
+            if (!directReferences.isBlank()) {
+                return directReferences;
+            }
+            Object sections = map.get("paperSections");
+            if (sections instanceof Map<?, ?> sectionMap) {
+                return referencesText(sectionMap.get("references"));
+            }
+        }
+        return "";
+    }
+
+    private String referencesText(Object references) {
+        if (references == null) {
+            return "";
+        }
+        if (references instanceof List<?> list) {
+            return String.join(System.lineSeparator(), list.stream().map(String::valueOf).toList());
+        }
+        if (references.getClass().isArray()) {
+            List<String> entries = new ArrayList<>();
+            for (int i = 0; i < Array.getLength(references); i++) {
+                entries.add(String.valueOf(Array.get(references, i)));
+            }
+            return String.join(System.lineSeparator(), entries);
+        }
+        return String.valueOf(references);
     }
 
     private Object mergeRisks(Object modelRisks, List<ReferenceFormatChecker.ReferenceRisk> referenceRisks) {
