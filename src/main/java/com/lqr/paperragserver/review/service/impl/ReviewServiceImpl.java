@@ -21,6 +21,7 @@ import com.lqr.paperragserver.review.dto.ReviewRiskItemResponse;
 import com.lqr.paperragserver.review.dto.ReviewRiskUpdateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskCreateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskResponse;
+import com.lqr.paperragserver.review.audit.ReviewAuditService;
 import com.lqr.paperragserver.review.entity.ReviewAuditLogEntity;
 import com.lqr.paperragserver.review.entity.ReviewCriterionEntity;
 import com.lqr.paperragserver.review.entity.ReviewReportEntity;
@@ -47,6 +48,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -70,6 +72,9 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Autowired
     private ReviewRiskService reviewRiskService;
+
+    @Autowired
+    private ReviewAuditService reviewAuditService;
 
     @Override
     public PageResponse<ReviewTaskResponse> listTasks(UUID currentUserId, boolean admin, String keyword, String status, int page, int size) {
@@ -208,6 +213,7 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "评审报告不存在");
         }
         ReviewTaskEntity task = requireTask(report.getTaskId());
+        Map<String, Object> beforeSnapshot = reportSnapshot(report);
         report.setReviewerUserId(currentUserId);
         if (request.paperSections() != null) {
             report.setPaperSections(request.paperSections());
@@ -231,13 +237,14 @@ public class ReviewServiceImpl implements ReviewService {
         report.setStatus(nextStatus);
         report.setAdjustedAt(OffsetDateTime.now());
         report.setUpdatedAt(OffsetDateTime.now());
+        report.setManualDelta(manualDelta(beforeSnapshot, reportSnapshot(report)));
         reportMapper.updateById(report);
         if ("CONFIRMED".equals(nextStatus) || "COMPLETED".equals(nextStatus)) {
             taskMapper.updateStatus(task.getId(), currentUserId, "COMPLETED");
         } else {
             taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
         }
-        appendAudit(task.getId(), currentUserId, "ADJUST_REPORT", "人工调整评审报告", Map.of("reportId", reportId.toString(), "status", nextStatus));
+        reviewAuditService.append(task.getId(), currentUserId, "ADJUST_REPORT", "人工调整评审报告", beforeSnapshot, reportSnapshot(report), Map.of());
         return ReviewReportResponse.from(reportMapper.selectById(reportId));
     }
 
@@ -416,6 +423,27 @@ public class ReviewServiceImpl implements ReviewService {
         log.setSnapshot(snapshot);
         log.setCreatedAt(OffsetDateTime.now());
         auditLogMapper.insert(log);
+    }
+
+    private Map<String, Object> reportSnapshot(ReviewReportEntity report) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("paperSections", report.getPaperSections());
+        snapshot.put("scores", report.getScores());
+        snapshot.put("comments", report.getComments());
+        snapshot.put("risks", report.getRisks());
+        snapshot.put("totalScore", report.getTotalScore());
+        snapshot.put("finalRecommendation", report.getFinalRecommendation());
+        snapshot.put("status", report.getStatus());
+        return snapshot;
+    }
+
+    private Map<String, Object> manualDelta(Map<String, Object> before, Map<String, Object> after) {
+        return Map.of(
+                "scoreChanged", !Objects.equals(before.get("scores"), after.get("scores")) || !Objects.equals(before.get("totalScore"), after.get("totalScore")),
+                "commentEdited", !Objects.equals(before.get("comments"), after.get("comments")),
+                "riskOverridden", !Objects.equals(before.get("risks"), after.get("risks")),
+                "finalRecommendationChanged", !Objects.equals(before.get("finalRecommendation"), after.get("finalRecommendation"))
+        );
     }
 
     private Map<String, Object> rawOutput(Map<String, Object> parsed, String modelText) {
