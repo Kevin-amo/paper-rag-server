@@ -151,7 +151,12 @@ public class ReviewServiceImpl implements ReviewService {
 
         taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
         String modelText = llmService.generate(buildReviewPrompt(document, criteria));
-        Map<String, Object> parsed = reviewOutputParser.parse(modelText);
+        Map<String, Object> parsed;
+        try {
+            parsed = reviewOutputParser.parse(modelText);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
+        }
         ReviewReportEntity report = reportMapper.selectLatestByTaskId(task.getId());
         boolean creating = report == null;
         OffsetDateTime now = OffsetDateTime.now();
