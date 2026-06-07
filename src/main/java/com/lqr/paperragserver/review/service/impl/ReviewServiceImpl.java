@@ -31,6 +31,7 @@ import com.lqr.paperragserver.review.mapper.ReviewCriterionMapper;
 import com.lqr.paperragserver.review.mapper.ReviewReportMapper;
 import com.lqr.paperragserver.review.mapper.ReviewTaskMapper;
 import com.lqr.paperragserver.review.assessment.ReviewOutputParser;
+import com.lqr.paperragserver.review.risk.ReferenceFormatChecker;
 import com.lqr.paperragserver.review.risk.ReviewRiskService;
 import com.lqr.paperragserver.review.service.ReviewService;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +64,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final PaperStructuredParseService paperStructuredParseService;
     private final LlmService llmService;
     private final ReviewOutputParser reviewOutputParser;
+    private final ReferenceFormatChecker referenceFormatChecker;
     private final ObjectMapper objectMapper;
 
     @Autowired
@@ -165,6 +167,7 @@ public class ReviewServiceImpl implements ReviewService {
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
         }
+        List<ReferenceFormatChecker.ReferenceRisk> referenceRisks = referenceFormatChecker.check(structuredReferences(parsed));
         ReviewReportEntity report = reportMapper.selectLatestByTaskId(task.getId());
         boolean creating = report == null;
         OffsetDateTime now = OffsetDateTime.now();
@@ -179,7 +182,7 @@ public class ReviewServiceImpl implements ReviewService {
         report.setPaperSections(mapValue(parsed.get("paperSections")));
         report.setScores(valueOrDefault(parsed.get("scores"), List.of()));
         report.setComments(mapValue(parsed.get("comments")));
-        report.setRisks(valueOrDefault(parsed.get("risks"), List.of()));
+        report.setRisks(mergeRisks(valueOrDefault(parsed.get("risks"), List.of()), referenceRisks));
         report.setRawModelOutput(rawOutput(parsed, modelText));
         report.setTotalScore(intValue(parsed.get("totalScore"), calculateTotalScore(parsed.get("scores"))));
         report.setFinalRecommendation(stringValue(parsed.get("finalRecommendation"), "建议人工复核后进入下一评审环节"));
@@ -437,6 +440,33 @@ public class ReviewServiceImpl implements ReviewService {
 
     private Object valueOrDefault(Object value, Object fallback) {
         return value == null ? fallback : value;
+    }
+
+    private String structuredReferences(Map<String, Object> parsed) {
+        Object sections = parsed.get("paperSections");
+        if (sections instanceof Map<?, ?> map) {
+            Object references = map.get("references");
+            return references == null ? "" : String.valueOf(references);
+        }
+        return "";
+    }
+
+    private Object mergeRisks(Object modelRisks, List<ReferenceFormatChecker.ReferenceRisk> referenceRisks) {
+        List<Object> merged = new ArrayList<>();
+        if (modelRisks instanceof List<?> list) {
+            merged.addAll(list);
+        }
+        for (ReferenceFormatChecker.ReferenceRisk risk : referenceRisks) {
+            merged.add(Map.of(
+                    "type", risk.riskType(),
+                    "level", risk.riskLevel(),
+                    "evidence", risk.evidence(),
+                    "suggestion", risk.suggestion(),
+                    "detector", "REFERENCE_RULE",
+                    "confidence", risk.confidence()
+            ));
+        }
+        return merged;
     }
 
     private int calculateTotalScore(Object scores) {
