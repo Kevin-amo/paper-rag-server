@@ -5,14 +5,20 @@ import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.document.structured.service.PaperStructuredParseService;
 import com.lqr.paperragserver.review.assessment.ReviewOutputParser;
+import com.lqr.paperragserver.review.dto.ReviewRiskItemResponse;
+import com.lqr.paperragserver.review.dto.ReviewRiskUpdateRequest;
 import com.lqr.paperragserver.review.entity.ReviewCriterionEntity;
+import com.lqr.paperragserver.review.entity.ReviewReportEntity;
+import com.lqr.paperragserver.review.entity.ReviewRiskItemEntity;
 import com.lqr.paperragserver.review.entity.ReviewTaskEntity;
 import com.lqr.paperragserver.review.mapper.ReviewAuditLogMapper;
 import com.lqr.paperragserver.review.mapper.ReviewCriterionMapper;
 import com.lqr.paperragserver.review.mapper.ReviewReportMapper;
 import com.lqr.paperragserver.review.mapper.ReviewTaskMapper;
+import com.lqr.paperragserver.review.risk.ReviewRiskService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
@@ -25,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ReviewServiceImplTest {
@@ -132,4 +139,100 @@ class ReviewServiceImplTest {
                     assertThat(response.getCause()).isInstanceOf(IllegalArgumentException.class);
                 });
     }
+
+    @Test
+    void listRisksShouldRejectTaskAssignedToAnotherReviewer() {
+        UUID currentUserId = UUID.randomUUID();
+        UUID otherReviewerId = UUID.randomUUID();
+        UUID reportId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
+        ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
+        ReviewRiskService riskService = mock(ReviewRiskService.class);
+        ReviewServiceImpl service = serviceWithRiskAccess(taskMapper, reportMapper, riskService);
+        when(reportMapper.selectById(reportId)).thenReturn(report(reportId, taskId));
+        when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task(taskId, otherReviewerId));
+
+        assertThatThrownBy(() -> service.listRisks(currentUserId, false, reportId))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    void listRisksShouldAllowAdminForAssignedTask() {
+        UUID currentUserId = UUID.randomUUID();
+        UUID reportId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
+        ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
+        ReviewRiskService riskService = mock(ReviewRiskService.class);
+        ReviewServiceImpl service = serviceWithRiskAccess(taskMapper, reportMapper, riskService);
+        when(reportMapper.selectById(reportId)).thenReturn(report(reportId, taskId));
+        when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task(taskId, UUID.randomUUID()));
+        when(riskService.listByReportId(reportId)).thenReturn(List.of());
+
+        assertThat(service.listRisks(currentUserId, true, reportId)).isEmpty();
+
+        verify(riskService).listByReportId(reportId);
+    }
+
+    @Test
+    void updateRiskShouldAllowUnassignedTask() {
+        UUID currentUserId = UUID.randomUUID();
+        UUID reportId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID riskId = UUID.randomUUID();
+        ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
+        ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
+        ReviewRiskService riskService = mock(ReviewRiskService.class);
+        ReviewServiceImpl service = serviceWithRiskAccess(taskMapper, reportMapper, riskService);
+        ReviewRiskItemEntity risk = new ReviewRiskItemEntity();
+        risk.setId(riskId);
+        risk.setReportId(reportId);
+        risk.setTaskId(taskId);
+        when(riskService.findById(riskId)).thenReturn(risk);
+        when(reportMapper.selectById(reportId)).thenReturn(report(reportId, taskId));
+        when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task(taskId, null));
+        ReviewRiskUpdateRequest request = new ReviewRiskUpdateRequest("CONFIRMED", "ok");
+        ReviewRiskItemResponse response = ReviewRiskItemResponse.from(risk);
+        when(riskService.updateStatus(riskId, "CONFIRMED", "ok")).thenReturn(response);
+
+        assertThat(service.updateRisk(currentUserId, false, riskId, request)).isEqualTo(response);
+
+        verify(riskService).updateStatus(riskId, "CONFIRMED", "ok");
+    }
+
+    private ReviewServiceImpl serviceWithRiskAccess(ReviewTaskMapper taskMapper,
+                                                    ReviewReportMapper reportMapper,
+                                                    ReviewRiskService riskService) {
+        ReviewServiceImpl service = new ReviewServiceImpl(
+                taskMapper,
+                reportMapper,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new ObjectMapper()
+        );
+        ReflectionTestUtils.setField(service, "reviewRiskService", riskService);
+        return service;
+    }
+
+    private ReviewReportEntity report(UUID reportId, UUID taskId) {
+        ReviewReportEntity report = new ReviewReportEntity();
+        report.setId(reportId);
+        report.setTaskId(taskId);
+        return report;
+    }
+
+    private ReviewTaskEntity task(UUID taskId, UUID reviewerUserId) {
+        ReviewTaskEntity task = new ReviewTaskEntity();
+        task.setId(taskId);
+        task.setReviewerUserId(reviewerUserId);
+        return task;
+    }
+
 }
