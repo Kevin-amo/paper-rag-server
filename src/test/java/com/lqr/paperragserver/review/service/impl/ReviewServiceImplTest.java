@@ -10,11 +10,13 @@ import com.lqr.paperragserver.review.audit.ReviewAuditService;
 import com.lqr.paperragserver.review.dto.ReviewReportUpdateRequest;
 import com.lqr.paperragserver.review.dto.ReviewRiskItemResponse;
 import com.lqr.paperragserver.review.dto.ReviewRiskUpdateRequest;
+import com.lqr.paperragserver.review.entity.ReviewAssignmentEntity;
 import com.lqr.paperragserver.review.entity.ReviewCriterionEntity;
 import com.lqr.paperragserver.review.entity.ReviewReportEntity;
 import com.lqr.paperragserver.review.entity.ReviewRiskItemEntity;
 import com.lqr.paperragserver.review.entity.ReviewTaskEntity;
 import com.lqr.paperragserver.review.mapper.ReviewAuditLogMapper;
+import com.lqr.paperragserver.review.mapper.ReviewAssignmentMapper;
 import com.lqr.paperragserver.review.mapper.ReviewCriterionMapper;
 import com.lqr.paperragserver.review.mapper.ReviewReportMapper;
 import com.lqr.paperragserver.review.mapper.ReviewTaskMapper;
@@ -106,11 +108,14 @@ class ReviewServiceImplTest {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
                 new ReviewOutputParser(objectMapper),
                 new ReferenceFormatChecker(),
-                objectMapper,
                 mock(ReviewAuditService.class),
-                mock(ReviewRiskService.class)
+                mock(ReviewRiskService.class),
+                objectMapper
         );
 
         assertThat(service).isNotNull();
@@ -123,6 +128,7 @@ class ReviewServiceImplTest {
         UUID documentId = UUID.randomUUID();
         ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
         ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
+        ReviewAssignmentMapper assignmentMapper = mock(ReviewAssignmentMapper.class);
         ReviewCriterionMapper criterionMapper = mock(ReviewCriterionMapper.class);
         ReviewAuditLogMapper auditLogMapper = mock(ReviewAuditLogMapper.class);
         DocumentPersistenceService documentPersistenceService = mock(DocumentPersistenceService.class);
@@ -174,6 +180,8 @@ class ReviewServiceImplTest {
         criterion.setEnabled(true);
         criterion.setSortOrder(1);
         when(criterionMapper.selectList(any())).thenReturn(List.of(criterion));
+        ReviewAssignmentEntity assignment = assignment(UUID.randomUUID(), taskId, userId);
+        when(assignmentMapper.selectByTaskAndReviewer(taskId, userId)).thenReturn(assignment);
         when(paperStructuredParseService.find(userId, "source-1")).thenReturn(Optional.empty());
         when(llmService.generate(any())).thenReturn("not json");
         when(reviewOutputParser.parse("not json")).thenThrow(new IllegalArgumentException("\u7f3a\u5c11 JSON \u5bf9\u8c61"));
@@ -181,17 +189,20 @@ class ReviewServiceImplTest {
         ReviewServiceImpl service = new ReviewServiceImpl(
                 taskMapper,
                 reportMapper,
+                assignmentMapper,
                 criterionMapper,
                 auditLogMapper,
+                null,
                 null,
                 documentPersistenceService,
                 paperStructuredParseService,
                 llmService,
+                null,
                 reviewOutputParser,
                 new ReferenceFormatChecker(),
-                objectMapper,
                 mock(ReviewAuditService.class),
-                mock(ReviewRiskService.class)
+                mock(ReviewRiskService.class),
+                objectMapper
         );
 
         assertThatThrownBy(() -> service.generateAiReview(userId, false, taskId))
@@ -211,22 +222,39 @@ class ReviewServiceImplTest {
         UUID taskId = UUID.randomUUID();
         ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
         ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
+        ReviewAssignmentMapper assignmentMapper = mock(ReviewAssignmentMapper.class);
+        ReviewCriterionMapper criterionMapper = mock(ReviewCriterionMapper.class);
+        DocumentPersistenceService documentPersistenceService = mock(DocumentPersistenceService.class);
+        PaperStructuredParseService paperStructuredParseService = mock(PaperStructuredParseService.class);
         LlmService llmService = mock(LlmService.class);
-        ReviewServiceImpl service = serviceWithDependencies(
+        ReviewServiceImpl service = new ReviewServiceImpl(
                 taskMapper,
                 reportMapper,
+                assignmentMapper,
+                criterionMapper,
+                mock(ReviewAuditLogMapper.class),
                 null,
                 null,
-                null,
-                null,
-                mock(PaperStructuredParseService.class),
+                documentPersistenceService,
+                paperStructuredParseService,
                 llmService,
+                null,
                 mock(ReviewOutputParser.class),
                 new ReferenceFormatChecker(),
+                mock(ReviewAuditService.class),
                 mock(ReviewRiskService.class),
-                mock(ReviewAuditService.class)
+                new ObjectMapper()
         );
-        when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task(taskId, otherReviewerId));
+        ReviewTaskEntity task = task(taskId, null);
+        task.setSubmitterUserId(currentUserId);
+        task.setSourceId("source-1");
+        when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task);
+        when(documentPersistenceService.findReviewDocument(currentUserId, "source-1"))
+                .thenReturn(Optional.of(document(currentUserId, "source-1")));
+        when(criterionMapper.selectList(any())).thenReturn(List.of(criterion()));
+        when(assignmentMapper.selectByTaskAndReviewer(taskId, currentUserId)).thenReturn(null);
+        when(assignmentMapper.selectByTaskId(taskId))
+                .thenReturn(List.of(assignment(UUID.randomUUID(), taskId, otherReviewerId)));
 
         assertThatThrownBy(() -> service.generateAiReview(currentUserId, false, taskId))
                 .isInstanceOf(ResponseStatusException.class)
@@ -246,24 +274,29 @@ class ReviewServiceImplTest {
         ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
         ReviewCriterionMapper criterionMapper = mock(ReviewCriterionMapper.class);
         ReviewAuditLogMapper auditLogMapper = mock(ReviewAuditLogMapper.class);
+        ReviewAssignmentMapper assignmentMapper = mock(ReviewAssignmentMapper.class);
         DocumentPersistenceService documentPersistenceService = mock(DocumentPersistenceService.class);
         PaperStructuredParseService paperStructuredParseService = mock(PaperStructuredParseService.class);
         LlmService llmService = mock(LlmService.class);
         ReviewOutputParser reviewOutputParser = mock(ReviewOutputParser.class);
         ReviewRiskService reviewRiskService = mock(ReviewRiskService.class);
-        ReviewServiceImpl service = serviceWithDependencies(
+        ReviewServiceImpl service = new ReviewServiceImpl(
                 taskMapper,
                 reportMapper,
+                assignmentMapper,
                 criterionMapper,
                 auditLogMapper,
+                null,
                 null,
                 documentPersistenceService,
                 paperStructuredParseService,
                 llmService,
+                null,
                 reviewOutputParser,
                 new ReferenceFormatChecker(),
+                mock(ReviewAuditService.class),
                 reviewRiskService,
-                mock(ReviewAuditService.class)
+                new ObjectMapper()
         );
         ReviewTaskEntity task = task(taskId, null);
         task.setDocumentId(documentId);
@@ -272,6 +305,8 @@ class ReviewServiceImplTest {
         when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task);
         DocumentPersistenceService.DocumentDetail document = document(currentUserId, "source-1");
         when(documentPersistenceService.findReviewDocument(currentUserId, "source-1")).thenReturn(Optional.of(document));
+        ReviewAssignmentEntity assignment = assignment(UUID.randomUUID(), taskId, currentUserId);
+        when(assignmentMapper.selectByTaskAndReviewer(taskId, currentUserId)).thenReturn(assignment);
         ReviewCriterionEntity criterion = criterion();
         when(criterionMapper.selectList(any())).thenReturn(List.of(criterion));
         PaperStructuredParseEntity structuredParse = new PaperStructuredParseEntity();
@@ -282,10 +317,11 @@ class ReviewServiceImplTest {
                 "paperSections", Map.of("title", "title"),
                 "risks", List.of()
         ));
-        when(reportMapper.selectLatestByTaskId(taskId))
+        when(reportMapper.selectByAssignmentId(assignment.getId()))
                 .thenReturn(null)
                 .thenAnswer(invocation -> {
                     ReviewReportEntity response = report(UUID.randomUUID(), taskId);
+                    response.setAssignmentId(assignment.getId());
                     response.setRisks(List.of());
                     return response;
                 });
@@ -315,16 +351,19 @@ class ReviewServiceImplTest {
                 taskMapper,
                 reportMapper,
                 null,
+                null,
                 auditLogMapper,
                 null,
                 null,
                 null,
                 null,
                 null,
+                null,
+                null,
                 new ReferenceFormatChecker(),
-                objectMapper,
                 reviewAuditService,
-                mock(ReviewRiskService.class)
+                mock(ReviewRiskService.class),
+                objectMapper
         );
         ReviewReportEntity report = report(reportId, taskId);
         report.setScores(List.of(Map.of("code", "LOGIC", "score", 70)));
@@ -385,7 +424,9 @@ class ReviewServiceImplTest {
         ReviewRiskService reviewRiskService = mock(ReviewRiskService.class);
         ReviewAuditService reviewAuditService = mock(ReviewAuditService.class);
         ReviewServiceImpl service = serviceWithRiskAccess(taskMapper, reportMapper, reviewRiskService);
-        when(reportMapper.selectById(reportId)).thenReturn(report(reportId, taskId));
+        ReviewReportEntity report = report(reportId, taskId);
+        report.setReviewerUserId(otherReviewerId);
+        when(reportMapper.selectById(reportId)).thenReturn(report);
         when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task(taskId, otherReviewerId));
 
         assertThatThrownBy(() -> service.updateReport(currentUserId, false, reportId,
@@ -524,17 +565,20 @@ class ReviewServiceImplTest {
         return new ReviewServiceImpl(
                 taskMapper,
                 reportMapper,
+                mock(ReviewAssignmentMapper.class),
                 criterionMapper,
                 auditLogMapper,
+                null,
                 documentMapper,
                 documentPersistenceService,
                 paperStructuredParseService,
                 llmService,
+                null,
                 reviewOutputParser,
                 referenceFormatChecker,
-                new ObjectMapper(),
                 auditService,
-                riskService
+                riskService,
+                new ObjectMapper()
         );
     }
 
@@ -588,6 +632,15 @@ class ReviewServiceImplTest {
         task.setId(taskId);
         task.setReviewerUserId(reviewerUserId);
         return task;
+    }
+
+    private ReviewAssignmentEntity assignment(UUID assignmentId, UUID taskId, UUID reviewerUserId) {
+        ReviewAssignmentEntity assignment = new ReviewAssignmentEntity();
+        assignment.setId(assignmentId);
+        assignment.setTaskId(taskId);
+        assignment.setReviewerUserId(reviewerUserId);
+        assignment.setStatus("ASSIGNED");
+        return assignment;
     }
 
 }

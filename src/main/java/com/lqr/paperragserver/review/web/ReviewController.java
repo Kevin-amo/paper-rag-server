@@ -10,6 +10,9 @@ import com.lqr.paperragserver.document.model.DocumentIngestionMessage;
 import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
 import com.lqr.paperragserver.document.service.DocumentIngestionProducer;
 import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
+import com.lqr.paperragserver.review.dto.ReviewAssignmentResponse;
+import com.lqr.paperragserver.review.dto.ReviewConsensusResponse;
+import com.lqr.paperragserver.review.dto.ReviewConsensusUpdateRequest;
 import com.lqr.paperragserver.review.dto.ReviewCriterionRequest;
 import com.lqr.paperragserver.review.dto.ReviewCriterionResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportResponse;
@@ -108,6 +111,28 @@ public class ReviewController {
         return reviewService.getTask(principal.getId(), isAdmin(principal), taskId);
     }
 
+    @GetMapping("/tasks/{taskId}/consensus")
+    public ReviewConsensusResponse getConsensus(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                 @PathVariable UUID taskId) {
+        requireReviewer(principal);
+        return reviewService.getConsensus(principal.getId(), isAdmin(principal), taskId);
+    }
+
+    @PatchMapping("/tasks/{taskId}/consensus")
+    public ReviewConsensusResponse updateConsensus(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                    @PathVariable UUID taskId,
+                                                    @Valid @RequestBody ReviewConsensusUpdateRequest request) {
+        requireReviewer(principal);
+        return reviewService.updateConsensus(principal.getId(), isAdmin(principal), taskId, request);
+    }
+
+    @PostMapping("/tasks/{taskId}/consensus/confirm")
+    public ReviewConsensusResponse confirmConsensus(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                     @PathVariable UUID taskId) {
+        requireReviewer(principal);
+        return reviewService.confirmConsensus(principal.getId(), isAdmin(principal), taskId);
+    }
+
     @PostMapping("/tasks/{taskId}/ai-review")
     public ReviewReportResponse generateAiReview(@AuthenticationPrincipal SecurityUserPrincipal principal,
                                                  @PathVariable UUID taskId) {
@@ -121,6 +146,14 @@ public class ReviewController {
                                              @Valid @RequestBody ReviewReportUpdateRequest request) {
         requireReviewer(principal);
         return reviewService.updateReport(principal.getId(), isAdmin(principal), reportId, request);
+    }
+
+
+    @PostMapping("/assignments/{assignmentId}/submit")
+    public ReviewAssignmentResponse submitAssignment(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                     @PathVariable UUID assignmentId) {
+        requireReviewer(principal);
+        return reviewService.submitAssignment(principal.getId(), assignmentId);
     }
 
     @GetMapping("/reports/{reportId}/risks")
@@ -189,7 +222,7 @@ public class ReviewController {
     }
 
     private void requireReviewer(SecurityUserPrincipal principal) {
-        if (!isAdmin(principal) && !principal.getRoles().contains(RoleCodes.REVIEWER)) {
+        if (principal == null || (!isAdmin(principal) && !principal.getRoles().contains(RoleCodes.REVIEWER))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "需要评审员权限");
         }
     }

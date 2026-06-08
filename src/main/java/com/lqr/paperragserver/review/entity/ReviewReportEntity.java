@@ -21,6 +21,7 @@ public class ReviewReportEntity {
 
     private UUID taskId;
     private UUID documentId;
+    private UUID assignmentId;
     private UUID reviewerUserId;
 
     @TableField(value = "paper_sections", typeHandler = JsonbTypeHandler.class)

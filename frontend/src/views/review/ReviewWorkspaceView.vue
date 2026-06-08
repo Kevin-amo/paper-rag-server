@@ -21,6 +21,7 @@ const activeReviewTab = ref('parse');
 const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '评审员');
 const selectedTask = computed(() => reviews.selectedTask.value);
 const selectedReport = computed(() => reviews.selectedReport.value);
+const assignmentSubmitted = computed(() => selectedTask.value?.currentAssignment?.status === 'SUBMITTED');
 const structuredParse = computed(() => reviews.structuredParse.value);
 const structuredContent = computed(() => {
   const merged = structuredParse.value?.mergedResult;
@@ -41,6 +42,11 @@ const statusLabelMap: Record<string, string> = {
   PENDING: '待评审',
   REVIEWING: '评审中',
   COMPLETED: '已完成',
+  PENDING_ASSIGNMENT: '待分配',
+  ASSIGNED: '已分配',
+  IN_REVIEW: '评审中',
+  SUBMITTED: '已提交',
+  CONSENSUS_CONFIRMED: '共识已确认',
   NEEDS_REVIEW: '需复核',
 };
 
@@ -260,7 +266,10 @@ onMounted(async () => {
             </div>
             <div class="hero-actions">
               <el-tag size="large" effect="plain">{{ statusLabel(selectedTask.status) }}</el-tag>
-              <el-button type="primary" :loading="reviews.generating.value" @click="reviews.runAiReview">
+              <el-tag v-if="selectedTask.currentAssignment" size="large" effect="plain">
+                {{ selectedTask.currentAssignment.role }} / {{ selectedTask.currentAssignment.status }}
+              </el-tag>
+              <el-button type="primary" :disabled="assignmentSubmitted" :loading="reviews.generating.value" @click="reviews.runAiReview">
                 {{ selectedReport ? '重新生成辅助评审' : '生成辅助评审' }}
               </el-button>
             </div>
@@ -278,7 +287,7 @@ onMounted(async () => {
                   <el-tag :type="structuredParse?.status === 'FAILED' ? 'danger' : structuredParse ? 'success' : 'info'" effect="plain">
                     {{ structuredParse?.status || '未生成' }}
                   </el-tag>
-                  <el-button size="small" :loading="reviews.regeneratingStructuredParse.value" @click="reviews.rerunStructuredParse">
+                  <el-button size="small" :disabled="assignmentSubmitted" :loading="reviews.regeneratingStructuredParse.value" @click="reviews.rerunStructuredParse">
                     重新解析
                   </el-button>
                 </div>
@@ -377,6 +386,7 @@ onMounted(async () => {
                     :model-value="Number(item.score)"
                     :min="0"
                     :max="Number(item.maxScore || 100)"
+                    :disabled="assignmentSubmitted"
                     @input="handleScoreInput(item, $event)"
                   />
                   <p>{{ item.reason }}</p>
@@ -385,20 +395,32 @@ onMounted(async () => {
               <el-empty v-else description="生成辅助评审后展示评分建议" />
 
               <div class="manual-form">
-                <el-input-number v-model="reviews.reportForm.totalScore" :min="0" :max="100" controls-position="right" />
+                <el-input-number v-model="reviews.reportForm.totalScore" :min="0" :max="100" controls-position="right" :disabled="assignmentSubmitted" />
                 <el-input
                   v-model="reviews.reportForm.finalRecommendation"
                   type="textarea"
                   :rows="3"
+                  :disabled="assignmentSubmitted"
                   placeholder="填写或调整最终评审意见"
                 />
                 <div class="manual-actions">
-                  <el-button :disabled="!selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport('ADJUSTED')">
+                  <el-button :disabled="assignmentSubmitted || !selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport('ADJUSTED')">
                     保存调整
                   </el-button>
-                  <el-button type="primary" :disabled="!selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport('CONFIRMED')">
+                  <el-button type="primary" :disabled="assignmentSubmitted || !selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport('CONFIRMED')">
                     确认评审结果
                   </el-button>
+                  <el-popconfirm title="提交后个人评审将只读，是否继续？" @confirm="reviews.submitCurrentAssignment">
+                    <template #reference>
+                      <el-button
+                        type="success"
+                        :disabled="assignmentSubmitted || reviews.submittingAssignment.value || !selectedTask?.report"
+                        :loading="reviews.submittingAssignment.value"
+                      >
+                        ????
+                      </el-button>
+                    </template>
+                  </el-popconfirm>
                 </div>
               </div>
             </section>

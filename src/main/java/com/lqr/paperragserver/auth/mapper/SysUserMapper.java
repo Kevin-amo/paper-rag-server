@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -28,6 +29,17 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
               and u.status = 'ACTIVE'
             """)
     long countActiveByRole(@Param("roleCode") String roleCode);
+
+    @Select("""
+            select u.*
+            from public.sys_user u
+            join public.sys_user_role ur on ur.user_id = u.id
+            join public.sys_role r on r.id = ur.role_id
+            where r.code = #{roleCode}
+              and u.status = 'ACTIVE'
+            order by coalesce(u.display_name, u.username), u.username
+            """)
+    List<SysUser> selectActiveByRole(@Param("roleCode") String roleCode);
 
     /**
      * 更新用户最后登录时间。

@@ -5,9 +5,11 @@ import com.lqr.paperragserver.common.typehandler.JsonbTypeHandler;
 import com.lqr.paperragserver.review.entity.ReviewReportEntity;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface ReviewReportMapper extends BaseMapper<ReviewReportEntity> {
@@ -20,6 +22,7 @@ public interface ReviewReportMapper extends BaseMapper<ReviewReportEntity> {
             limit 1
             """)
     @Results(id = "reviewReportResultMap", value = {
+            @Result(column = "assignment_id", property = "assignmentId"),
             @Result(column = "paper_sections", property = "paperSections", typeHandler = JsonbTypeHandler.class),
             @Result(column = "scores", property = "scores", typeHandler = JsonbTypeHandler.class),
             @Result(column = "comments", property = "comments", typeHandler = JsonbTypeHandler.class),
@@ -28,4 +31,28 @@ public interface ReviewReportMapper extends BaseMapper<ReviewReportEntity> {
             @Result(column = "manual_delta", property = "manualDelta", typeHandler = JsonbTypeHandler.class)
     })
     ReviewReportEntity selectLatestByTaskId(@Param("taskId") UUID taskId);
+
+    @Select("""
+            select *
+            from public.review_report
+            where assignment_id = #{assignmentId}
+            order by updated_at desc
+            limit 1
+            """)
+    @ResultMap("reviewReportResultMap")
+    ReviewReportEntity selectByAssignmentId(@Param("assignmentId") UUID assignmentId);
+
+    @Select("""
+            select r.*
+            from public.review_report r
+            left join public.review_assignment a on a.id = r.assignment_id
+            where r.task_id = #{taskId}
+              and (
+                (r.assignment_id is not null and a.status = 'SUBMITTED')
+                or (r.assignment_id is null and r.status in ('CONFIRMED', 'COMPLETED'))
+              )
+            order by r.updated_at desc
+            """)
+    @ResultMap("reviewReportResultMap")
+    List<ReviewReportEntity> selectSubmittedByTaskId(@Param("taskId") UUID taskId);
 }

@@ -4,6 +4,7 @@ import com.lqr.paperragserver.document.dto.DocumentDetailResponse;
 import com.lqr.paperragserver.review.entity.ReviewTaskEntity;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record ReviewTaskResponse(
@@ -20,9 +21,21 @@ public record ReviewTaskResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         DocumentDetailResponse document,
-        ReviewReportResponse report
+        ReviewReportResponse report,
+        ReviewAssignmentResponse currentAssignment,
+        List<ReviewAssignmentResponse> assignments
 ) {
     public static ReviewTaskResponse from(ReviewTaskEntity entity, DocumentDetailResponse document, ReviewReportResponse report) {
+        return from(entity, document, report, null, List.of());
+    }
+
+    public static ReviewTaskResponse from(
+            ReviewTaskEntity entity,
+            DocumentDetailResponse document,
+            ReviewReportResponse report,
+            ReviewAssignmentResponse currentAssignment,
+            List<ReviewAssignmentResponse> assignments
+    ) {
         return new ReviewTaskResponse(
                 entity.getId(),
                 entity.getDocumentId(),
@@ -37,7 +50,9 @@ public record ReviewTaskResponse(
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
                 document,
-                report
+                report,
+                currentAssignment,
+                assignments == null ? List.of() : assignments
         );
     }
 }

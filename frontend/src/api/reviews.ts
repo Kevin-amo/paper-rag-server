@@ -4,9 +4,12 @@ import type {
   ListReviewTasksParams,
   PageResponse,
   ReviewCriterion,
+  ReviewAssignment,
+  ReviewConsensus,
   ReviewReport,
   ReviewRiskRecord,
   ReviewTask,
+  UpdateReviewConsensusPayload,
   UpdateReviewReportPayload,
   UpdateReviewRiskPayload,
   UploadReviewPaperPayload,
@@ -66,6 +69,13 @@ export async function updateReviewReport(reportId: string, payload: UpdateReview
   return data;
 }
 
+export async function listReviewCriteria(includeDisabled = false) {
+  const { data } = await http.get<ReviewCriterion[]>('/reviews/criteria', {
+    params: compactParams({ includeDisabled }),
+  });
+  return data;
+}
+
 export async function listReviewRisks(reportId: string) {
   const { data } = await http.get<ReviewRiskRecord[]>(`/reviews/reports/${reportId}/risks`);
   return data;
@@ -91,9 +101,22 @@ export async function resolveReviewRisk(riskId: string) {
   return data;
 }
 
-export async function listReviewCriteria(includeDisabled = false) {
-  const { data } = await http.get<ReviewCriterion[]>('/reviews/criteria', {
-    params: compactParams({ includeDisabled }),
-  });
+export async function submitReviewAssignment(assignmentId: string) {
+  const { data } = await http.post<ReviewAssignment>(`/reviews/assignments/${assignmentId}/submit`);
+  return data;
+}
+
+export async function getReviewConsensus(taskId: string) {
+  const { data } = await http.get<ReviewConsensus>(`/reviews/tasks/${taskId}/consensus`);
+  return data;
+}
+
+export async function updateReviewConsensus(taskId: string, payload: UpdateReviewConsensusPayload) {
+  const { data } = await http.patch<ReviewConsensus>(`/reviews/tasks/${taskId}/consensus`, payload);
+  return data;
+}
+
+export async function confirmReviewConsensus(taskId: string) {
+  const { data } = await http.post<ReviewConsensus>(`/reviews/tasks/${taskId}/consensus/confirm`);
   return data;
 }

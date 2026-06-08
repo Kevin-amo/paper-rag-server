@@ -41,6 +41,12 @@ const router = createRouter({
       component: () => import('../views/admin/AdminUsersView.vue'),
       meta: { roles: ['ADMIN'] },
     },
+    {
+      path: '/admin/reviews',
+      name: 'admin-reviews',
+      component: () => import('../views/admin/AdminReviewDashboardView.vue'),
+      meta: { roles: ['ADMIN'] },
+    },
   ],
 });
 
