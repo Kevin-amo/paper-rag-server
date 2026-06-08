@@ -85,7 +85,7 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTaskEntity> {
             from public.review_task t
             join public.review_assignment a on a.task_id = t.id
             where a.reviewer_user_id = #{reviewerUserId}
-              and a.status <> 'CANCELLED'
+              and a.status &lt;&gt; 'CANCELLED'
             <if test="keyword != null and keyword != ''">
               and (
                 t.source_id ilike concat('%', #{keyword}, '%')
