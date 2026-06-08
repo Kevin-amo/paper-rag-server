@@ -14,20 +14,36 @@ import com.lqr.paperragserver.document.entity.DocumentEntity;
 import com.lqr.paperragserver.document.mapper.DocumentMapper;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
 import com.lqr.paperragserver.document.structured.service.PaperStructuredParseService;
+import com.lqr.paperragserver.review.dto.ReviewAssignmentResponse;
+import com.lqr.paperragserver.review.dto.ReviewConsensusResponse;
+import com.lqr.paperragserver.review.dto.ReviewConsensusUpdateRequest;
 import com.lqr.paperragserver.review.dto.ReviewCriterionRequest;
 import com.lqr.paperragserver.review.dto.ReviewCriterionResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportUpdateRequest;
+import com.lqr.paperragserver.review.dto.ReviewRiskItemResponse;
+import com.lqr.paperragserver.review.dto.ReviewRiskUpdateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskCreateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskResponse;
+import com.lqr.paperragserver.review.audit.ReviewAuditService;
+import com.lqr.paperragserver.review.assessment.ReviewOutputParser;
+import com.lqr.paperragserver.review.entity.ReviewAssignmentEntity;
 import com.lqr.paperragserver.review.entity.ReviewAuditLogEntity;
 import com.lqr.paperragserver.review.entity.ReviewCriterionEntity;
 import com.lqr.paperragserver.review.entity.ReviewReportEntity;
+import com.lqr.paperragserver.review.entity.ReviewRiskItemEntity;
 import com.lqr.paperragserver.review.entity.ReviewTaskEntity;
+import com.lqr.paperragserver.review.mapper.ReviewAssignmentMapper;
 import com.lqr.paperragserver.review.mapper.ReviewAuditLogMapper;
 import com.lqr.paperragserver.review.mapper.ReviewCriterionMapper;
 import com.lqr.paperragserver.review.mapper.ReviewReportMapper;
 import com.lqr.paperragserver.review.mapper.ReviewTaskMapper;
+import com.lqr.paperragserver.review.model.ReviewAssignmentStatuses;
+import com.lqr.paperragserver.review.model.ReviewTaskStatuses;
+import com.lqr.paperragserver.review.risk.ReferenceFormatChecker;
+import com.lqr.paperragserver.review.risk.ReviewRiskService;
+import com.lqr.paperragserver.review.service.ReviewAssignmentService;
+import com.lqr.paperragserver.review.service.ReviewConsensusService;
 import com.lqr.paperragserver.review.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,11 +51,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.lang.reflect.Array;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -51,18 +69,42 @@ public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewTaskMapper taskMapper;
     private final ReviewReportMapper reportMapper;
+    private final ReviewAssignmentMapper assignmentMapper;
     private final ReviewCriterionMapper criterionMapper;
     private final ReviewAuditLogMapper auditLogMapper;
+    private final ReviewAssignmentService assignmentService;
     private final DocumentMapper documentMapper;
     private final DocumentPersistenceService documentPersistenceService;
     private final PaperStructuredParseService paperStructuredParseService;
     private final LlmService llmService;
+    private final ReviewConsensusService consensusService;
+    private final ReviewOutputParser reviewOutputParser;
+    private final ReferenceFormatChecker referenceFormatChecker;
+    private final ReviewAuditService reviewAuditService;
+    private final ReviewRiskService reviewRiskService;
     private final ObjectMapper objectMapper;
 
     @Override
     public PageResponse<ReviewTaskResponse> listTasks(UUID currentUserId, boolean admin, String keyword, String status, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
+        if (!admin) {
+            List<ReviewTaskEntity> reviewerTasks = taskMapper.selectReviewerTasks(
+                    currentUserId,
+                    blankToNull(keyword),
+                    status == null || status.isBlank() ? null : status.trim().toUpperCase()
+            );
+            long offset = (long) safePage * safeSize;
+            if (offset >= reviewerTasks.size()) {
+                return new PageResponse<>(List.of(), safePage, safeSize, reviewerTasks.size());
+            }
+            int fromIndex = (int) offset;
+            int toIndex = Math.min(fromIndex + safeSize, reviewerTasks.size());
+            List<ReviewTaskResponse> items = reviewerTasks.subList(fromIndex, toIndex).stream()
+                    .map(task -> toTaskResponse(task, false, currentUserId, false))
+                    .toList();
+            return new PageResponse<>(items, safePage, safeSize, reviewerTasks.size());
+        }
         LambdaQueryWrapper<ReviewTaskEntity> wrapper = new LambdaQueryWrapper<ReviewTaskEntity>()
                 .orderByDesc(ReviewTaskEntity::getUpdatedAt)
                 .orderByDesc(ReviewTaskEntity::getCreatedAt);
@@ -77,7 +119,7 @@ public class ReviewServiceImpl implements ReviewService {
         }
         Page<ReviewTaskEntity> result = taskMapper.selectPage(new Page<>(safePage + 1L, safeSize), wrapper);
         List<ReviewTaskResponse> items = result.getRecords().stream()
-                .map(task -> toTaskResponse(task, false))
+                .map(task -> toTaskResponse(task, false, currentUserId, true))
                 .toList();
         return new PageResponse<>(items, safePage, safeSize, result.getTotal());
     }
@@ -85,7 +127,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     public ReviewTaskResponse getTask(UUID currentUserId, boolean admin, UUID taskId) {
         ReviewTaskEntity task = requireTask(taskId);
-        return toTaskResponse(task, true);
+        return toTaskResponse(task, true, currentUserId, admin);
     }
 
     @Override
@@ -100,13 +142,13 @@ public class ReviewServiceImpl implements ReviewService {
         task.setSubmitterUserId(currentUserId);
         task.setSourceId(sourceId);
         task.setTitle(nonBlank(request.title(), document.title(), sourceId));
-        task.setStatus("PENDING");
+        task.setStatus(ReviewTaskStatuses.PENDING_ASSIGNMENT);
         OffsetDateTime now = OffsetDateTime.now();
         task.setCreatedAt(now);
         task.setUpdatedAt(now);
         taskMapper.insert(task);
         appendAudit(task.getId(), currentUserId, "CREATE_TASK", "创建评审任务", Map.of("sourceId", sourceId));
-        return toTaskResponse(task, true);
+        return toTaskResponse(task, true, currentUserId, true);
     }
 
     @Override
@@ -130,7 +172,7 @@ public class ReviewServiceImpl implements ReviewService {
         task.setSubmitterUserId(ownerUserId);
         task.setSourceId(sourceId);
         task.setTitle(nonBlank(document.title(), sourceId));
-        task.setStatus("PENDING");
+        task.setStatus(ReviewTaskStatuses.PENDING_ASSIGNMENT);
         OffsetDateTime now = OffsetDateTime.now();
         task.setCreatedAt(now);
         task.setUpdatedAt(now);
@@ -148,10 +190,43 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请先配置评审标准");
         }
 
-        taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
+        ReviewAssignmentEntity assignment = assignmentMapper.selectByTaskAndReviewer(taskId, currentUserId);
+        boolean hasAssignments = false;
+        if (assignment == null) {
+            hasAssignments = !assignmentMapper.selectByTaskId(taskId).isEmpty();
+        }
+        if (assignment == null && hasAssignments) {
+            if (admin) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u7ba1\u7406\u5458\u4e0d\u80fd\u8986\u76d6\u5df2\u5206\u914d\u8bc4\u5ba1\u4eba\u7684\u4e2a\u4eba\u62a5\u544a");
+            }
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u8bbf\u95ee\u5206\u914d\u7ed9\u81ea\u5df1\u7684\u8bc4\u5ba1\u4efb\u52a1");
+        }
+        if (assignment == null && !admin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u8bbf\u95ee\u5206\u914d\u7ed9\u81ea\u5df1\u7684\u8bc4\u5ba1\u4efb\u52a1");
+        }
+        if (assignment != null && ReviewAssignmentStatuses.SUBMITTED.equals(assignment.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "\u8bc4\u5ba1\u5df2\u63d0\u4ea4\uff0c\u4e0d\u80fd\u91cd\u65b0\u751f\u6210\u62a5\u544a");
+        }
+
+        if (assignment != null) {
+            if (!ReviewAssignmentStatuses.REVIEWING.equals(assignment.getStatus())) {
+                assignmentMapper.updateStatus(assignment.getId(), ReviewAssignmentStatuses.REVIEWING);
+            }
+            taskMapper.updateTaskStatus(task.getId(), ReviewTaskStatuses.IN_REVIEW);
+        } else {
+            taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
+        }
         String modelText = llmService.generate(buildReviewPrompt(document, criteria));
-        Map<String, Object> parsed = parseModelOutput(modelText);
-        ReviewReportEntity report = reportMapper.selectLatestByTaskId(task.getId());
+        Map<String, Object> parsed;
+        try {
+            parsed = reviewOutputParser.parse(modelText);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
+        }
+        List<ReferenceFormatChecker.ReferenceRisk> referenceRisks = referenceFormatChecker.check(referenceCheckerInput(document, parsed));
+        ReviewReportEntity report = assignment == null
+                ? reportMapper.selectLatestByTaskId(task.getId())
+                : reportMapper.selectByAssignmentId(assignment.getId());
         boolean creating = report == null;
         OffsetDateTime now = OffsetDateTime.now();
         if (creating) {
@@ -159,13 +234,16 @@ public class ReviewServiceImpl implements ReviewService {
             report.setId(UUID.randomUUID());
             report.setTaskId(task.getId());
             report.setDocumentId(task.getDocumentId());
+            if (assignment != null) {
+                report.setAssignmentId(assignment.getId());
+            }
             report.setCreatedAt(now);
         }
         report.setReviewerUserId(currentUserId);
         report.setPaperSections(mapValue(parsed.get("paperSections")));
         report.setScores(valueOrDefault(parsed.get("scores"), List.of()));
         report.setComments(mapValue(parsed.get("comments")));
-        report.setRisks(valueOrDefault(parsed.get("risks"), List.of()));
+        report.setRisks(mergeRisks(valueOrDefault(parsed.get("risks"), List.of()), referenceRisks));
         report.setRawModelOutput(rawOutput(parsed, modelText));
         report.setTotalScore(intValue(parsed.get("totalScore"), calculateTotalScore(parsed.get("scores"))));
         report.setFinalRecommendation(stringValue(parsed.get("finalRecommendation"), "建议人工复核后进入下一评审环节"));
@@ -177,8 +255,11 @@ public class ReviewServiceImpl implements ReviewService {
         } else {
             reportMapper.updateById(report);
         }
+        reviewRiskService.replaceReportRisks(report.getId(), task.getId(), report.getRisks());
         appendAudit(task.getId(), currentUserId, "AI_REVIEW", "生成 AI 辅助评审报告", Map.of("reportId", report.getId().toString()));
-        return ReviewReportResponse.from(reportMapper.selectLatestByTaskId(task.getId()));
+        return ReviewReportResponse.from(assignment == null
+                ? reportMapper.selectLatestByTaskId(task.getId())
+                : reportMapper.selectByAssignmentId(assignment.getId()));
     }
 
     @Override
@@ -189,6 +270,31 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "评审报告不存在");
         }
         ReviewTaskEntity task = requireTask(report.getTaskId());
+        Map<String, Object> beforeSnapshot = reportSnapshot(report);
+        boolean risksProvided = request.risks() != null;
+        ReviewAssignmentEntity assignment = null;
+        if (report.getAssignmentId() != null) {
+            assignment = assignmentMapper.selectById(report.getAssignmentId());
+            if (assignment == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u8bc4\u5ba1\u5206\u914d\u4e0d\u5b58\u5728");
+            }
+            if (!admin && !assignment.getReviewerUserId().equals(currentUserId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u4fee\u6539\u81ea\u5df1\u7684\u8bc4\u5ba1\u62a5\u544a");
+            }
+            if (ReviewAssignmentStatuses.SUBMITTED.equals(assignment.getStatus())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "\u8bc4\u5ba1\u5df2\u63d0\u4ea4\uff0c\u4e0d\u80fd\u4fee\u6539\u62a5\u544a");
+            }
+            if (ReviewAssignmentStatuses.ASSIGNED.equals(assignment.getStatus())) {
+                assignmentMapper.updateStatus(assignment.getId(), ReviewAssignmentStatuses.REVIEWING);
+            }
+        } else if (!admin) {
+            if (report.getReviewerUserId() != null && !currentUserId.equals(report.getReviewerUserId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u4fee\u6539\u81ea\u5df1\u7684\u8bc4\u5ba1\u62a5\u544a");
+            }
+            if ("CONFIRMED".equals(report.getStatus()) || "COMPLETED".equals(report.getStatus())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "\u8bc4\u5ba1\u62a5\u544a\u5df2\u786e\u8ba4\uff0c\u4e0d\u80fd\u4fee\u6539");
+            }
+        }
         report.setReviewerUserId(currentUserId);
         if (request.paperSections() != null) {
             report.setPaperSections(request.paperSections());
@@ -212,14 +318,74 @@ public class ReviewServiceImpl implements ReviewService {
         report.setStatus(nextStatus);
         report.setAdjustedAt(OffsetDateTime.now());
         report.setUpdatedAt(OffsetDateTime.now());
+        Map<String, Object> afterSnapshot = reportSnapshot(report);
+        report.setManualDelta(manualDelta(beforeSnapshot, afterSnapshot));
         reportMapper.updateById(report);
-        if ("CONFIRMED".equals(nextStatus) || "COMPLETED".equals(nextStatus)) {
+        if (assignment != null) {
+            taskMapper.updateTaskStatus(task.getId(), ReviewTaskStatuses.IN_REVIEW);
+        } else if ("CONFIRMED".equals(nextStatus) || "COMPLETED".equals(nextStatus)) {
             taskMapper.updateStatus(task.getId(), currentUserId, "COMPLETED");
         } else {
             taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
         }
-        appendAudit(task.getId(), currentUserId, "ADJUST_REPORT", "人工调整评审报告", Map.of("reportId", reportId.toString(), "status", nextStatus));
+        if (risksProvided) {
+            reviewRiskService.replaceReportRisks(report.getId(), task.getId(), report.getRisks());
+        }
+        reviewAuditService.append(task.getId(), currentUserId, "ADJUST_REPORT", "人工调整评审报告", beforeSnapshot, afterSnapshot, Map.of());
         return ReviewReportResponse.from(reportMapper.selectById(reportId));
+    }
+
+    @Override
+    public List<ReviewRiskItemResponse> listRisks(UUID currentUserId, boolean admin, UUID reportId) {
+        ReviewReportEntity report = requireReport(reportId);
+        assertReportAccess(currentUserId, admin, report);
+        return reviewRiskService.listByReportId(reportId);
+    }
+
+    @Override
+    public ReviewRiskItemResponse updateRisk(UUID currentUserId, boolean admin, UUID riskId, ReviewRiskUpdateRequest request) {
+        ReviewRiskItemEntity risk = reviewRiskService.findById(riskId);
+        if (risk == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u98ce\u9669\u9879\u4e0d\u5b58\u5728");
+        }
+        ReviewReportEntity report = requireReport(risk.getReportId());
+        assertReportAccess(currentUserId, admin, report);
+        return reviewRiskService.updateStatus(riskId, request.status(), request.reviewerNote());
+    }
+
+
+    @Override
+    @Transactional
+    public ReviewAssignmentResponse submitAssignment(UUID currentUserId, UUID assignmentId) {
+        ReviewReportEntity report = reportMapper.selectByAssignmentId(assignmentId);
+        if (report == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "\u8bf7\u5148\u751f\u6210\u6216\u4fdd\u5b58\u8bc4\u5ba1\u62a5\u544a\u518d\u63d0\u4ea4");
+        }
+        return assignmentService.submitAssignment(currentUserId, assignmentId);
+    }
+
+    @Override
+    public ReviewConsensusResponse getConsensus(UUID currentUserId, boolean admin, UUID taskId) {
+        if (!consensusService.canAccessConsensus(currentUserId, admin, taskId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u6709\u7ec4\u957f\u6216\u7ba1\u7406\u5458\u53ef\u4ee5\u67e5\u770b\u5171\u8bc6\u6c47\u603b");
+        }
+        return consensusService.getForTask(taskId);
+    }
+
+    @Override
+    public ReviewConsensusResponse updateConsensus(UUID currentUserId, boolean admin, UUID taskId, ReviewConsensusUpdateRequest request) {
+        if (!consensusService.canAccessConsensus(currentUserId, admin, taskId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u6709\u7ec4\u957f\u6216\u7ba1\u7406\u5458\u53ef\u4ee5\u4fee\u6539\u5171\u8bc6\u6c47\u603b");
+        }
+        return consensusService.update(taskId, request);
+    }
+
+    @Override
+    public ReviewConsensusResponse confirmConsensus(UUID currentUserId, boolean admin, UUID taskId) {
+        if (!consensusService.canAccessConsensus(currentUserId, admin, taskId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u6709\u7ec4\u957f\u6216\u7ba1\u7406\u5458\u53ef\u4ee5\u786e\u8ba4\u5171\u8bc6\u6c47\u603b");
+        }
+        return consensusService.confirm(taskId, currentUserId);
     }
 
     @Override
@@ -261,10 +427,54 @@ public class ReviewServiceImpl implements ReviewService {
         return ReviewCriterionResponse.from(criterionMapper.selectById(id));
     }
 
-    private ReviewTaskResponse toTaskResponse(ReviewTaskEntity task, boolean includeDocument) {
+    private ReviewTaskResponse toTaskResponse(ReviewTaskEntity task, boolean includeDocument, UUID currentUserId, boolean admin) {
+        if (!admin) {
+            ReviewAssignmentEntity currentAssignment = assignmentMapper.selectByTaskAndReviewer(task.getId(), currentUserId);
+            if (currentAssignment == null) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u8bbf\u95ee\u5206\u914d\u7ed9\u81ea\u5df1\u7684\u8bc4\u5ba1\u4efb\u52a1");
+            }
+            DocumentDetailResponse document = includeDocument ? DocumentDetailResponse.from(requireDocument(task)) : null;
+            ReviewReportResponse report = ReviewReportResponse.from(reportMapper.selectByAssignmentId(currentAssignment.getId()));
+            return ReviewTaskResponse.from(
+                    task,
+                    document,
+                    report,
+                    ReviewAssignmentResponse.from(currentAssignment),
+                    List.of(ReviewAssignmentResponse.from(currentAssignment))
+            );
+        }
         DocumentDetailResponse document = includeDocument ? DocumentDetailResponse.from(requireDocument(task)) : null;
+        List<ReviewAssignmentResponse> assignments = assignmentMapper.selectByTaskId(task.getId()).stream()
+                .map(ReviewAssignmentResponse::from)
+                .toList();
         ReviewReportResponse report = ReviewReportResponse.from(reportMapper.selectLatestByTaskId(task.getId()));
-        return ReviewTaskResponse.from(task, document, report);
+        return ReviewTaskResponse.from(task, document, report, null, assignments);
+    }
+
+    private ReviewReportEntity requireReport(UUID reportId) {
+        ReviewReportEntity report = reportMapper.selectById(reportId);
+        if (report == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u8bc4\u5ba1\u62a5\u544a\u4e0d\u5b58\u5728");
+        }
+        return report;
+    }
+
+    private void assertReportAccess(UUID currentUserId, boolean admin, ReviewReportEntity report) {
+        if (admin) {
+            return;
+        }
+        if (report.getAssignmentId() != null) {
+            ReviewAssignmentEntity assignment = assignmentMapper.selectById(report.getAssignmentId());
+            if (assignment != null && currentUserId.equals(assignment.getReviewerUserId())) {
+                return;
+            }
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u8bbf\u95ee\u81ea\u5df1\u7684\u8bc4\u5ba1\u98ce\u9669\u9879");
+        }
+        ReviewTaskEntity task = requireTask(report.getTaskId());
+        if (task.getReviewerUserId() == null || task.getReviewerUserId().equals(currentUserId)) {
+            return;
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u65e0\u6743\u8bbf\u95ee\u8be5\u8bc4\u5ba1\u4efb\u52a1");
     }
 
     private PromptConstructionService.Prompt buildReviewPrompt(DocumentPersistenceService.DocumentDetail document, List<ReviewCriterionResponse> criteria) {
@@ -436,6 +646,28 @@ public class ReviewServiceImpl implements ReviewService {
         auditLogMapper.insert(log);
     }
 
+    private Map<String, Object> reportSnapshot(ReviewReportEntity report) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("reportId", report.getId() == null ? null : report.getId().toString());
+        snapshot.put("paperSections", report.getPaperSections());
+        snapshot.put("scores", report.getScores());
+        snapshot.put("comments", report.getComments());
+        snapshot.put("risks", report.getRisks());
+        snapshot.put("totalScore", report.getTotalScore());
+        snapshot.put("finalRecommendation", report.getFinalRecommendation());
+        snapshot.put("status", report.getStatus());
+        return snapshot;
+    }
+
+    private Map<String, Object> manualDelta(Map<String, Object> before, Map<String, Object> after) {
+        return Map.of(
+                "scoreChanged", !Objects.equals(before.get("scores"), after.get("scores")) || !Objects.equals(before.get("totalScore"), after.get("totalScore")),
+                "commentEdited", !Objects.equals(before.get("comments"), after.get("comments")),
+                "riskOverridden", !Objects.equals(before.get("risks"), after.get("risks")),
+                "finalRecommendationChanged", !Objects.equals(before.get("finalRecommendation"), after.get("finalRecommendation"))
+        );
+    }
+
     private Map<String, Object> rawOutput(Map<String, Object> parsed, String modelText) {
         Map<String, Object> raw = new LinkedHashMap<>(parsed);
         raw.put("rawText", modelText);
@@ -459,6 +691,70 @@ public class ReviewServiceImpl implements ReviewService {
 
     private Object valueOrDefault(Object value, Object fallback) {
         return value == null ? fallback : value;
+    }
+
+    private String structuredReferences(Map<String, Object> parsed) {
+        Object sections = parsed.get("paperSections");
+        if (sections instanceof Map<?, ?> map) {
+            return referencesText(map.get("references"));
+        }
+        return "";
+    }
+
+    private String referenceCheckerInput(DocumentPersistenceService.DocumentDetail document, Map<String, Object> parsed) {
+        String structuredParseReferences = paperStructuredParseService.find(document.ownerUserId(), document.sourceId())
+                .map(result -> referencesFromStructuredParse(result.getMergedResult()))
+                .orElse("");
+        return structuredParseReferences.isBlank() ? structuredReferences(parsed) : structuredParseReferences;
+    }
+
+    private String referencesFromStructuredParse(Object mergedResult) {
+        if (mergedResult instanceof Map<?, ?> map) {
+            String directReferences = referencesText(map.get("references"));
+            if (!directReferences.isBlank()) {
+                return directReferences;
+            }
+            Object sections = map.get("paperSections");
+            if (sections instanceof Map<?, ?> sectionMap) {
+                return referencesText(sectionMap.get("references"));
+            }
+        }
+        return "";
+    }
+
+    private String referencesText(Object references) {
+        if (references == null) {
+            return "";
+        }
+        if (references instanceof List<?> list) {
+            return String.join(System.lineSeparator(), list.stream().map(String::valueOf).toList());
+        }
+        if (references.getClass().isArray()) {
+            List<String> entries = new ArrayList<>();
+            for (int index = 0; index < Array.getLength(references); index++) {
+                entries.add(String.valueOf(Array.get(references, index)));
+            }
+            return String.join(System.lineSeparator(), entries);
+        }
+        return String.valueOf(references);
+    }
+
+    private Object mergeRisks(Object modelRisks, List<ReferenceFormatChecker.ReferenceRisk> referenceRisks) {
+        List<Object> merged = new ArrayList<>();
+        if (modelRisks instanceof List<?> list) {
+            merged.addAll(list);
+        }
+        for (ReferenceFormatChecker.ReferenceRisk risk : referenceRisks) {
+            merged.add(Map.of(
+                    "type", risk.riskType(),
+                    "level", risk.riskLevel(),
+                    "evidence", risk.evidence(),
+                    "suggestion", risk.suggestion(),
+                    "detector", "REFERENCE_RULE",
+                    "confidence", risk.confidence()
+            ));
+        }
+        return merged;
     }
 
     private int calculateTotalScore(Object scores) {

@@ -7,8 +7,11 @@ import type {
   ReviewAssignment,
   ReviewConsensus,
   ReviewReport,
+  ReviewRiskRecord,
   ReviewTask,
+  UpdateReviewConsensusPayload,
   UpdateReviewReportPayload,
+  UpdateReviewRiskPayload,
   UploadReviewPaperPayload,
 } from '../types';
 
@@ -73,6 +76,31 @@ export async function listReviewCriteria(includeDisabled = false) {
   return data;
 }
 
+export async function listReviewRisks(reportId: string) {
+  const { data } = await http.get<ReviewRiskRecord[]>(`/reviews/reports/${reportId}/risks`);
+  return data;
+}
+
+export async function updateReviewRisk(riskId: string, payload: UpdateReviewRiskPayload) {
+  const { data } = await http.put<ReviewRiskRecord>(`/reviews/risks/${riskId}`, payload);
+  return data;
+}
+
+export async function confirmReviewRisk(riskId: string) {
+  const { data } = await http.post<ReviewRiskRecord>(`/reviews/risks/${riskId}/confirm`);
+  return data;
+}
+
+export async function ignoreReviewRisk(riskId: string) {
+  const { data } = await http.post<ReviewRiskRecord>(`/reviews/risks/${riskId}/ignore`);
+  return data;
+}
+
+export async function resolveReviewRisk(riskId: string) {
+  const { data } = await http.post<ReviewRiskRecord>(`/reviews/risks/${riskId}/resolve`);
+  return data;
+}
+
 export async function submitReviewAssignment(assignmentId: string) {
   const { data } = await http.post<ReviewAssignment>(`/reviews/assignments/${assignmentId}/submit`);
   return data;
@@ -80,5 +108,15 @@ export async function submitReviewAssignment(assignmentId: string) {
 
 export async function getReviewConsensus(taskId: string) {
   const { data } = await http.get<ReviewConsensus>(`/reviews/tasks/${taskId}/consensus`);
+  return data;
+}
+
+export async function updateReviewConsensus(taskId: string, payload: UpdateReviewConsensusPayload) {
+  const { data } = await http.patch<ReviewConsensus>(`/reviews/tasks/${taskId}/consensus`, payload);
+  return data;
+}
+
+export async function confirmReviewConsensus(taskId: string) {
+  const { data } = await http.post<ReviewConsensus>(`/reviews/tasks/${taskId}/consensus/confirm`);
   return data;
 }

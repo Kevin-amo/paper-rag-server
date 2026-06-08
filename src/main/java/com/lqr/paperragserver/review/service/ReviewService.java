@@ -1,12 +1,17 @@
 package com.lqr.paperragserver.review.service;
 
 import com.lqr.paperragserver.document.dto.PageResponse;
+import com.lqr.paperragserver.review.dto.ReviewAssignmentResponse;
+import com.lqr.paperragserver.review.dto.ReviewConsensusResponse;
 import com.lqr.paperragserver.review.dto.ReviewCriterionRequest;
 import com.lqr.paperragserver.review.dto.ReviewCriterionResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportResponse;
 import com.lqr.paperragserver.review.dto.ReviewReportUpdateRequest;
+import com.lqr.paperragserver.review.dto.ReviewRiskItemResponse;
+import com.lqr.paperragserver.review.dto.ReviewRiskUpdateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskCreateRequest;
 import com.lqr.paperragserver.review.dto.ReviewTaskResponse;
+import com.lqr.paperragserver.review.dto.ReviewConsensusUpdateRequest;
 
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +29,18 @@ public interface ReviewService {
     ReviewReportResponse generateAiReview(UUID currentUserId, boolean admin, UUID taskId);
 
     ReviewReportResponse updateReport(UUID currentUserId, boolean admin, UUID reportId, ReviewReportUpdateRequest request);
+
+    ReviewAssignmentResponse submitAssignment(UUID currentUserId, UUID assignmentId);
+
+    ReviewConsensusResponse getConsensus(UUID currentUserId, boolean admin, UUID taskId);
+
+    ReviewConsensusResponse updateConsensus(UUID currentUserId, boolean admin, UUID taskId, ReviewConsensusUpdateRequest request);
+
+    ReviewConsensusResponse confirmConsensus(UUID currentUserId, boolean admin, UUID taskId);
+
+    List<ReviewRiskItemResponse> listRisks(UUID currentUserId, boolean admin, UUID reportId);
+
+    ReviewRiskItemResponse updateRisk(UUID currentUserId, boolean admin, UUID riskId, ReviewRiskUpdateRequest request);
 
     List<ReviewCriterionResponse> listCriteria(boolean includeDisabled);
 

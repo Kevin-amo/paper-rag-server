@@ -4,6 +4,7 @@ import type {
   AdminReviewTaskSummary,
   AssignReviewersPayload,
   PageResponse,
+  ReviewAssignment,
   ReviewConsensus,
   ReviewerLoad,
   UpdateReviewConsensusPayload,
@@ -38,7 +39,7 @@ export async function getAdminReviewTask(taskId: string) {
 }
 
 export async function assignReviewers(taskId: string, payload: AssignReviewersPayload) {
-  const { data } = await http.post<AdminReviewTaskDetail>(`/admin/reviews/tasks/${taskId}/assignments`, payload);
+  const { data } = await http.post<ReviewAssignment[]>(`/admin/reviews/tasks/${taskId}/assignments`, payload);
   return data;
 }
 

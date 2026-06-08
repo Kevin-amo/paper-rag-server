@@ -557,7 +557,7 @@ create table if not exists public.review_task (
     reviewer_user_id uuid references public.sys_user(id) on delete set null,
     source_id varchar(128) not null,
     title varchar(512) not null,
-    status varchar(32) not null default 'PENDING',
+    status varchar(32) not null default 'PENDING_ASSIGNMENT',
     assigned_at timestamptz,
     due_at timestamptz,
     completed_at timestamptz,
@@ -565,11 +565,11 @@ create table if not exists public.review_task (
     updated_at timestamptz not null default now(),
 
     constraint uq_review_task_document unique (document_id),
-    constraint chk_review_task_status check (status in ('PENDING', 'REVIEWING', 'COMPLETED', 'NEEDS_REVIEW'))
+    constraint chk_review_task_status check (status in ('PENDING', 'PENDING_ASSIGNMENT', 'ASSIGNED', 'REVIEWING', 'IN_REVIEW', 'SUBMITTED', 'COMPLETED', 'CONSENSUS_CONFIRMED', 'NEEDS_REVIEW'))
 );
 
 comment on table public.review_task is '论文评审任务表';
-comment on column public.review_task.status is '评审状态：PENDING、REVIEWING、COMPLETED、NEEDS_REVIEW';
+comment on column public.review_task.status is '评审状态：PENDING、PENDING_ASSIGNMENT、ASSIGNED、REVIEWING、IN_REVIEW、SUBMITTED、COMPLETED、CONSENSUS_CONFIRMED、NEEDS_REVIEW';
 
 create index if not exists idx_review_task_status_updated_at
     on public.review_task using btree (status, updated_at desc);
@@ -580,16 +580,43 @@ create index if not exists idx_review_task_submitter
 create index if not exists idx_review_task_reviewer
     on public.review_task using btree (reviewer_user_id, updated_at desc);
 
+create table if not exists public.review_assignment (
+    id uuid primary key default uuid_generate_v4(),
+    task_id uuid not null references public.review_task(id) on delete cascade,
+    reviewer_user_id uuid not null references public.sys_user(id) on delete cascade,
+    role varchar(32) not null default 'REVIEWER',
+    status varchar(32) not null default 'ASSIGNED',
+    assigned_at timestamptz not null default now(),
+    due_at timestamptz,
+    submitted_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    constraint uq_review_assignment_task_reviewer unique (task_id, reviewer_user_id),
+    constraint chk_review_assignment_role check (role in ('LEAD', 'REVIEWER', 'ARBITER')),
+    constraint chk_review_assignment_status check (status in ('ASSIGNED', 'REVIEWING', 'SUBMITTED', 'RETURNED', 'CANCELLED'))
+);
+create index if not exists idx_review_assignment_task_status on public.review_assignment using btree (task_id, status);
+create index if not exists idx_review_assignment_reviewer_status on public.review_assignment using btree (reviewer_user_id, status);
+create unique index if not exists uq_review_assignment_task_active_lead
+    on public.review_assignment (task_id)
+    where role = 'LEAD' and status <> 'CANCELLED';
+
 create table if not exists public.review_report (
     id uuid primary key default uuid_generate_v4(),
     task_id uuid not null references public.review_task(id) on delete cascade,
     document_id uuid not null references public.paper_document(id) on delete cascade,
     reviewer_user_id uuid references public.sys_user(id) on delete set null,
+    assignment_id uuid references public.review_assignment(id) on delete cascade,
     paper_sections jsonb not null default '{}'::jsonb,
     scores jsonb not null default '[]'::jsonb,
     comments jsonb not null default '{}'::jsonb,
     risks jsonb not null default '[]'::jsonb,
     raw_model_output jsonb not null default '{}'::jsonb,
+    criterion_version int,
+    model_version varchar(128),
+    prompt_version varchar(64),
+    confidence numeric(5,4),
+    manual_delta jsonb not null default '{}'::jsonb,
     total_score int,
     final_recommendation text,
     status varchar(32) not null default 'AI_GENERATED',
@@ -599,6 +626,7 @@ create table if not exists public.review_report (
     updated_at timestamptz not null default now(),
 
     constraint chk_review_report_total_score check (total_score is null or total_score between 0 and 100),
+    constraint chk_review_report_confidence check (confidence is null or (confidence >= 0 and confidence <= 1)),
     constraint chk_review_report_status check (status in ('AI_GENERATED', 'ADJUSTED', 'CONFIRMED', 'COMPLETED'))
 );
 
@@ -613,6 +641,55 @@ create index if not exists idx_review_report_task_updated_at
 create index if not exists idx_review_report_reviewer
     on public.review_report using btree (reviewer_user_id, updated_at desc);
 
+create unique index if not exists uq_review_report_assignment
+    on public.review_report (assignment_id)
+    where assignment_id is not null;
+create index if not exists idx_review_report_task_reviewer
+    on public.review_report using btree (task_id, reviewer_user_id);
+
+create table if not exists public.review_risk_item (
+    id uuid primary key default uuid_generate_v4(),
+    report_id uuid not null references public.review_report(id) on delete cascade,
+    task_id uuid not null references public.review_task(id) on delete cascade,
+    risk_type varchar(64) not null,
+    risk_level varchar(32) not null,
+    evidence text,
+    evidence_location jsonb not null default '{}'::jsonb,
+    suggestion text,
+    detector varchar(64),
+    confidence numeric(5,4),
+    status varchar(32) not null default 'OPEN',
+    reviewer_note text,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    constraint chk_review_risk_level check (risk_level in ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+    constraint chk_review_risk_confidence check (confidence is null or (confidence >= 0 and confidence <= 1)),
+    constraint chk_review_risk_status check (status in ('OPEN', 'CONFIRMED', 'IGNORED', 'RESOLVED'))
+);
+
+create index if not exists idx_review_risk_item_report_status on public.review_risk_item using btree (report_id, status);
+create index if not exists idx_review_risk_item_task_level on public.review_risk_item using btree (task_id, risk_level);
+
+create table if not exists public.review_consensus (
+    id uuid primary key default uuid_generate_v4(),
+    task_id uuid not null references public.review_task(id) on delete cascade,
+    lead_reviewer_user_id uuid references public.sys_user(id) on delete set null,
+    score_summary jsonb not null default '{}'::jsonb,
+    comment_summary jsonb not null default '{}'::jsonb,
+    disagreement_items jsonb not null default '[]'::jsonb,
+    final_score int,
+    final_recommendation text,
+    status varchar(32) not null default 'DRAFT',
+    confirmed_by_user_id uuid references public.sys_user(id) on delete set null,
+    confirmed_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    constraint uq_review_consensus_task unique (task_id),
+    constraint chk_review_consensus_score check (final_score is null or final_score between 0 and 100),
+    constraint chk_review_consensus_status check (status in ('DRAFT', 'IN_DISCUSSION', 'CONFIRMED', 'ARCHIVED'))
+);
+create index if not exists idx_review_consensus_status on public.review_consensus using btree (status);
+
 create table if not exists public.review_audit_log (
     id uuid primary key default uuid_generate_v4(),
     task_id uuid not null references public.review_task(id) on delete cascade,
@@ -620,6 +697,10 @@ create table if not exists public.review_audit_log (
     action varchar(64) not null,
     note text,
     snapshot jsonb not null default '{}'::jsonb,
+    before_snapshot jsonb not null default '{}'::jsonb,
+    after_snapshot jsonb not null default '{}'::jsonb,
+    diff jsonb not null default '{}'::jsonb,
+    client_info jsonb not null default '{}'::jsonb,
     created_at timestamptz not null default now()
 );
 

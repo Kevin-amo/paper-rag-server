@@ -399,6 +399,12 @@ export interface UploadReviewPaperPayload {
   title?: string;
 }
 
+export interface ReviewScoringRule {
+  level: string;
+  range: [number, number];
+  description: string;
+}
+
 export interface ReviewCriterion {
   id: string;
   code: string;
@@ -406,6 +412,10 @@ export interface ReviewCriterion {
   description: string | null;
   maxScore: number;
   weight: number;
+  version: number;
+  category: string | null;
+  evidenceRequired: boolean;
+  scoringRules: Array<Record<string, unknown>> | Record<string, unknown> | null;
   enabled: boolean;
   sortOrder: number;
   createdAt: string;
@@ -426,6 +436,28 @@ export interface ReviewRiskItem {
   level: 'LOW' | 'MEDIUM' | 'HIGH' | string;
   evidence: string;
   suggestion: string;
+}
+
+export interface ReviewRiskRecord {
+  id: string;
+  reportId: string;
+  taskId: string;
+  riskType: string;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string;
+  evidence: string | null;
+  evidenceLocation: Record<string, unknown>;
+  suggestion: string | null;
+  detector: string | null;
+  confidence: number | null;
+  status: 'OPEN' | 'CONFIRMED' | 'IGNORED' | 'RESOLVED' | string;
+  reviewerNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateReviewRiskPayload {
+  status: 'OPEN' | 'CONFIRMED' | 'IGNORED' | 'RESOLVED';
+  reviewerNote?: string | null;
 }
 
 export interface ReviewComments {
@@ -469,28 +501,22 @@ export interface ReviewConsensus {
 
 export interface AssignReviewersPayload {
   reviewerUserIds: string[];
-  leadReviewerUserId?: string | null;
-  arbiterUserId?: string | null;
+  leadReviewerUserId: string;
   dueAt?: string | null;
 }
 
 export interface UpdateReviewConsensusPayload {
-  scoreSummary?: Record<string, unknown> | null;
-  commentSummary?: Record<string, unknown> | null;
-  disagreementItems?: Array<Record<string, unknown>> | null;
   finalScore?: number | null;
   finalRecommendation?: string | null;
-  status?: ReviewConsensusStatus;
 }
 
 export interface ReviewerLoad {
   reviewerUserId: string;
-  reviewerName: string | null;
-  activeAssignments: number;
-  pendingAssignments: number;
-  submittedAssignments: number;
-  completedAssignments: number;
-  updatedAt: string | null;
+  username: string | null;
+  displayName: string | null;
+  assignedCount: number;
+  reviewingCount: number;
+  submittedCount: number;
 }
 
 export interface AdminReviewTaskSummary {
@@ -500,18 +526,19 @@ export interface AdminReviewTaskSummary {
   sourceId: string;
   title: string;
   status: ReviewTaskStatus;
-  currentAssignment: ReviewAssignment | null;
-  assignments: ReviewAssignment[];
-  assignedAt: string | null;
+  assignmentCount: number;
+  submittedCount: number;
+  leadReviewerUserId: string | null;
   dueAt: string | null;
-  completedAt: string | null;
+  consensusStatus: ReviewConsensusStatus;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface AdminReviewTaskDetail extends AdminReviewTaskSummary {
-  document: DocumentDetail | null;
-  report: ReviewReport | null;
+export interface AdminReviewTaskDetail {
+  task: ReviewTask;
+  assignments: ReviewAssignment[];
+  submittedReports: ReviewReport[];
   consensus: ReviewConsensus | null;
 }
 
@@ -525,6 +552,11 @@ export interface ReviewReport {
   scores: ReviewScoreItem[] | unknown;
   comments: ReviewComments | Record<string, unknown>;
   risks: ReviewRiskItem[] | unknown;
+  criterionVersion: number | null;
+  modelVersion: string | null;
+  promptVersion: string | null;
+  confidence: number | null;
+  manualDelta: Record<string, unknown> | null;
   totalScore: number | null;
   finalRecommendation: string | null;
   status: ReviewReportStatus;
