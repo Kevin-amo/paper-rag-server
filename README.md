@@ -197,7 +197,7 @@ npm run dev
 http://localhost:5173
 ```
 
-Vite 默认会把 `/auth`、`/documents`、`/agent`、`/conversations`、`/admin`、`/reviews` 等请求代理到 `http://localhost:8080`。
+Vite 默认会把 `/api/*` 请求代理到 `http://localhost:8080`，并去掉 `/api` 前缀后转发到后端；前端代码默认使用 `VITE_API_PREFIX=/api`，避免 `/admin` 等 SPA 页面路由在浏览器刷新时被代理到后端。
 
 如需修改后端地址：
 

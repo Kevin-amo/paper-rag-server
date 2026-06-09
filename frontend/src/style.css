@@ -42,6 +42,11 @@ body,
   min-height: 100%;
 }
 
+html {
+  scrollbar-gutter: stable;
+  overflow-y: auto;
+}
+
 body {
   margin: 0;
   min-width: 0;

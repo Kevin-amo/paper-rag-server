@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { clearAuthSession, getAccessToken } from '../composables/authState';
 
-const rawPrefix = import.meta.env.VITE_API_PREFIX?.trim() ?? '';
+const rawPrefix = import.meta.env.VITE_API_PREFIX?.trim() ?? '/api';
 
 export const apiPrefix = rawPrefix === '/' ? '' : rawPrefix.replace(/\/$/, '');
 

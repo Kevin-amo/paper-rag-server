@@ -425,7 +425,7 @@ onMounted(async () => {
                         :disabled="assignmentSubmitted || reviews.submittingAssignment.value || !selectedTask?.report"
                         :loading="reviews.submittingAssignment.value"
                       >
-                        ????
+                        提交评审
                       </el-button>
                     </template>
                   </el-popconfirm>

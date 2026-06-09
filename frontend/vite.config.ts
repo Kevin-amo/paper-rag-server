@@ -11,30 +11,6 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: 5173,
       proxy: {
-        '/documents': {
-          target,
-          changeOrigin: true,
-        },
-        '/conversations': {
-          target,
-          changeOrigin: true,
-        },
-        '/agent': {
-          target,
-          changeOrigin: true,
-        },
-        '/auth': {
-          target,
-          changeOrigin: true,
-        },
-        '/admin': {
-          target,
-          changeOrigin: true,
-        },
-        '/reviews': {
-          target,
-          changeOrigin: true,
-        },
         '/api': {
           target,
           changeOrigin: true,

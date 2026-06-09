@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "npm run check:routing && vue-tsc --noEmit && vite build",
+    "check:routing": "node scripts/check-routing-config.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -1,10 +1,9 @@
-import { computed, reactive, ref } from 'vue';
+﻿import { computed, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   generateReviewReport,
   getReviewTask,
   listReviewRisks,
-  submitReviewAssignment,
   listReviewCriteria,
   listReviewTasks,
   submitReviewAssignment,
@@ -171,7 +170,7 @@ export function useReviews() {
       const result = await regeneratePaperStructuredParse(sourceId);
       if (selectedTask.value?.sourceId === sourceId) {
         structuredParse.value = result;
-        ElMessage.success('结构化解析已重新生成');
+        ElMessage.success('缁撴瀯鍖栬В鏋愬凡閲嶆柊鐢熸垚');
       }
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
@@ -205,7 +204,7 @@ export function useReviews() {
   async function saveReport(status: ReviewReportStatus = reportForm.status) {
     const report = selectedReport.value;
     if (!report || !selectedTask.value) {
-      ElMessage.warning('请先生成辅助评审报告');
+      ElMessage.warning('璇峰厛鐢熸垚杈呭姪璇勫鎶ュ憡');
       return;
     }
     saving.value = true;
@@ -324,7 +323,7 @@ export function useReviews() {
         riskRecords.value = riskRecords.value.map((item) => (
           item.id === riskId && item.reportId === reportId ? updated : item
         ));
-        ElMessage.success('风险状态已更新');
+        ElMessage.success('椋庨櫓鐘舵€佸凡鏇存柊');
       }
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
@@ -417,3 +416,5 @@ export function useReviews() {
     updateScore,
   };
 }
+
+

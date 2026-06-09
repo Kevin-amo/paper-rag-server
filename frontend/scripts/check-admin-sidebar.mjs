@@ -1,0 +1,48 @@
+import { readFileSync } from 'node:fs';
+
+const shell = readFileSync(new URL('../src/components/admin/AdminShell.vue', import.meta.url), 'utf8');
+const reviews = readFileSync(new URL('../src/views/admin/AdminReviewDashboardView.vue', import.meta.url), 'utf8');
+const usersView = readFileSync(new URL('../src/views/admin/AdminUsersView.vue', import.meta.url), 'utf8');
+const usersPanel = readFileSync(new URL('../src/components/admin/AdminUsersPanel.vue', import.meta.url), 'utf8');
+const globalStyle = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+
+const requiredMenuLabels = ['用户管理', '评审任务', '评审员分配', '评审指标', '共识/归档'];
+const requiredReviewTabs = [
+  'name="tasks"',
+  'name="assignments"',
+  'name="criteria"',
+  'name="archive"',
+];
+
+const missing = [];
+for (const label of requiredMenuLabels) {
+  if (!shell.includes(label)) missing.push(`AdminShell missing menu label: ${label}`);
+}
+for (const tab of requiredReviewTabs) {
+  if (!reviews.includes(tab)) missing.push(`AdminReviewDashboardView missing tab marker: ${tab}`);
+}
+if (!shell.includes('admin-layout') || !shell.includes('admin-sidebar')) {
+  missing.push('AdminShell missing conventional sidebar layout classes');
+}
+if (!reviews.includes('route.query.tab') || !reviews.includes('router.replace')) {
+  missing.push('AdminReviewDashboardView missing query-driven tab synchronization');
+}
+if (usersPanel.includes('<el-drawer') || usersPanel.includes('admin-users-drawer') || usersView.includes('v-model="panelVisible"')) {
+  missing.push('User management must render inline, not as a drawer controlled by v-model');
+}
+if (usersPanel.includes('user-avatar') || usersPanel.includes('avatarUrl') || usersPanel.includes('<img')) {
+  missing.push('User management table must not render user avatars');
+}
+if (!usersPanel.includes('users-panel') || !usersPanel.includes('用户列表')) {
+  missing.push('User management panel missing inline management layout markers');
+}
+if (!/html\s*\{[^}]*scrollbar-gutter:\s*stable[^}]*overflow-y:\s*auto/s.test(globalStyle)) {
+  missing.push('Global layout must set html scrollbar-gutter: stable together with overflow-y: auto to prevent admin navigation shift');
+}
+
+if (missing.length) {
+  console.error(missing.join('\n'));
+  process.exit(1);
+}
+
+console.log('Admin sidebar static checks passed.');

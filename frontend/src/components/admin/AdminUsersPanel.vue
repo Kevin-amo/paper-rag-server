@@ -5,55 +5,33 @@ export default {
 </script>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { onMounted } from 'vue';
 import StatusTag from '../common/StatusTag.vue';
 import RoleTag from '../common/RoleTag.vue';
 import ConfirmDeleteButton from '../common/ConfirmDeleteButton.vue';
 import { useAdminUsers } from '../../composables/useAdminUsers';
-import type { AdminUser, UserRole, UserStatus } from '../../types';
-
-const props = defineProps<{
-  modelValue: boolean;
-}>();
-
-const emit = defineEmits<{
-  'update:modelValue': [value: boolean];
-}>();
-
-const visible = computed({
-  get: () => props.modelValue,
-  set: (value: boolean) => emit('update:modelValue', value),
-});
+import type { UserRole, UserStatus } from '../../types';
 
 const admin = useAdminUsers();
 
-watch(
-  () => props.modelValue,
-  (open) => {
-    if (open) {
-      void admin.loadUsers(0);
-    }
-  },
-  { immediate: props.modelValue },
-);
+onMounted(() => {
+  void admin.loadUsers(0);
+});
 
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString() : '-';
 }
-
-function userInitial(user: AdminUser) {
-  return (user.displayName || user.username).slice(0, 1).toUpperCase();
-}
 </script>
 
 <template>
-  <el-drawer v-model="visible" size="min(1120px, 94vw)" destroy-on-close class="admin-users-drawer">
-    <template #header>
-      <div class="drawer-title">
-        <span>Admin Console</span>
-        <strong>用户管理</strong>
+  <section class="users-panel">
+    <div class="panel-heading">
+      <div>
+        <h2>用户列表</h2>
+        <p>管理账号、角色、状态和密码重置。</p>
       </div>
-    </template>
+      <el-button type="primary" @click="admin.openCreateDialog">新建用户</el-button>
+    </div>
 
     <section class="admin-summary">
       <div class="summary-card">
@@ -78,37 +56,30 @@ function userInitial(user: AdminUser) {
       <el-input
         v-model="admin.keyword.value"
         clearable
-        size="large"
         placeholder="搜索用户名 / 昵称 / 邮箱"
         @keyup.enter="admin.loadUsers(0)"
       />
-      <el-select v-model="admin.statusFilter.value" clearable size="large" placeholder="状态" class="status-filter">
+      <el-select v-model="admin.statusFilter.value" clearable placeholder="状态" class="status-filter">
         <el-option label="启用" value="ACTIVE" />
         <el-option label="禁用" value="DISABLED" />
       </el-select>
-      <el-button size="large" @click="admin.loadUsers(0)">搜索</el-button>
-      <el-button size="large" type="primary" @click="admin.openCreateDialog">新建用户</el-button>
+      <el-button @click="admin.loadUsers(0)">搜索</el-button>
+      <el-button type="primary" @click="admin.loadUsers(admin.pagination.page)">刷新</el-button>
     </div>
 
-    <el-table :data="admin.users.value" :loading="admin.loading.value" height="560" class="users-table">
+    <el-table :data="admin.users.value" :loading="admin.loading.value" class="users-table">
       <el-table-column label="用户" min-width="220">
         <template #default="{ row }">
           <div class="user-cell">
-            <div class="user-avatar">
-              <img v-if="row.avatarUrl" :src="row.avatarUrl" :alt="`${row.username} 头像`">
-              <span v-else>{{ userInitial(row) }}</span>
-            </div>
-            <div>
-              <strong>{{ row.displayName || row.username }}</strong>
-              <span>{{ row.username }}</span>
-            </div>
+            <strong>{{ row.displayName || row.username }}</strong>
+            <span>{{ row.username }}</span>
           </div>
         </template>
       </el-table-column>
       <el-table-column prop="email" label="邮箱" min-width="190" show-overflow-tooltip>
         <template #default="{ row }">{{ row.email || '-' }}</template>
       </el-table-column>
-      <el-table-column label="角色" min-width="230">
+      <el-table-column label="角色" min-width="240">
         <template #default="{ row }">
           <el-select
             :model-value="row.roles"
@@ -208,58 +179,68 @@ function userInitial(user: AdminUser) {
         <el-button type="primary" :loading="admin.saving.value" @click="admin.resetPassword">确认重置</el-button>
       </template>
     </el-dialog>
-  </el-drawer>
+  </section>
 </template>
 
 <style scoped>
-.drawer-title {
+.users-panel {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 18px;
+  background: #fff;
+}
+
+.panel-heading {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #eef0f4;
+  padding-bottom: 14px;
 }
 
-.drawer-title span {
-  color: var(--app-primary);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.panel-heading h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
 }
 
-.drawer-title strong {
-  color: var(--app-text);
-  font-size: 22px;
+.panel-heading p {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 13px;
 }
 
 .admin-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 18px;
+  gap: 12px;
 }
 
 .summary-card {
-  border: 1px solid rgba(37, 99, 235, 0.11);
-  border-radius: 20px;
-  padding: 16px;
-  background: linear-gradient(135deg, #eff6ff, #fff);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
 }
 
 .summary-card.muted {
-  background: linear-gradient(135deg, #f8fafc, #fff);
+  background: #f9fafb;
 }
 
 .summary-card span {
   display: block;
-  color: var(--app-text-muted);
+  color: #6b7280;
   font-size: 13px;
 }
 
 .summary-card strong {
   display: block;
   margin-top: 8px;
-  color: var(--app-text);
-  font-size: 28px;
+  color: #111827;
+  font-size: 24px;
   line-height: 1;
 }
 
@@ -267,7 +248,6 @@ function userInitial(user: AdminUser) {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) 150px auto auto;
   gap: 10px;
-  margin-bottom: 14px;
 }
 
 .status-filter {
@@ -276,42 +256,23 @@ function userInitial(user: AdminUser) {
 
 .users-table {
   overflow: hidden;
-  border: 1px solid var(--app-border);
-  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
 }
 
 .user-cell {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.user-avatar {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  overflow: hidden;
-  border-radius: 12px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--app-primary), #60a5fa);
-  font-weight: 800;
-}
-
-.user-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.user-cell div:last-child {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
 
+.user-cell strong {
+  color: #111827;
+  font-weight: 700;
+}
+
 .user-cell span {
-  color: var(--app-text-muted);
+  color: #6b7280;
   font-size: 12px;
 }
 
@@ -331,14 +292,13 @@ function userInitial(user: AdminUser) {
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
 }
 
 .full-select {
   width: 100%;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 980px) {
   .admin-summary,
   .toolbar {
     grid-template-columns: 1fr;
@@ -346,6 +306,11 @@ function userInitial(user: AdminUser) {
 
   .status-filter {
     width: 100%;
+  }
+
+  .panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>
