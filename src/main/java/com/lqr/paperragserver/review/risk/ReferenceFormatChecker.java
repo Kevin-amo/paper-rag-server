@@ -11,10 +11,10 @@ import java.util.regex.Pattern;
 
 @Component
 public class ReferenceFormatChecker {
-    private static final Pattern NUMBERED_REFERENCE_PATTERN = Pattern.compile("^\\s*(?:\\[\\d+]|\\d+[.)\\u3001])\\s+.*");
+    private static final Pattern NUMBERED_REFERENCE_PATTERN = Pattern.compile("^\\s*(?:\\[\\d+]|\\d+[.)、])\\s+.*");
     private static final Pattern YEAR_PATTERN = Pattern.compile("\\b(19\\d{2}|20\\d{2})\\b");
     private static final Pattern AUTHOR_PREFIX_PATTERN = Pattern.compile("^[A-Z][A-Za-z'-]*(?:\\.|\\s+[A-Z]\\.)\\s+.+");
-    private static final Pattern CJK_REFERENCE_PREFIX_PATTERN = Pattern.compile("^[\\p{IsHan}]{2,20}[.\\uFF0E\\u3002]\\s*.+");
+    private static final Pattern CJK_REFERENCE_PREFIX_PATTERN = Pattern.compile("^[\\p{IsHan}]{2,20}[.．。]\\s*.+");
 
     public List<ReferenceRisk> check(String referencesText) {
         if (referencesText == null || referencesText.isBlank()) {
@@ -104,7 +104,7 @@ public class ReferenceFormatChecker {
         return normalized.equals("references")
                 || normalized.equals("reference")
                 || normalized.equals("bibliography")
-                || normalized.equals("\u53C2\u8003\u6587\u732E");
+                || normalized.equals("参考文献");
     }
 
     private boolean looksLikeStandaloneReferenceLine(String line) {

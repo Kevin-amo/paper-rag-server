@@ -1,4 +1,4 @@
-﻿import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   generateReviewReport,
@@ -168,7 +168,7 @@ export function useReviews() {
       const result = await regenerateReviewTaskStructuredParse(taskId);
       if (selectedTask.value?.id === taskId) {
         structuredParse.value = result;
-        ElMessage.success('缁撴瀯鍖栬В鏋愬凡閲嶆柊鐢熸垚');
+        ElMessage.success('结构化解析已重新生成');
       }
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
@@ -203,7 +203,7 @@ export function useReviews() {
     const report = selectedReport.value;
     const task = selectedTask.value;
     if (!report || !task) {
-      ElMessage.warning('璇峰厛鐢熸垚杈呭姪璇勫鎶ュ憡');
+      ElMessage.warning('请先生成辅助评审报告');
       return;
     }
     saving.value = true;
@@ -322,7 +322,7 @@ export function useReviews() {
         riskRecords.value = riskRecords.value.map((item) => (
           item.id === riskId && item.reportId === reportId ? updated : item
         ));
-        ElMessage.success('椋庨櫓鐘舵€佸凡鏇存柊');
+        ElMessage.success('风险状态已更新');
       }
     } catch (error) {
       ElMessage.error(getErrorMessage(error));

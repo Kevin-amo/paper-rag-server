@@ -247,7 +247,7 @@ public class DefaultPaperSectionRuleParser implements PaperSectionRuleParser {
     }
 
     private String normalizeLine(String value) {
-        return value == null ? "" : value.replace('\u3000', ' ').trim();
+        return value == null ? "" : value.replace('　', ' ').trim();
     }
 
     private String blankToNull(String value) {

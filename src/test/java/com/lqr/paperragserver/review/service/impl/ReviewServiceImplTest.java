@@ -239,7 +239,7 @@ class ReviewServiceImplTest {
         when(assignmentMapper.selectByTaskAndReviewer(taskId, userId)).thenReturn(assignment);
         when(paperStructuredParseService.find(userId, "source-1")).thenReturn(Optional.empty());
         when(llmService.generate(any())).thenReturn("not json");
-        when(reviewOutputParser.parse("not json")).thenThrow(new IllegalArgumentException("\u7f3a\u5c11 JSON \u5bf9\u8c61"));
+        when(reviewOutputParser.parse("not json")).thenThrow(new IllegalArgumentException("缺少 JSON 对象"));
 
         ReviewServiceImpl service = new ReviewServiceImpl(
                 taskMapper,
@@ -265,7 +265,7 @@ class ReviewServiceImplTest {
                 .satisfies(ex -> {
                     ResponseStatusException response = (ResponseStatusException) ex;
                     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
-                    assertThat(response.getReason()).contains("\u7f3a\u5c11 JSON \u5bf9\u8c61");
+                    assertThat(response.getReason()).contains("缺少 JSON 对象");
                     assertThat(response.getCause()).isInstanceOf(IllegalArgumentException.class);
                 });
     }

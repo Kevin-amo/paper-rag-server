@@ -99,7 +99,7 @@ public class ReviewRiskService {
     private String normalizeStatus(String value) {
         String normalized = value.trim().toUpperCase();
         if (!ALLOWED_STATUSES.contains(normalized)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "\u98ce\u9669\u9879\u72b6\u6001\u975e\u6cd5");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "风险项状态非法");
         }
         return normalized;
     }

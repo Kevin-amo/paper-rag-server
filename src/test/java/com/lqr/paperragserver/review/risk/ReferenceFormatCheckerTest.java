@@ -99,7 +99,7 @@ class ReferenceFormatCheckerTest {
     @Test
     void checkShouldIgnoreChineseReferenceHeading() {
         var risks = checker.check("""
-                \u53C2\u8003\u6587\u732E
+                参考文献
                 [1] Wang A. Recent reference. Journal A, 2024.
                 """);
 

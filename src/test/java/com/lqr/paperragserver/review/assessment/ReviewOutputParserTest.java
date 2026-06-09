@@ -17,12 +17,12 @@ class ReviewOutputParserTest {
         Map<String, Object> parsed = parser.parse("""
                 ```json
                 {
-                  "paperSections": {"title": "\u8bba\u6587A",},
+                  "paperSections": {"title": "论文A",},
                   "scores": [{"code": "LOGIC", "score": 130, "maxScore": 100, "confidence": 1.4,}],
-                  "comments": {"summary": "\u53ef\u8bfb",},
+                  "comments": {"summary": "可读",},
                   "risks": [],
                   "totalScore": 120,
-                  "finalRecommendation": "\u5efa\u8bae\u4fee\u6539\u540e\u901a\u8fc7",
+                  "finalRecommendation": "建议修改后通过",
                 }
                 ```
                 """);
@@ -35,9 +35,9 @@ class ReviewOutputParserTest {
 
     @Test
     void parseShouldRejectTextWithoutJson() {
-        assertThatThrownBy(() -> parser.parse("\u6ca1\u6709 JSON"))
+        assertThatThrownBy(() -> parser.parse("没有 JSON"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("\u7f3a\u5c11 JSON \u5bf9\u8c61");
+                .hasMessageContaining("缺少 JSON 对象");
     }
 
     @Test
@@ -98,7 +98,7 @@ class ReviewOutputParserTest {
     void parseShouldRejectInvalidJsonThatCannotBeRepaired() {
         assertThatThrownBy(() -> parser.parse("{\"scores\": [}"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("\u4e0d\u662f\u6709\u6548 JSON");
+                .hasMessageContaining("不是有效 JSON");
     }
 
 }

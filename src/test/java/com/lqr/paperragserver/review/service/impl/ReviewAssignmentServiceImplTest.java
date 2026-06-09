@@ -50,7 +50,7 @@ class ReviewAssignmentServiceImplTest {
 
         assertThatThrownBy(() -> service.assignReviewers(taskId, UUID.randomUUID(), request))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("\u7ec4\u957f\u5fc5\u987b\u5728\u8bc4\u5ba1\u4eba\u5217\u8868\u4e2d");
+                .hasMessageContaining("组长必须在评审人列表中");
         verify(assignmentMapper, never()).insert(any(ReviewAssignmentEntity.class));
     }
 
@@ -64,7 +64,7 @@ class ReviewAssignmentServiceImplTest {
 
         assertThatThrownBy(() -> service.assignReviewers(taskId, UUID.randomUUID(), request))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("\u8bc4\u5ba1\u4eba\u4e0d\u80fd\u91cd\u590d");
+                .hasMessageContaining("评审人不能重复");
         verify(assignmentMapper, never()).insert(any(ReviewAssignmentEntity.class));
     }
 
@@ -78,7 +78,7 @@ class ReviewAssignmentServiceImplTest {
 
         assertThatThrownBy(() -> service.assignReviewers(taskId, UUID.randomUUID(), request))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("\u5f53\u524d\u4efb\u52a1\u72b6\u6001\u4e0d\u5141\u8bb8\u91cd\u65b0\u5206\u914d\u8bc4\u5ba1\u4eba");
+                .hasMessageContaining("当前任务状态不允许重新分配评审人");
         verify(assignmentMapper, never()).insert(any(ReviewAssignmentEntity.class));
     }
 
@@ -93,7 +93,7 @@ class ReviewAssignmentServiceImplTest {
 
         assertThatThrownBy(() -> service.assignReviewers(taskId, UUID.randomUUID(), request))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("\u8bc4\u5ba1\u4efb\u52a1\u5df2\u5206\u914d");
+                .hasMessageContaining("评审任务已分配");
         verify(assignmentMapper, never()).insert(any(ReviewAssignmentEntity.class));
     }
 
@@ -106,7 +106,7 @@ class ReviewAssignmentServiceImplTest {
 
         assertThatThrownBy(() -> service.submitAssignment(otherUserId, assignmentId))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("\u53ea\u80fd\u63d0\u4ea4\u81ea\u5df1\u7684\u8bc4\u5ba1\u4efb\u52a1");
+                .hasMessageContaining("只能提交自己的评审任务");
         verify(assignmentMapper, never()).updateStatus(any(), any());
     }
 

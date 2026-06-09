@@ -201,15 +201,15 @@ public class ReviewServiceImpl implements ReviewService {
         }
         if (assignment == null && hasAssignments) {
             if (admin) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u7ba1\u7406\u5458\u4e0d\u80fd\u8986\u76d6\u5df2\u5206\u914d\u8bc4\u5ba1\u4eba\u7684\u4e2a\u4eba\u62a5\u544a");
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "管理员不能覆盖已分配评审人的个人报告");
             }
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u8bbf\u95ee\u5206\u914d\u7ed9\u81ea\u5df1\u7684\u8bc4\u5ba1\u4efb\u52a1");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能访问分配给自己的评审任务");
         }
         if (assignment == null && !admin) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u8bbf\u95ee\u5206\u914d\u7ed9\u81ea\u5df1\u7684\u8bc4\u5ba1\u4efb\u52a1");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能访问分配给自己的评审任务");
         }
         if (assignment != null && ReviewAssignmentStatuses.SUBMITTED.equals(assignment.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "\u8bc4\u5ba1\u5df2\u63d0\u4ea4\uff0c\u4e0d\u80fd\u91cd\u65b0\u751f\u6210\u62a5\u544a");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "评审已提交，不能重新生成报告");
         }
 
         if (assignment != null) {
@@ -299,23 +299,23 @@ public class ReviewServiceImpl implements ReviewService {
         if (report.getAssignmentId() != null) {
             assignment = assignmentMapper.selectById(report.getAssignmentId());
             if (assignment == null) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u8bc4\u5ba1\u5206\u914d\u4e0d\u5b58\u5728");
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "评审分配不存在");
             }
             if (!admin && !assignment.getReviewerUserId().equals(currentUserId)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u4fee\u6539\u81ea\u5df1\u7684\u8bc4\u5ba1\u62a5\u544a");
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能修改自己的评审报告");
             }
             if (ReviewAssignmentStatuses.SUBMITTED.equals(assignment.getStatus())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "\u8bc4\u5ba1\u5df2\u63d0\u4ea4\uff0c\u4e0d\u80fd\u4fee\u6539\u62a5\u544a");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "评审已提交，不能修改报告");
             }
             if (ReviewAssignmentStatuses.ASSIGNED.equals(assignment.getStatus())) {
                 assignmentMapper.updateStatus(assignment.getId(), ReviewAssignmentStatuses.REVIEWING);
             }
         } else if (!admin) {
             if (report.getReviewerUserId() != null && !currentUserId.equals(report.getReviewerUserId())) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u4fee\u6539\u81ea\u5df1\u7684\u8bc4\u5ba1\u62a5\u544a");
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能修改自己的评审报告");
             }
             if ("CONFIRMED".equals(report.getStatus()) || "COMPLETED".equals(report.getStatus())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "\u8bc4\u5ba1\u62a5\u544a\u5df2\u786e\u8ba4\uff0c\u4e0d\u80fd\u4fee\u6539");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "评审报告已确认，不能修改");
             }
         }
         report.setReviewerUserId(currentUserId);
@@ -369,7 +369,7 @@ public class ReviewServiceImpl implements ReviewService {
     public ReviewRiskItemResponse updateRisk(UUID currentUserId, boolean admin, UUID riskId, ReviewRiskUpdateRequest request) {
         ReviewRiskItemEntity risk = reviewRiskService.findById(riskId);
         if (risk == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u98ce\u9669\u9879\u4e0d\u5b58\u5728");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "风险项不存在");
         }
         ReviewReportEntity report = requireReport(risk.getReportId());
         assertReportAccess(currentUserId, admin, report);
@@ -382,7 +382,7 @@ public class ReviewServiceImpl implements ReviewService {
     public ReviewAssignmentResponse submitAssignment(UUID currentUserId, UUID assignmentId) {
         ReviewReportEntity report = reportMapper.selectByAssignmentId(assignmentId);
         if (report == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "\u8bf7\u5148\u751f\u6210\u6216\u4fdd\u5b58\u8bc4\u5ba1\u62a5\u544a\u518d\u63d0\u4ea4");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请先生成或保存评审报告再提交");
         }
         return assignmentService.submitAssignment(currentUserId, assignmentId);
     }
@@ -390,7 +390,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     public ReviewConsensusResponse getConsensus(UUID currentUserId, boolean admin, UUID taskId) {
         if (!consensusService.canAccessConsensus(currentUserId, admin, taskId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u6709\u7ec4\u957f\u6216\u7ba1\u7406\u5458\u53ef\u4ee5\u67e5\u770b\u5171\u8bc6\u6c47\u603b");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只有组长或管理员可以查看共识汇总");
         }
         return consensusService.getForTask(taskId);
     }
@@ -398,7 +398,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     public ReviewConsensusResponse updateConsensus(UUID currentUserId, boolean admin, UUID taskId, ReviewConsensusUpdateRequest request) {
         if (!consensusService.canAccessConsensus(currentUserId, admin, taskId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u6709\u7ec4\u957f\u6216\u7ba1\u7406\u5458\u53ef\u4ee5\u4fee\u6539\u5171\u8bc6\u6c47\u603b");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只有组长或管理员可以修改共识汇总");
         }
         return consensusService.update(taskId, request);
     }
@@ -406,7 +406,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     public ReviewConsensusResponse confirmConsensus(UUID currentUserId, boolean admin, UUID taskId) {
         if (!consensusService.canAccessConsensus(currentUserId, admin, taskId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u6709\u7ec4\u957f\u6216\u7ba1\u7406\u5458\u53ef\u4ee5\u786e\u8ba4\u5171\u8bc6\u6c47\u603b");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只有组长或管理员可以确认共识汇总");
         }
         return consensusService.confirm(taskId, currentUserId);
     }
@@ -454,7 +454,7 @@ public class ReviewServiceImpl implements ReviewService {
         if (!admin) {
             ReviewAssignmentEntity currentAssignment = assignmentMapper.selectByTaskAndReviewer(task.getId(), currentUserId);
             if (currentAssignment == null) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u8bbf\u95ee\u5206\u914d\u7ed9\u81ea\u5df1\u7684\u8bc4\u5ba1\u4efb\u52a1");
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能访问分配给自己的评审任务");
             }
             DocumentDetailResponse document = includeDocument ? DocumentDetailResponse.from(requireDocument(task)) : null;
             ReviewReportResponse report = ReviewReportResponse.from(reportMapper.selectByAssignmentId(currentAssignment.getId()));
@@ -477,7 +477,7 @@ public class ReviewServiceImpl implements ReviewService {
     private ReviewReportEntity requireReport(UUID reportId) {
         ReviewReportEntity report = reportMapper.selectById(reportId);
         if (report == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u8bc4\u5ba1\u62a5\u544a\u4e0d\u5b58\u5728");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "评审报告不存在");
         }
         return report;
     }
@@ -491,13 +491,13 @@ public class ReviewServiceImpl implements ReviewService {
             if (assignment != null && currentUserId.equals(assignment.getReviewerUserId())) {
                 return;
             }
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u8bbf\u95ee\u81ea\u5df1\u7684\u8bc4\u5ba1\u98ce\u9669\u9879");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能访问自己的评审风险项");
         }
         ReviewTaskEntity task = requireTask(report.getTaskId());
         if (task.getReviewerUserId() == null || task.getReviewerUserId().equals(currentUserId)) {
             return;
         }
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u65e0\u6743\u8bbf\u95ee\u8be5\u8bc4\u5ba1\u4efb\u52a1");
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该评审任务");
     }
 
     private PromptConstructionService.Prompt buildReviewPrompt(DocumentPersistenceService.DocumentDetail document, List<ReviewCriterionResponse> criteria) {
@@ -627,7 +627,7 @@ public class ReviewServiceImpl implements ReviewService {
     private ReviewTaskEntity requireAccessibleTask(UUID currentUserId, boolean admin, UUID taskId) {
         ReviewTaskEntity task = requireTask(taskId);
         if (!admin && assignmentMapper.selectByTaskAndReviewer(taskId, currentUserId) == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u8bbf\u95ee\u5206\u914d\u7ed9\u81ea\u5df1\u7684\u8bc4\u5ba1\u4efb\u52a1");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能访问分配给自己的评审任务");
         }
         return task;
     }

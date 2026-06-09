@@ -16,12 +16,12 @@ class ConsensusCalculatorTest {
 
     @Test
     void calculateShouldAverageOverallAndCriterionScores() {
-        ReviewReportEntity first = report(UUID.randomUUID(), UUID.randomUUID(), 80, "寤鸿閫氳繃",
+        ReviewReportEntity first = report(UUID.randomUUID(), UUID.randomUUID(), 80, "建议通过",
                 List.of(
                         Map.of("code", "LOGIC", "score", 70),
                         Map.of("code", "NOVELTY", "score", "88")
                 ));
-        ReviewReportEntity second = report(UUID.randomUUID(), UUID.randomUUID(), 90, "寤鸿淇敼鍚庨€氳繃",
+        ReviewReportEntity second = report(UUID.randomUUID(), UUID.randomUUID(), 90, "建议修改后通过",
                 List.of(
                         Map.of("code", "LOGIC", "score", 95),
                         Map.of("code", "NOVELTY", "score", 92)
@@ -54,13 +54,13 @@ class ConsensusCalculatorTest {
                 .anySatisfy(recommendation -> assertThat((Map<String, Object>) recommendation)
                         .containsEntry("reportId", first.getId())
                         .containsEntry("reviewerUserId", first.getReviewerUserId())
-                        .containsEntry("finalRecommendation", "寤鸿閫氳繃"));
+                        .containsEntry("finalRecommendation", "建议通过"));
     }
 
     @Test
     void calculateShouldFlagOverallDisagreementAtThreshold() {
-        ReviewReportEntity first = report(UUID.randomUUID(), UUID.randomUUID(), 75, "寤鸿閫氳繃", List.of());
-        ReviewReportEntity second = report(UUID.randomUUID(), UUID.randomUUID(), 90, "寤鸿澶嶆牳", List.of());
+        ReviewReportEntity first = report(UUID.randomUUID(), UUID.randomUUID(), 75, "建议通过", List.of());
+        ReviewReportEntity second = report(UUID.randomUUID(), UUID.randomUUID(), 90, "建议复核", List.of());
 
         ConsensusCalculator.Result result = calculator.calculate(List.of(first, second));
 

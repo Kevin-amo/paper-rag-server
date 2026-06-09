@@ -35,23 +35,23 @@ public class ReviewOutputParser {
                 return objectMapper.readValue(repairedJson, new TypeReference<Map<String, Object>>() {
                 });
             } catch (JsonProcessingException ignored) {
-                throw new IllegalArgumentException("\u6a21\u578b\u8bc4\u5ba1\u7ed3\u679c\u4e0d\u662f\u6709\u6548 JSON", ignored);
+                throw new IllegalArgumentException("模型评审结果不是有效 JSON", ignored);
             }
         }
     }
 
     private String extractJson(String value) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("\u6a21\u578b\u8bc4\u5ba1\u7ed3\u679c\u4e3a\u7a7a");
+            throw new IllegalArgumentException("模型评审结果为空");
         }
         String text = stripCodeFence(value.trim());
         int start = text.indexOf('{');
         if (start < 0) {
-            throw new IllegalArgumentException("\u6a21\u578b\u8bc4\u5ba1\u7ed3\u679c\u7f3a\u5c11 JSON \u5bf9\u8c61");
+            throw new IllegalArgumentException("模型评审结果缺少 JSON 对象");
         }
         int end = balancedObjectEnd(text, start);
         if (end < 0) {
-            throw new IllegalArgumentException("\u6a21\u578b\u8bc4\u5ba1\u7ed3\u679c JSON \u5bf9\u8c61\u4e0d\u5b8c\u6574");
+            throw new IllegalArgumentException("模型评审结果 JSON 对象不完整");
         }
         return text.substring(start, end + 1);
     }

@@ -63,12 +63,12 @@ function handleSubmit() {
   }
 
   if (!form.reviewerUserIds.length || !form.leadReviewerUserId) {
-    ElMessage.warning('\u8bf7\u9009\u62e9\u8bc4\u5ba1\u4eba\u5e76\u6307\u5b9a\u7ec4\u957f');
+    ElMessage.warning('请选择评审人并指定组长');
     return;
   }
 
   if (!form.reviewerUserIds.includes(form.leadReviewerUserId)) {
-    ElMessage.warning('\u7ec4\u957f\u5fc5\u987b\u5728\u8bc4\u5ba1\u4eba\u5217\u8868\u4e2d');
+    ElMessage.warning('组长必须在评审人列表中');
     return;
   }
 

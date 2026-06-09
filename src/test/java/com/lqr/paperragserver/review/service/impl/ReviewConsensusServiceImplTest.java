@@ -97,7 +97,7 @@ class ReviewConsensusServiceImplTest {
         assertThatThrownBy(() -> service.recalculate(taskId))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value()).isEqualTo(409))
-                .hasMessageContaining("\u6700\u7ec8\u5171\u8bc6\u5df2\u786e\u8ba4\uff0c\u4e0d\u80fd\u91cd\u65b0\u8ba1\u7b97");
+                .hasMessageContaining("最终共识已确认，不能重新计算");
         verify(consensusMapper, never()).insert(any(ReviewConsensusEntity.class));
         verify(consensusMapper, never()).updateById(any(ReviewConsensusEntity.class));
     }
@@ -114,7 +114,7 @@ class ReviewConsensusServiceImplTest {
         assertThatThrownBy(() -> service.recalculate(taskId))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value()).isEqualTo(409))
-                .hasMessageContaining("\u6700\u7ec8\u5171\u8bc6\u5df2\u786e\u8ba4\uff0c\u4e0d\u80fd\u91cd\u65b0\u8ba1\u7b97");
+                .hasMessageContaining("最终共识已确认，不能重新计算");
         verify(consensusMapper, never()).insert(any(ReviewConsensusEntity.class));
         verify(consensusMapper, never()).updateById(any(ReviewConsensusEntity.class));
     }
@@ -137,7 +137,7 @@ class ReviewConsensusServiceImplTest {
         assertThatThrownBy(() -> service.update(taskId, new ReviewConsensusUpdateRequest(90, "ok")))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value()).isEqualTo(404))
-                .hasMessageContaining("\u5171\u8bc6\u6c47\u603b\u4e0d\u5b58\u5728\uff0c\u8bf7\u5148\u91cd\u65b0\u8ba1\u7b97");
+                .hasMessageContaining("共识汇总不存在，请先重新计算");
         verify(consensusMapper, never()).updateById(any(ReviewConsensusEntity.class));
     }
 
@@ -170,7 +170,7 @@ class ReviewConsensusServiceImplTest {
         assertThatThrownBy(() -> service.update(taskId, new ReviewConsensusUpdateRequest(92, "pass")))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value()).isEqualTo(409))
-                .hasMessageContaining("\u6700\u7ec8\u5171\u8bc6\u5df2\u786e\u8ba4\uff0c\u4e0d\u80fd\u4fee\u6539");
+                .hasMessageContaining("最终共识已确认，不能修改");
         verify(consensusMapper, never()).updateById(any(ReviewConsensusEntity.class));
     }
 
@@ -207,7 +207,7 @@ class ReviewConsensusServiceImplTest {
         assertThatThrownBy(() -> service.confirm(taskId, operatorUserId))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value()).isEqualTo(409))
-                .hasMessageContaining("\u8bf7\u7b49\u5f85\u6240\u6709\u8bc4\u5ba1\u4eba\u63d0\u4ea4\u540e\u518d\u5904\u7406\u5171\u8bc6\u6c47\u603b");
+                .hasMessageContaining("请等待所有评审人提交后再处理共识汇总");
         verify(consensusMapper, never()).updateById(any(ReviewConsensusEntity.class));
         verify(taskMapper, never()).updateTaskStatus(any(UUID.class), any(String.class));
     }
@@ -224,7 +224,7 @@ class ReviewConsensusServiceImplTest {
         assertThatThrownBy(() -> service.confirm(taskId, operatorUserId))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value()).isEqualTo(409))
-                .hasMessageContaining("\u6700\u7ec8\u5171\u8bc6\u5df2\u786e\u8ba4\uff0c\u4e0d\u80fd\u91cd\u590d\u786e\u8ba4");
+                .hasMessageContaining("最终共识已确认，不能重复确认");
         verify(consensusMapper, never()).updateById(any(ReviewConsensusEntity.class));
         verify(taskMapper, never()).updateTaskStatus(any(UUID.class), any(String.class));
     }

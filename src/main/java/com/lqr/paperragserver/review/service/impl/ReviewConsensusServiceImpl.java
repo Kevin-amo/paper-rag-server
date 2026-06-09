@@ -51,12 +51,12 @@ public class ReviewConsensusServiceImpl implements ReviewConsensusService {
     public ReviewConsensusResponse recalculate(UUID taskId) {
         ReviewConsensusEntity consensus = consensusMapper.selectByTaskId(taskId);
         if (isConfirmed(consensus)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "\u6700\u7ec8\u5171\u8bc6\u5df2\u786e\u8ba4\uff0c\u4e0d\u80fd\u91cd\u65b0\u8ba1\u7b97");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "最终共识已确认，不能重新计算");
         }
 
         List<ReviewReportEntity> reports = reportMapper.selectSubmittedByTaskId(taskId);
         if (reports == null || reports.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "\u6ca1\u6709\u5df2\u63d0\u4ea4\u7684\u4e2a\u4eba\u8bc4\u5ba1\u62a5\u544a");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "没有已提交的个人评审报告");
         }
         requireAllAssignmentsSubmitted(taskId);
 
@@ -90,7 +90,7 @@ public class ReviewConsensusServiceImpl implements ReviewConsensusService {
     public ReviewConsensusResponse update(UUID taskId, ReviewConsensusUpdateRequest request) {
         ReviewConsensusEntity consensus = requireConsensus(taskId);
         if (isConfirmed(consensus)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "\u6700\u7ec8\u5171\u8bc6\u5df2\u786e\u8ba4\uff0c\u4e0d\u80fd\u4fee\u6539");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "最终共识已确认，不能修改");
         }
         if (request.finalScore() != null) {
             consensus.setFinalScore(request.finalScore());
@@ -108,7 +108,7 @@ public class ReviewConsensusServiceImpl implements ReviewConsensusService {
     public ReviewConsensusResponse confirm(UUID taskId, UUID operatorUserId) {
         ReviewConsensusEntity consensus = requireConsensus(taskId);
         if (isConfirmed(consensus)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "\u6700\u7ec8\u5171\u8bc6\u5df2\u786e\u8ba4\uff0c\u4e0d\u80fd\u91cd\u590d\u786e\u8ba4");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "最终共识已确认，不能重复确认");
         }
         requireAllAssignmentsSubmitted(taskId);
         OffsetDateTime now = OffsetDateTime.now();
@@ -141,14 +141,14 @@ public class ReviewConsensusServiceImpl implements ReviewConsensusService {
         long activeCount = assignmentMapper.countActiveByTaskId(taskId);
         long submittedCount = assignmentMapper.countSubmittedByTaskId(taskId);
         if (activeCount == 0 || activeCount != submittedCount) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "\u8bf7\u7b49\u5f85\u6240\u6709\u8bc4\u5ba1\u4eba\u63d0\u4ea4\u540e\u518d\u5904\u7406\u5171\u8bc6\u6c47\u603b");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "请等待所有评审人提交后再处理共识汇总");
         }
     }
 
     private ReviewConsensusEntity requireConsensus(UUID taskId) {
         ReviewConsensusEntity consensus = consensusMapper.selectByTaskId(taskId);
         if (consensus == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "\u5171\u8bc6\u6c47\u603b\u4e0d\u5b58\u5728\uff0c\u8bf7\u5148\u91cd\u65b0\u8ba1\u7b97");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "共识汇总不存在，请先重新计算");
         }
         return consensus;
     }
