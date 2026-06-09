@@ -5,21 +5,119 @@ export default {
 </script>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { EditPen, MoreFilled } from '@element-plus/icons-vue';
 import StatusTag from '../common/StatusTag.vue';
 import RoleTag from '../common/RoleTag.vue';
-import ConfirmDeleteButton from '../common/ConfirmDeleteButton.vue';
 import { useAdminUsers } from '../../composables/useAdminUsers';
-import type { UserRole, UserStatus } from '../../types';
+import type { AdminUser, UserRole, UserStatus } from '../../types';
+
+type UserActionCommand = 'edit' | 'reset-password' | 'delete';
 
 const admin = useAdminUsers();
+const roleOptions: Array<{ label: string; value: UserRole }> = [
+  { label: '管理员', value: 'ADMIN' },
+  { label: '评审员', value: 'REVIEWER' },
+  { label: '普通用户', value: 'USER' },
+];
+const statusOptions: Array<{ label: string; value: UserStatus }> = [
+  { label: '启用', value: 'ACTIVE' },
+  { label: '禁用', value: 'DISABLED' },
+];
+const roleEditorUserId = ref<string | null>(null);
+const statusEditorUserId = ref<string | null>(null);
+const roleDraft = ref<UserRole[]>([]);
+const statusDraft = ref<UserStatus>('ACTIVE');
+const inlineSavingUserId = ref<string | null>(null);
 
 onMounted(() => {
-  void admin.loadUsers(0);
+  if (!admin.loaded.value) {
+    void admin.loadUsers(0);
+  }
+  window.addEventListener('click', closeInlineEditors);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', closeInlineEditors);
 });
 
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString() : '-';
+}
+
+function closeInlineEditors() {
+  closeRoleEditor();
+  closeStatusEditor();
+}
+
+function openRoleEditor(user: AdminUser) {
+  statusEditorUserId.value = null;
+  roleDraft.value = [...user.roles];
+  roleEditorUserId.value = user.id;
+}
+
+function closeRoleEditor() {
+  roleEditorUserId.value = null;
+  roleDraft.value = [];
+}
+
+async function saveRoleEditor(user: AdminUser) {
+  if (!roleDraft.value.length) {
+    ElMessage.warning('请至少保留一个角色');
+    return;
+  }
+  inlineSavingUserId.value = user.id;
+  try {
+    await admin.changeRoles(user, [...roleDraft.value]);
+    closeRoleEditor();
+  } finally {
+    inlineSavingUserId.value = null;
+  }
+}
+
+function openStatusEditor(user: AdminUser) {
+  roleEditorUserId.value = null;
+  statusDraft.value = user.status;
+  statusEditorUserId.value = user.id;
+}
+
+function closeStatusEditor() {
+  statusEditorUserId.value = null;
+}
+
+async function saveStatusEditor(user: AdminUser) {
+  inlineSavingUserId.value = user.id;
+  try {
+    await admin.changeStatus(user, statusDraft.value);
+    closeStatusEditor();
+  } finally {
+    inlineSavingUserId.value = null;
+  }
+}
+
+async function handleUserAction(command: UserActionCommand, user: AdminUser) {
+  closeInlineEditors();
+  if (command === 'edit') {
+    admin.openEditDialog(user);
+    return;
+  }
+  if (command === 'reset-password') {
+    admin.openPasswordDialog(user);
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm('确认删除这个用户吗？此操作不可恢复。', '删除用户', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      confirmButtonClass: 'danger-confirm-button',
+      type: 'warning',
+    });
+    await admin.removeUser(user);
+  } catch {
+    // User cancelled the confirmation dialog.
+  }
 }
 </script>
 
@@ -34,21 +132,33 @@ function formatDate(value: string | null) {
     </div>
 
     <section class="admin-summary">
-      <div class="summary-card">
-        <span>当前页用户</span>
-        <strong>{{ admin.users.value.length }}</strong>
+      <div class="summary-card accent-blue">
+        <span class="metric-icon">U</span>
+        <div>
+          <span>当前页用户</span>
+          <strong>{{ admin.users.value.length }}</strong>
+        </div>
       </div>
-      <div class="summary-card">
-        <span>启用账号</span>
-        <strong>{{ admin.activeCount.value }}</strong>
+      <div class="summary-card accent-green">
+        <span class="metric-icon">A</span>
+        <div>
+          <span>启用账号</span>
+          <strong>{{ admin.activeCount.value }}</strong>
+        </div>
       </div>
-      <div class="summary-card">
-        <span>管理员</span>
-        <strong>{{ admin.adminCount.value }}</strong>
+      <div class="summary-card accent-indigo">
+        <span class="metric-icon">M</span>
+        <div>
+          <span>管理员</span>
+          <strong>{{ admin.adminCount.value }}</strong>
+        </div>
       </div>
-      <div class="summary-card muted">
-        <span>禁用账号</span>
-        <strong>{{ admin.disabledCount.value }}</strong>
+      <div class="summary-card accent-red">
+        <span class="metric-icon">D</span>
+        <div>
+          <span>禁用账号</span>
+          <strong>{{ admin.disabledCount.value }}</strong>
+        </div>
       </div>
     </section>
 
@@ -81,30 +191,93 @@ function formatDate(value: string | null) {
       </el-table-column>
       <el-table-column label="角色" min-width="240">
         <template #default="{ row }">
-          <el-select
-            :model-value="row.roles"
-            multiple
-            collapse-tags
-            collapse-tags-tooltip
-            @change="(roles: UserRole[]) => admin.changeRoles(row, roles)"
-          >
-            <el-option label="管理员" value="ADMIN" />
-            <el-option label="评审员" value="REVIEWER" />
-            <el-option label="普通用户" value="USER" />
-          </el-select>
-          <div class="role-preview">
-            <RoleTag v-for="role in row.roles" :key="role" :role="role" />
+          <div class="inline-edit-cell">
+            <div class="tag-list">
+              <RoleTag v-for="role in row.roles" :key="role" :role="role" />
+            </div>
+            <el-popover
+              :visible="roleEditorUserId === row.id"
+              placement="bottom-start"
+              trigger="manual"
+              width="280"
+              popper-class="admin-inline-popover"
+            >
+              <template #reference>
+                <el-button
+                  circle
+                  text
+                  class="cell-edit-button"
+                  :icon="EditPen"
+                  aria-label="编辑角色"
+                  title="编辑角色"
+                  @click.stop="openRoleEditor(row)"
+                />
+              </template>
+              <div class="inline-editor" @click.stop @keydown.esc.stop="closeRoleEditor">
+                <div class="inline-editor-title">调整角色</div>
+                <el-checkbox-group v-model="roleDraft" class="role-choice-list">
+                  <el-checkbox-button v-for="option in roleOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </el-checkbox-button>
+                </el-checkbox-group>
+                <div class="inline-editor-actions">
+                  <el-button size="small" @click="closeRoleEditor">取消</el-button>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    :loading="inlineSavingUserId === row.id"
+                    @click="saveRoleEditor(row)"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+            </el-popover>
           </div>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="150">
         <template #default="{ row }">
-          <el-select :model-value="row.status" @change="(status: UserStatus) => admin.changeStatus(row, status)">
-            <el-option label="启用" value="ACTIVE" />
-            <el-option label="禁用" value="DISABLED" />
-          </el-select>
-          <div class="status-preview">
+          <div class="inline-edit-cell compact">
             <StatusTag :status="row.status" />
+            <el-popover
+              :visible="statusEditorUserId === row.id"
+              placement="bottom-start"
+              trigger="manual"
+              width="220"
+              popper-class="admin-inline-popover"
+            >
+              <template #reference>
+                <el-button
+                  circle
+                  text
+                  class="cell-edit-button"
+                  :icon="EditPen"
+                  aria-label="编辑状态"
+                  title="编辑状态"
+                  @click.stop="openStatusEditor(row)"
+                />
+              </template>
+              <div class="inline-editor" @click.stop @keydown.esc.stop="closeStatusEditor">
+                <div class="inline-editor-title">调整状态</div>
+                <el-radio-group v-model="statusDraft" class="status-choice-list">
+                  <el-radio-button v-for="option in statusOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </el-radio-button>
+                </el-radio-group>
+                <div class="inline-editor-actions">
+                  <el-button size="small" @click="closeStatusEditor">取消</el-button>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    :loading="inlineSavingUserId === row.id"
+                    @click="saveStatusEditor(row)"
+                  >
+                    保存
+                  </el-button>
+                </div>
+              </div>
+            </el-popover>
           </div>
         </template>
       </el-table-column>
@@ -114,17 +287,32 @@ function formatDate(value: string | null) {
       <el-table-column label="创建时间" min-width="170">
         <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column label="操作" width="110" fixed="right" align="center">
         <template #default="{ row }">
-          <div class="table-actions">
-            <el-button text type="primary" @click="admin.openEditDialog(row)">编辑</el-button>
-            <el-button text type="primary" @click="admin.openPasswordDialog(row)">重置密码</el-button>
-            <ConfirmDeleteButton
-              title="确认删除这个用户吗？"
-              :loading="admin.deletingUserId.value === row.id"
-              @confirm="admin.removeUser(row)"
-            />
-          </div>
+          <el-dropdown
+            trigger="click"
+            placement="bottom-end"
+            popper-class="user-actions-menu"
+            @command="(command: UserActionCommand) => handleUserAction(command, row)"
+          >
+            <button class="action-menu-trigger" type="button" aria-label="更多操作">
+              <el-icon><MoreFilled /></el-icon>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="edit">编辑</el-dropdown-item>
+                <el-dropdown-item command="reset-password">重置密码</el-dropdown-item>
+                <el-dropdown-item
+                  command="delete"
+                  divided
+                  class="danger-menu-item"
+                  :disabled="admin.deletingUserId.value === row.id"
+                >
+                  删除
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </template>
       </el-table-column>
     </el-table>
@@ -186,10 +374,11 @@ function formatDate(value: string | null) {
 .users-panel {
   display: grid;
   gap: 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
   padding: 18px;
   background: #fff;
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.05);
 }
 
 .panel-heading {
@@ -197,19 +386,19 @@ function formatDate(value: string | null) {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid #edf1f7;
   padding-bottom: 14px;
 }
 
 .panel-heading h2 {
   margin: 0;
-  color: #111827;
+  color: #101828;
   font-size: 18px;
 }
 
 .panel-heading p {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: #667085;
   font-size: 13px;
 }
 
@@ -220,28 +409,59 @@ function formatDate(value: string | null) {
 }
 
 .summary-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
   padding: 14px;
   background: #fff;
+  box-shadow: 0 10px 26px rgba(16, 24, 40, 0.04);
 }
 
-.summary-card.muted {
-  background: #f9fafb;
+.metric-icon {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 850;
 }
 
 .summary-card span {
   display: block;
-  color: #6b7280;
+  color: #667085;
   font-size: 13px;
 }
 
 .summary-card strong {
   display: block;
   margin-top: 8px;
-  color: #111827;
+  color: #101828;
   font-size: 24px;
   line-height: 1;
+}
+
+.accent-blue .metric-icon {
+  background: #eaf2ff;
+  color: #155eef;
+}
+
+.accent-green .metric-icon {
+  background: #e8f8ef;
+  color: #099250;
+}
+
+.accent-indigo .metric-icon {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.accent-red .metric-icon {
+  background: #feecec;
+  color: #d92d20;
 }
 
 .toolbar {
@@ -254,10 +474,17 @@ function formatDate(value: string | null) {
   width: 150px;
 }
 
+.toolbar :deep(.el-input__wrapper),
+.toolbar :deep(.el-select__wrapper) {
+  min-height: 38px;
+  border-radius: 9px;
+  box-shadow: 0 0 0 1px #d0d7e2 inset;
+}
+
 .users-table {
   overflow: hidden;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
 }
 
 .user-cell {
@@ -267,26 +494,132 @@ function formatDate(value: string | null) {
 }
 
 .user-cell strong {
-  color: #111827;
+  color: #101828;
   font-weight: 700;
 }
 
 .user-cell span {
-  color: #6b7280;
+  color: #667085;
   font-size: 12px;
 }
 
-.role-preview,
-.status-preview {
+.inline-edit-cell {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  margin-top: 8px;
+  min-height: 32px;
 }
 
-.table-actions {
+.inline-edit-cell.compact {
+  justify-content: flex-start;
+}
+
+.tag-list {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cell-edit-button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  color: #667085;
+  opacity: 0;
+  transition:
+    opacity 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.inline-edit-cell:hover .cell-edit-button,
+.cell-edit-button:focus {
+  opacity: 1;
+}
+
+.cell-edit-button:hover,
+.cell-edit-button:focus {
+  color: var(--app-primary);
+  background: var(--app-primary-soft);
+}
+
+.inline-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.inline-editor-title {
+  color: #101828;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.role-choice-list,
+.status-choice-list {
   display: flex;
   flex-wrap: wrap;
+  gap: 8px;
+}
+
+.role-choice-list :deep(.el-checkbox-button__inner),
+.status-choice-list :deep(.el-radio-button__inner) {
+  border: 1px solid #d0d7e2;
+  border-radius: 999px;
+  box-shadow: none;
+  font-weight: 700;
+}
+
+.role-choice-list :deep(.el-checkbox-button:first-child .el-checkbox-button__inner),
+.status-choice-list :deep(.el-radio-button:first-child .el-radio-button__inner) {
+  border-left: 1px solid #d0d7e2;
+  border-radius: 999px;
+}
+
+.role-choice-list :deep(.el-checkbox-button.is-checked .el-checkbox-button__inner),
+.status-choice-list :deep(.el-radio-button.is-active .el-radio-button__inner) {
+  border-color: var(--app-primary);
+  background: var(--app-primary);
+  box-shadow: none;
+}
+
+.inline-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.action-menu-trigger {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
+  height: 32px;
+  min-width: 72px;
+  border: 0;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--app-primary);
+  cursor: pointer;
+  justify-content: center;
+  box-shadow: none;
+  font-weight: 800;
+  font: inherit;
+  line-height: 1;
+  transition: color 0.16s ease;
+}
+
+.action-menu-trigger:hover,
+.action-menu-trigger:focus {
+  background: transparent;
+  color: var(--app-primary-dark);
+  outline: none;
+  box-shadow: none;
+}
+
+.action-menu-trigger:focus-visible {
+  outline: 2px solid rgba(0, 122, 255, 0.3);
+  outline-offset: 2px;
 }
 
 .pagination-wrap {
@@ -296,6 +629,33 @@ function formatDate(value: string | null) {
 
 .full-select {
   width: 100%;
+}
+
+:global(.admin-inline-popover) {
+  border: 1px solid rgba(209, 209, 214, 0.78);
+  border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
+}
+
+:global(.user-actions-menu) {
+  min-width: 132px;
+}
+
+:global(.user-actions-menu .danger-menu-item) {
+  color: var(--app-danger);
+  font-weight: 800;
+}
+
+:global(.user-actions-menu .danger-menu-item:not(.is-disabled):hover) {
+  background: rgba(255, 59, 48, 0.1);
+  color: #d70015;
+}
+
+:global(.danger-confirm-button) {
+  --el-button-bg-color: var(--app-danger);
+  --el-button-border-color: var(--app-danger);
+  --el-button-hover-bg-color: #ff6259;
+  --el-button-hover-border-color: #ff6259;
 }
 
 @media (max-width: 980px) {

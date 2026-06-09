@@ -190,15 +190,6 @@ onMounted(async () => {
       </article>
     </section>
 
-    <section class="review-upload-card app-card">
-      <div>
-        <p>Review Upload</p>
-        <h2>上传待评审论文</h2>
-        <span>文件会进入独立的评审入库流程，不会出现在普通用户知识库和默认问答检索中。</span>
-      </div>
-      <el-button type="primary" :loading="reviews.uploading.value" @click="uploadDialogVisible = true">选择论文</el-button>
-    </section>
-
     <section class="review-layout">
       <aside class="task-panel app-card">
         <div class="panel-header">
@@ -271,14 +262,6 @@ onMounted(async () => {
               </el-tag>
               <el-button type="primary" :disabled="assignmentSubmitted" :loading="reviews.generating.value" @click="reviews.runAiReview">
                 {{ selectedReport ? '重新生成辅助评审' : '生成辅助评审' }}
-              </el-button>
-              <el-button
-                v-if="selectedTask.currentAssignment"
-                :disabled="reviews.submittingAssignment.value"
-                :loading="reviews.submittingAssignment.value"
-                @click="reviews.submitCurrentAssignment"
-              >
-                提交评审分配
               </el-button>
             </div>
           </div>
@@ -412,11 +395,8 @@ onMounted(async () => {
                   placeholder="填写或调整最终评审意见"
                 />
                 <div class="manual-actions">
-                  <el-button :disabled="assignmentSubmitted || !selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport('ADJUSTED')">
+                  <el-button :disabled="assignmentSubmitted || !selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport">
                     保存调整
-                  </el-button>
-                  <el-button type="primary" :disabled="assignmentSubmitted || !selectedReport" :loading="reviews.saving.value" @click="reviews.saveReport('CONFIRMED')">
-                    确认评审结果
                   </el-button>
                   <el-popconfirm title="提交后个人评审将只读，是否继续？" @confirm="reviews.submitCurrentAssignment">
                     <template #reference>
@@ -576,7 +556,7 @@ onMounted(async () => {
       </div>
       <template #footer>
         <el-button @click="uploadDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="reviews.uploading.value" @click="submitReviewUpload">提交入库</el-button>
+        <el-button type="primary" :loading="reviews.uploading.value" @click="submitReviewUpload">提交</el-button>
       </template>
     </el-dialog>
   </MainLayout>
@@ -585,33 +565,6 @@ onMounted(async () => {
 <style scoped>
 .review-page {
   gap: 18px;
-}
-
-.review-upload-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 20px;
-}
-
-.review-upload-card p {
-  margin: 0;
-  color: var(--app-primary);
-  font-size: 12px;
-  font-weight: 850;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.review-upload-card h2 {
-  margin: 4px 0 6px;
-  color: var(--app-text);
-}
-
-.review-upload-card span {
-  color: var(--app-text-muted);
-  line-height: 1.6;
 }
 
 .review-upload-form {
@@ -978,7 +931,6 @@ onMounted(async () => {
 
 @media (max-width: 1180px) {
   .review-layout,
-  .review-upload-card,
   .comments-risk-grid,
   .manual-form {
     grid-template-columns: 1fr;
@@ -1007,10 +959,312 @@ onMounted(async () => {
 
   .detail-hero,
   .panel-header,
-  .review-upload-card,
   .section-title {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+.review-page {
+  gap: 16px;
+  padding: 20px 24px 32px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0) 240px),
+    #f6f8fb;
+}
+
+.review-page :deep(.page-header) {
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
+  padding: 20px 22px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.05);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.review-page :deep(.page-eyebrow) {
+  margin-bottom: 6px;
+  color: #155eef;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.review-page :deep(.page-header h1) {
+  color: #101828;
+  font-size: clamp(22px, 2.2vw, 30px);
+  letter-spacing: 0;
+}
+
+.review-page :deep(.page-description) {
+  margin-top: 8px;
+  color: #475467;
+  line-height: 1.6;
+}
+
+.review-page :deep(.el-button) {
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.review-page :deep(.el-button--primary) {
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
+}
+
+.review-page :deep(.el-input__wrapper),
+.review-page :deep(.el-select__wrapper),
+.review-page :deep(.el-textarea__inner),
+.review-page :deep(.el-input-number .el-input__wrapper) {
+  border-radius: 9px;
+  box-shadow: 0 0 0 1px #d0d7e2 inset;
+}
+
+.review-page :deep(.el-tabs__item) {
+  color: #475467;
+  font-weight: 700;
+}
+
+.review-page :deep(.el-tabs__item.is-active) {
+  color: #155eef;
+}
+
+.review-page :deep(.el-tabs__active-bar) {
+  background: #155eef;
+}
+
+.review-page :deep(.el-collapse) {
+  border-color: #edf1f7;
+}
+
+.review-page :deep(.el-collapse-item__header) {
+  color: #101828;
+  font-weight: 750;
+}
+
+.review-page .app-card,
+.task-panel,
+.review-detail {
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.05);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.summary-card span,
+.panel-header p,
+.detail-hero p {
+  color: #155eef;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.panel-header h2,
+.detail-hero h2,
+.section-title h3 {
+  color: #101828;
+}
+
+.task-meta,
+.task-bottom span:last-child,
+.detail-hero span,
+.section-title span {
+  color: #667085;
+}
+
+.summary-grid {
+  gap: 12px;
+}
+
+.summary-card {
+  position: relative;
+  min-height: 96px;
+  display: grid;
+  align-content: center;
+  padding: 16px 18px 16px 72px;
+  border-color: #dde3ee;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 26px rgba(16, 24, 40, 0.04);
+}
+
+.summary-card::before {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.summary-card:nth-child(1)::before {
+  background: #eaf2ff;
+  color: #155eef;
+  content: 'Q';
+}
+
+.summary-card:nth-child(2)::before {
+  background: #fff4df;
+  color: #dc6803;
+  content: 'R';
+}
+
+.summary-card:nth-child(3)::before {
+  background: #e8f8ef;
+  color: #099250;
+  content: 'C';
+}
+
+.summary-card:nth-child(4)::before {
+  background: #eef2ff;
+  color: #4f46e5;
+  content: 'M';
+}
+
+.summary-card strong {
+  margin-top: 8px;
+  color: #101828;
+  font-size: 28px;
+}
+
+.review-layout {
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.task-panel,
+.review-detail {
+  padding: 18px;
+}
+
+.panel-header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid #edf1f7;
+}
+
+.task-toolbar {
+  gap: 10px;
+}
+
+.task-list {
+  gap: 6px;
+}
+
+.task-item {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 12px 12px 12px 14px;
+  background: #fff;
+  box-shadow: inset 0 -1px 0 #edf1f7;
+}
+
+.task-item:hover {
+  border-color: #c7d7fe;
+  background: #f5f8ff;
+}
+
+.task-item.active {
+  border-color: #b2ccff;
+  background: #f0f6ff;
+}
+
+.task-item.active::before {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: #155eef;
+  content: '';
+}
+
+.task-title {
+  color: #101828;
+  font-weight: 750;
+}
+
+.detail-hero {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #edf1f7;
+}
+
+.hero-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.detail-section {
+  margin-top: 18px;
+}
+
+.section-grid article,
+.score-card,
+.comments-card,
+.audit-grid article {
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.section-grid span,
+.audit-grid span {
+  color: #667085;
+}
+
+.section-grid strong,
+.audit-grid strong,
+.score-head strong,
+.comment-columns strong,
+.risk-list strong {
+  color: #101828;
+}
+
+.paper-sections p,
+.score-card p,
+.comment-summary,
+.risk-list p {
+  color: #475467;
+  line-height: 1.7;
+}
+
+.score-head span {
+  color: #155eef;
+}
+
+.manual-form {
+  align-items: start;
+}
+
+.risk-list article {
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
+  padding: 14px;
+  background: #fff;
+}
+
+.risk-list span {
+  color: #667085;
+}
+
+.manual-delta {
+  border-color: #dde3ee;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #101828;
+}
+
+@media (max-width: 1180px) {
+  .review-page {
+    padding: 16px;
   }
 }
 </style>

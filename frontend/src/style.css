@@ -45,11 +45,13 @@ body,
 html {
   scrollbar-gutter: stable;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   min-width: 0;
+  overflow-x: hidden;
   background: var(--app-bg);
 }
 
@@ -82,6 +84,18 @@ a {
   --el-button-hover-bg-color: var(--app-primary-dark);
   --el-button-hover-border-color: var(--app-primary-dark);
   box-shadow: 0 12px 26px rgba(0, 122, 255, 0.2);
+}
+
+.el-button--success {
+  --el-button-bg-color: var(--app-success);
+  --el-button-border-color: var(--app-success);
+  --el-button-hover-bg-color: #28b84d;
+  --el-button-hover-border-color: #28b84d;
+  --el-button-active-bg-color: #229f42;
+  --el-button-active-border-color: #229f42;
+  --el-button-text-color: #fff;
+  --el-button-hover-text-color: #fff;
+  --el-button-active-text-color: #fff;
 }
 
 .el-drawer {

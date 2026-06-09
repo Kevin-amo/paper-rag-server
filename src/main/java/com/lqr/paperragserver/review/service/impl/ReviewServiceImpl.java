@@ -13,6 +13,7 @@ import com.lqr.paperragserver.document.dto.PageResponse;
 import com.lqr.paperragserver.document.entity.DocumentEntity;
 import com.lqr.paperragserver.document.mapper.DocumentMapper;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
+import com.lqr.paperragserver.document.structured.dto.PaperStructuredParseResponse;
 import com.lqr.paperragserver.document.structured.service.PaperStructuredParseService;
 import com.lqr.paperragserver.review.dto.ReviewAssignmentResponse;
 import com.lqr.paperragserver.review.dto.ReviewConsensusResponse;
@@ -263,6 +264,25 @@ public class ReviewServiceImpl implements ReviewService {
         return ReviewReportResponse.from(assignment == null
                 ? reportMapper.selectLatestByTaskId(task.getId())
                 : reportMapper.selectByAssignmentId(assignment.getId()));
+    }
+
+    @Override
+    public PaperStructuredParseResponse getStructuredParse(UUID currentUserId, boolean admin, UUID taskId) {
+        ReviewTaskEntity task = requireAccessibleTask(currentUserId, admin, taskId);
+        requireDocument(task);
+        return paperStructuredParseService.find(task.getSubmitterUserId(), task.getSourceId())
+                .map(PaperStructuredParseResponse::from)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "结构化解析结果不存在"));
+    }
+
+    @Override
+    @Transactional
+    public PaperStructuredParseResponse regenerateStructuredParse(UUID currentUserId, boolean admin, UUID taskId) {
+        ReviewTaskEntity task = requireAccessibleTask(currentUserId, admin, taskId);
+        requireDocument(task);
+        return PaperStructuredParseResponse.from(
+                paperStructuredParseService.regenerate(task.getSubmitterUserId(), task.getSourceId())
+        );
     }
 
     @Override
@@ -600,6 +620,14 @@ public class ReviewServiceImpl implements ReviewService {
         ReviewTaskEntity task = taskMapper.selectByIdIncludingDeleted(taskId);
         if (task == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "评审任务不存在");
+        }
+        return task;
+    }
+
+    private ReviewTaskEntity requireAccessibleTask(UUID currentUserId, boolean admin, UUID taskId) {
+        ReviewTaskEntity task = requireTask(taskId);
+        if (!admin && assignmentMapper.selectByTaskAndReviewer(taskId, currentUserId) == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u8bbf\u95ee\u5206\u914d\u7ed9\u81ea\u5df1\u7684\u8bc4\u5ba1\u4efb\u52a1");
         }
         return task;
     }

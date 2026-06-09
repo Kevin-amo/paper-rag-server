@@ -6,8 +6,9 @@ import AdminReviewTaskTable from '../../components/admin/review/AdminReviewTaskT
 import ReviewAssignmentDrawer from '../../components/admin/review/ReviewAssignmentDrawer.vue';
 import ReviewConsensusDrawer from '../../components/admin/review/ReviewConsensusDrawer.vue';
 import ReviewCriteriaPanel from '../../components/admin/review/ReviewCriteriaPanel.vue';
+import ReviewTaskDetailDrawer from '../../components/admin/review/ReviewTaskDetailDrawer.vue';
 import { useAdminReviews } from '../../composables/useAdminReviews';
-import type { AdminReviewTaskSummary, AssignReviewersPayload, UpdateReviewConsensusPayload } from '../../types';
+import type { AdminReviewTaskSummary, AssignReviewersPayload, ReviewerLoad, UpdateReviewConsensusPayload } from '../../types';
 
 const adminReviews = useAdminReviews();
 const route = useRoute();
@@ -16,6 +17,7 @@ const validTabs = ['tasks', 'assignments', 'criteria', 'archive'] as const;
 type ReviewAdminTab = (typeof validTabs)[number];
 
 const activeTab = ref<ReviewAdminTab>(normalizeTab(route.query.tab));
+const detailVisible = ref(false);
 const assignmentVisible = ref(false);
 const consensusVisible = ref(false);
 
@@ -48,17 +50,18 @@ function normalizeTab(tab: unknown): ReviewAdminTab {
 }
 
 async function openTask(task: AdminReviewTaskSummary) {
-  await adminReviews.openTask(task.id);
+  const detail = await adminReviews.openTask(task.id);
+  detailVisible.value = Boolean(detail);
 }
 
 async function openAssignment(task: AdminReviewTaskSummary) {
-  await Promise.all([adminReviews.openTask(task.id), adminReviews.loadReviewerLoads()]);
-  assignmentVisible.value = true;
+  const [detail] = await Promise.all([adminReviews.openTask(task.id), adminReviews.loadReviewerLoads()]);
+  assignmentVisible.value = Boolean(detail);
 }
 
 async function openConsensus(task: AdminReviewTaskSummary) {
-  await adminReviews.openTask(task.id);
-  consensusVisible.value = true;
+  const detail = await adminReviews.openTask(task.id);
+  consensusVisible.value = Boolean(detail);
 }
 
 async function saveAssignments(taskId: string, payload: AssignReviewersPayload) {
@@ -74,6 +77,10 @@ async function confirmConsensus(taskId: string) {
   await adminReviews.confirm(taskId);
 }
 
+function reviewerDisplayName(load: ReviewerLoad) {
+  return load.displayName || load.username || load.reviewerUserId;
+}
+
 onMounted(async () => {
   await Promise.all([adminReviews.loadTasks(0), adminReviews.loadReviewerLoads()]);
 });
@@ -82,21 +89,33 @@ onMounted(async () => {
 <template>
   <AdminShell :active="activeTab" :title="activeSectionTitle">
     <section class="summary-grid">
-      <div class="summary-card">
-        <span>任务总数</span>
-        <strong>{{ adminReviews.total.value }}</strong>
+      <div class="summary-card accent-blue">
+        <span class="metric-icon">T</span>
+        <div>
+          <span>任务总数</span>
+          <strong>{{ adminReviews.total.value }}</strong>
+        </div>
       </div>
-      <div class="summary-card">
-        <span>当前页任务</span>
-        <strong>{{ adminReviews.tasks.value.length }}</strong>
+      <div class="summary-card accent-indigo">
+        <span class="metric-icon">P</span>
+        <div>
+          <span>当前页任务</span>
+          <strong>{{ adminReviews.tasks.value.length }}</strong>
+        </div>
       </div>
-      <div class="summary-card">
-        <span>提交进度</span>
-        <strong>{{ submittedTotal }}/{{ assignmentTotal }}</strong>
+      <div class="summary-card accent-green">
+        <span class="metric-icon">S</span>
+        <div>
+          <span>提交进度</span>
+          <strong>{{ submittedTotal }}/{{ assignmentTotal }}</strong>
+        </div>
       </div>
-      <div class="summary-card muted">
-        <span>评审员</span>
-        <strong>{{ adminReviews.reviewerLoads.value.length }}</strong>
+      <div class="summary-card accent-amber">
+        <span class="metric-icon">R</span>
+        <div>
+          <span>评审员</span>
+          <strong>{{ adminReviews.reviewerLoads.value.length }}</strong>
+        </div>
       </div>
     </section>
 
@@ -157,10 +176,17 @@ onMounted(async () => {
           </div>
           <div class="load-toolbar">
             <el-button @click="activeTab = 'tasks'">返回任务列表</el-button>
-            <el-button type="primary" @click="adminReviews.loadReviewerLoads()">刷新负载</el-button>
+            <el-button type="primary" @click="adminReviews.loadReviewerLoads()">刷新</el-button>
           </div>
           <el-table :data="adminReviews.reviewerLoads.value" class="load-table">
-            <el-table-column prop="reviewerUserId" label="Reviewer User ID" min-width="220" show-overflow-tooltip />
+            <el-table-column label="评审员" min-width="220" show-overflow-tooltip>
+              <template #default="{ row }">
+                <div class="reviewer-cell">
+                  <strong>{{ reviewerDisplayName(row) }}</strong>
+                  <span>{{ row.username || row.reviewerUserId }}</span>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column prop="assignedCount" label="待评数量" width="140" />
             <el-table-column prop="reviewingCount" label="评审中" width="140" />
             <el-table-column prop="submittedCount" label="已提交" width="140" />
@@ -194,6 +220,11 @@ onMounted(async () => {
       :reviewer-loads="adminReviews.reviewerLoads.value"
       @submit="saveAssignments"
     />
+    <ReviewTaskDetailDrawer
+      v-model="detailVisible"
+      :task-detail="adminReviews.selectedTask.value"
+      :loading="adminReviews.loading.value"
+    />
     <ReviewConsensusDrawer
       v-model="consensusVisible"
       :task-detail="adminReviews.selectedTask.value"
@@ -213,36 +244,67 @@ onMounted(async () => {
 }
 
 .summary-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
   padding: 16px;
   background: #fff;
+  box-shadow: 0 10px 26px rgba(16, 24, 40, 0.04);
 }
 
-.summary-card.muted {
-  background: #f9fafb;
+.metric-icon {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 850;
 }
 
 .summary-card span {
   display: block;
-  color: #6b7280;
+  color: #667085;
   font-size: 13px;
 }
 
 .summary-card strong {
   display: block;
-  margin-top: 8px;
-  color: #111827;
+  margin-top: 7px;
+  color: #101828;
   font-size: 26px;
   line-height: 1;
 }
 
+.accent-blue .metric-icon {
+  background: #eaf2ff;
+  color: #155eef;
+}
+
+.accent-indigo .metric-icon {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.accent-green .metric-icon {
+  background: #e8f8ef;
+  color: #099250;
+}
+
+.accent-amber .metric-icon {
+  background: #fff4df;
+  color: #dc6803;
+}
+
 .dashboard-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
   padding: 18px;
   background: #fff;
-  box-shadow: none;
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.05);
 }
 
 .section-note {
@@ -251,17 +313,17 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 14px;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid #edf1f7;
   padding-bottom: 12px;
 }
 
 .section-note strong {
-  color: #111827;
+  color: #101828;
   font-size: 16px;
 }
 
 .section-note span {
-  color: #6b7280;
+  color: #667085;
   font-size: 13px;
 }
 
@@ -274,6 +336,13 @@ onMounted(async () => {
 
 .status-select {
   width: 180px;
+}
+
+.toolbar :deep(.el-input__wrapper),
+.toolbar :deep(.el-select__wrapper) {
+  min-height: 38px;
+  border-radius: 9px;
+  box-shadow: 0 0 0 1px #d0d7e2 inset;
 }
 
 .pagination-wrap,
@@ -290,15 +359,31 @@ onMounted(async () => {
 
 .load-table {
   overflow: hidden;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
+}
+
+.reviewer-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.reviewer-cell strong {
+  color: #101828;
+  font-weight: 750;
+}
+
+.reviewer-cell span {
+  color: #667085;
+  font-size: 12px;
 }
 
 .archive-helper {
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
+  border: 1px dashed #c4cfdd;
+  border-radius: 10px;
   padding: 22px;
-  background: #f9fafb;
+  background: #f8fafc;
 }
 
 .archive-helper p {

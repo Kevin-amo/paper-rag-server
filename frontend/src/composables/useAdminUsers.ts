@@ -14,27 +14,46 @@ import type { AdminUser, UserRole, UserStatus } from '../types';
 
 export type AdminUserFormMode = 'create' | 'edit';
 
-export function useAdminUsers() {
-  const loading = ref(false);
-  const saving = ref(false);
-  const deletingUserId = ref<string | null>(null);
-  const users = ref<AdminUser[]>([]);
-  const keyword = ref('');
-  const statusFilter = ref<UserStatus | ''>('');
-  const formDialogVisible = ref(false);
-  const passwordDialogVisible = ref(false);
-  const selectedUser = ref<AdminUser | null>(null);
-  const formMode = ref<AdminUserFormMode>('create');
-  const pagination = reactive({ page: 0, size: 20, total: 0 });
-
-  const userForm = reactive({
+const adminUsersStore = {
+  loaded: ref(false),
+  loading: ref(false),
+  saving: ref(false),
+  deletingUserId: ref<string | null>(null),
+  users: ref<AdminUser[]>([]),
+  keyword: ref(''),
+  statusFilter: ref<UserStatus | ''>(''),
+  formDialogVisible: ref(false),
+  passwordDialogVisible: ref(false),
+  selectedUser: ref<AdminUser | null>(null),
+  formMode: ref<AdminUserFormMode>('create'),
+  pagination: reactive({ page: 0, size: 20, total: 0 }),
+  userForm: reactive({
     username: '',
     password: '',
     displayName: '',
     email: '',
     roles: ['USER'] as UserRole[],
-  });
-  const passwordForm = reactive({ password: '' });
+  }),
+  passwordForm: reactive({ password: '' }),
+};
+
+export function useAdminUsers() {
+  const {
+    loaded,
+    loading,
+    saving,
+    deletingUserId,
+    users,
+    keyword,
+    statusFilter,
+    formDialogVisible,
+    passwordDialogVisible,
+    selectedUser,
+    formMode,
+    pagination,
+    userForm,
+    passwordForm,
+  } = adminUsersStore;
 
   const activeCount = computed(() => users.value.filter((user) => user.status === 'ACTIVE').length);
   const adminCount = computed(() => users.value.filter((user) => user.roles.includes('ADMIN')).length);
@@ -54,6 +73,7 @@ export function useAdminUsers() {
       pagination.page = result.page;
       pagination.size = result.size;
       pagination.total = result.total;
+      loaded.value = true;
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
     } finally {
@@ -198,6 +218,7 @@ export function useAdminUsers() {
 
   return {
     loading,
+    loaded,
     saving,
     deletingUserId,
     users,

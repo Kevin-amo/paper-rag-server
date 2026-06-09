@@ -10,6 +10,7 @@ import com.lqr.paperragserver.document.model.DocumentIngestionMessage;
 import com.lqr.paperragserver.document.service.DocumentIngestionJobService;
 import com.lqr.paperragserver.document.service.DocumentIngestionProducer;
 import com.lqr.paperragserver.document.service.DocumentUploadStorageService;
+import com.lqr.paperragserver.document.structured.dto.PaperStructuredParseResponse;
 import com.lqr.paperragserver.review.dto.ReviewAssignmentResponse;
 import com.lqr.paperragserver.review.dto.ReviewConsensusResponse;
 import com.lqr.paperragserver.review.dto.ReviewConsensusUpdateRequest;
@@ -138,6 +139,20 @@ public class ReviewController {
                                                  @PathVariable UUID taskId) {
         requireReviewer(principal);
         return reviewService.generateAiReview(principal.getId(), isAdmin(principal), taskId);
+    }
+
+    @GetMapping("/tasks/{taskId}/structured-parse")
+    public PaperStructuredParseResponse getStructuredParse(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                           @PathVariable UUID taskId) {
+        requireReviewer(principal);
+        return reviewService.getStructuredParse(principal.getId(), isAdmin(principal), taskId);
+    }
+
+    @PostMapping("/tasks/{taskId}/structured-parse/regenerate")
+    public PaperStructuredParseResponse regenerateStructuredParse(@AuthenticationPrincipal SecurityUserPrincipal principal,
+                                                                  @PathVariable UUID taskId) {
+        requireReviewer(principal);
+        return reviewService.regenerateStructuredParse(principal.getId(), isAdmin(principal), taskId);
     }
 
     @PatchMapping("/reports/{reportId}")

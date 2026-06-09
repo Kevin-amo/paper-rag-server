@@ -3,6 +3,7 @@ import type {
   DocumentUploadAcceptedResponse,
   ListReviewTasksParams,
   PageResponse,
+  PaperStructuredParse,
   ReviewCriterion,
   ReviewAssignment,
   ReviewConsensus,
@@ -61,6 +62,16 @@ export async function getReviewTask(taskId: string) {
 
 export async function generateReviewReport(taskId: string) {
   const { data } = await http.post<ReviewReport>(`/reviews/tasks/${taskId}/ai-review`);
+  return data;
+}
+
+export async function getReviewTaskStructuredParse(taskId: string) {
+  const { data } = await http.get<PaperStructuredParse>(`/reviews/tasks/${taskId}/structured-parse`);
+  return data;
+}
+
+export async function regenerateReviewTaskStructuredParse(taskId: string) {
+  const { data } = await http.post<PaperStructuredParse>(`/reviews/tasks/${taskId}/structured-parse/regenerate`);
   return data;
 }
 

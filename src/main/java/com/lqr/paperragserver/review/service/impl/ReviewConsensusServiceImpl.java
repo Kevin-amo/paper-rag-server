@@ -1,5 +1,7 @@
 package com.lqr.paperragserver.review.service.impl;
 
+import com.lqr.paperragserver.auth.entity.SysUser;
+import com.lqr.paperragserver.auth.mapper.SysUserMapper;
 import com.lqr.paperragserver.review.consensus.ConsensusCalculator;
 import com.lqr.paperragserver.review.dto.ReviewConsensusResponse;
 import com.lqr.paperragserver.review.dto.ReviewConsensusUpdateRequest;
@@ -32,6 +34,7 @@ public class ReviewConsensusServiceImpl implements ReviewConsensusService {
     private final ReviewReportMapper reportMapper;
     private final ReviewAssignmentMapper assignmentMapper;
     private final ReviewTaskMapper taskMapper;
+    private final SysUserMapper userMapper;
     private final ConsensusCalculator consensusCalculator;
 
     @Override
@@ -157,7 +160,31 @@ public class ReviewConsensusServiceImpl implements ReviewConsensusService {
     private ReviewConsensusResponse toResponse(ReviewConsensusEntity consensus, List<ReviewReportEntity> reports) {
         List<ReviewReportResponse> submittedReports = reports == null
                 ? List.of()
-                : reports.stream().map(ReviewReportResponse::from).toList();
-        return ReviewConsensusResponse.from(consensus, submittedReports);
+                : reports.stream().map(this::toReportResponse).toList();
+        SysUser leadReviewer = consensus.getLeadReviewerUserId() == null ? null : userMapper.selectById(consensus.getLeadReviewerUserId());
+        SysUser confirmedBy = consensus.getConfirmedByUserId() == null ? null : userMapper.selectById(consensus.getConfirmedByUserId());
+        return ReviewConsensusResponse.from(
+                consensus,
+                submittedReports,
+                username(leadReviewer),
+                displayName(leadReviewer),
+                username(confirmedBy),
+                displayName(confirmedBy)
+        );
+    }
+
+    private String username(SysUser user) {
+        return user == null ? null : user.getUsername();
+    }
+
+    private String displayName(SysUser user) {
+        return user == null ? null : user.getDisplayName();
+    }
+
+    private ReviewReportResponse toReportResponse(ReviewReportEntity report) {
+        SysUser reviewer = report == null || report.getReviewerUserId() == null
+                ? null
+                : userMapper.selectById(report.getReviewerUserId());
+        return ReviewReportResponse.from(report, reviewer);
     }
 }

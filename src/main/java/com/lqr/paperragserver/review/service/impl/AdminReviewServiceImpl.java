@@ -1,5 +1,7 @@
 package com.lqr.paperragserver.review.service.impl;
 
+import com.lqr.paperragserver.auth.entity.SysUser;
+import com.lqr.paperragserver.auth.mapper.SysUserMapper;
 import com.lqr.paperragserver.document.dto.PageResponse;
 import com.lqr.paperragserver.review.dto.AdminReviewTaskDetailResponse;
 import com.lqr.paperragserver.review.dto.AdminReviewTaskSummaryResponse;
@@ -40,6 +42,7 @@ public class AdminReviewServiceImpl implements AdminReviewService {
     private final ReviewService reviewService;
     private final ReviewAssignmentService assignmentService;
     private final ReviewConsensusService consensusService;
+    private final SysUserMapper userMapper;
 
     @Override
     public PageResponse<AdminReviewTaskSummaryResponse> listTasks(String keyword, String status, int page, int size) {
@@ -102,6 +105,7 @@ public class AdminReviewServiceImpl implements AdminReviewService {
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
+        SysUser leadReviewer = leadReviewerUserId == null ? null : userMapper.selectById(leadReviewerUserId);
         OffsetDateTime dueAt = assignmentMapper.maxDueAtByTaskId(task.getId());
         return new AdminReviewTaskSummaryResponse(
                 task.getId(),
@@ -117,6 +121,8 @@ public class AdminReviewServiceImpl implements AdminReviewService {
                         .filter(assignment -> ReviewAssignmentStatuses.SUBMITTED.equals(assignment.getStatus()))
                         .count(),
                 leadReviewerUserId,
+                leadReviewer == null ? null : leadReviewer.getUsername(),
+                leadReviewer == null ? null : leadReviewer.getDisplayName(),
                 dueAt,
                 consensus == null ? null : consensus.getStatus(),
                 task.getCreatedAt(),

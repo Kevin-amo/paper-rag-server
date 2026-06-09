@@ -2,19 +2,17 @@
 import { ElMessage } from 'element-plus';
 import {
   generateReviewReport,
+  getReviewTaskStructuredParse,
   getReviewTask,
   listReviewRisks,
   listReviewCriteria,
   listReviewTasks,
+  regenerateReviewTaskStructuredParse,
   submitReviewAssignment,
   uploadReviewPaper,
   updateReviewReport,
   updateReviewRisk,
 } from '../api/reviews';
-import {
-  getPaperStructuredParse,
-  regeneratePaperStructuredParse,
-} from '../api/documents';
 import { getErrorMessage } from '../api/http';
 import type {
   PaperStructuredParse,
@@ -119,7 +117,7 @@ export function useReviews() {
       }
       selectedTask.value = task;
       syncReportForm(task.report);
-      await loadStructuredParse(task.sourceId, false);
+      await loadStructuredParse(task.id, false);
       if (requestId !== selectTaskRequestId || selectedTask.value?.id !== taskId) {
         return;
       }
@@ -138,16 +136,16 @@ export function useReviews() {
     }
   }
 
-  async function loadStructuredParse(sourceId: string, showError = true) {
+  async function loadStructuredParse(taskId: string, showError = true) {
     const requestId = ++structuredParseRequestId;
     structuredParseLoading.value = true;
     try {
-      const result = await getPaperStructuredParse(sourceId);
-      if (requestId === structuredParseRequestId && selectedTask.value?.sourceId === sourceId) {
+      const result = await getReviewTaskStructuredParse(taskId);
+      if (requestId === structuredParseRequestId && selectedTask.value?.id === taskId) {
         structuredParse.value = result;
       }
     } catch (error) {
-      if (requestId === structuredParseRequestId && selectedTask.value?.sourceId === sourceId) {
+      if (requestId === structuredParseRequestId && selectedTask.value?.id === taskId) {
         structuredParse.value = null;
       }
       if (showError && requestId === structuredParseRequestId) {
@@ -164,11 +162,11 @@ export function useReviews() {
     if (!selectedTask.value) {
       return;
     }
-    const sourceId = selectedTask.value.sourceId;
+    const taskId = selectedTask.value.id;
     regeneratingStructuredParse.value = true;
     try {
-      const result = await regeneratePaperStructuredParse(sourceId);
-      if (selectedTask.value?.sourceId === sourceId) {
+      const result = await regenerateReviewTaskStructuredParse(taskId);
+      if (selectedTask.value?.id === taskId) {
         structuredParse.value = result;
         ElMessage.success('缁撴瀯鍖栬В鏋愬凡閲嶆柊鐢熸垚');
       }
@@ -201,9 +199,10 @@ export function useReviews() {
     }
   }
 
-  async function saveReport(status: ReviewReportStatus = reportForm.status) {
+  async function saveReport() {
     const report = selectedReport.value;
-    if (!report || !selectedTask.value) {
+    const task = selectedTask.value;
+    if (!report || !task) {
       ElMessage.warning('璇峰厛鐢熸垚杈呭姪璇勫鎶ュ憡');
       return;
     }
@@ -216,17 +215,17 @@ export function useReviews() {
         risks: report.risks,
         totalScore: reportForm.totalScore,
         finalRecommendation: reportForm.finalRecommendation.trim() || null,
-        status,
+        status: 'ADJUSTED',
       };
       const nextReport = await updateReviewReport(report.id, payload);
       selectedTask.value = {
-        ...selectedTask.value,
-        status: status === 'CONFIRMED' || status === 'COMPLETED' ? 'COMPLETED' : 'REVIEWING',
+        ...task,
+        status: task.currentAssignment ? 'IN_REVIEW' : 'REVIEWING',
         report: nextReport,
       };
       syncReportForm(nextReport);
       await loadTasks();
-      ElMessage.success(status === 'CONFIRMED' || status === 'COMPLETED' ? '评审结果已确认' : '评审调整已保存');
+      ElMessage.success('评审调整已保存');
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
     } finally {
@@ -242,7 +241,7 @@ export function useReviews() {
     const taskId = selectedTask.value?.id;
     const assignmentId = selectedTask.value?.currentAssignment?.id;
     if (!taskId || !assignmentId) {
-      ElMessage.warning('??????????????');
+      ElMessage.warning('当前没有可提交的评审任务');
       return;
     }
 
@@ -253,7 +252,7 @@ export function useReviews() {
       if (selectedTask.value?.id === taskId) {
         await selectTask(taskId);
       }
-      ElMessage.success('???????');
+      ElMessage.success('评审已提交');
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
     } finally {

@@ -10,7 +10,11 @@ public record ReviewConsensusResponse(
         UUID id,
         UUID taskId,
         UUID leadReviewerUserId,
+        String leadReviewerUsername,
+        String leadReviewerDisplayName,
         UUID confirmedByUserId,
+        String confirmedByUsername,
+        String confirmedByDisplayName,
         Object scoreSummary,
         Object commentSummary,
         Object disagreementItems,
@@ -23,6 +27,17 @@ public record ReviewConsensusResponse(
         List<ReviewReportResponse> submittedReports
 ) {
     public static ReviewConsensusResponse from(ReviewConsensusEntity entity, List<ReviewReportResponse> submittedReports) {
+        return from(entity, submittedReports, null, null, null, null);
+    }
+
+    public static ReviewConsensusResponse from(
+            ReviewConsensusEntity entity,
+            List<ReviewReportResponse> submittedReports,
+            String leadReviewerUsername,
+            String leadReviewerDisplayName,
+            String confirmedByUsername,
+            String confirmedByDisplayName
+    ) {
         if (entity == null) {
             return null;
         }
@@ -30,7 +45,11 @@ public record ReviewConsensusResponse(
                 entity.getId(),
                 entity.getTaskId(),
                 entity.getLeadReviewerUserId(),
+                leadReviewerUsername,
+                leadReviewerDisplayName,
                 entity.getConfirmedByUserId(),
+                confirmedByUsername,
+                confirmedByDisplayName,
                 entity.getScoreSummary(),
                 entity.getCommentSummary(),
                 entity.getDisagreementItems(),

@@ -144,6 +144,23 @@ class ReviewAssignmentServiceImplTest {
         org.assertj.core.api.Assertions.assertThat(loads.getFirst().assignedCount()).isEqualTo(2L);
     }
 
+    @Test
+    void listAssignmentsIncludesReviewerDisplayName() {
+        UUID taskId = UUID.randomUUID();
+        UUID assignmentId = UUID.randomUUID();
+        UUID reviewerId = UUID.randomUUID();
+        when(assignmentMapper.selectByTaskId(taskId)).thenReturn(List.of(
+                assignment(assignmentId, taskId, reviewerId, ReviewAssignmentStatuses.SUBMITTED)
+        ));
+        when(userMapper.selectById(reviewerId)).thenReturn(user(reviewerId, "reviewer-a", "评审员A"));
+
+        var assignments = service.listAssignments(taskId);
+
+        org.assertj.core.api.Assertions.assertThat(assignments).hasSize(1);
+        org.assertj.core.api.Assertions.assertThat(assignments.getFirst().reviewerUsername()).isEqualTo("reviewer-a");
+        org.assertj.core.api.Assertions.assertThat(assignments.getFirst().reviewerDisplayName()).isEqualTo("评审员A");
+    }
+
     private ReviewTaskEntity task(UUID taskId) {
         ReviewTaskEntity task = new ReviewTaskEntity();
         task.setId(taskId);
@@ -165,5 +182,13 @@ class ReviewAssignmentServiceImplTest {
         assignment.setReviewerUserId(reviewerId);
         assignment.setStatus(status);
         return assignment;
+    }
+
+    private SysUser user(UUID id, String username, String displayName) {
+        SysUser user = new SysUser();
+        user.setId(id);
+        user.setUsername(username);
+        user.setDisplayName(displayName);
+        return user;
     }
 }

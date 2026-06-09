@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.review.dto;
 
+import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.review.entity.ReviewAssignmentEntity;
 
 import java.time.OffsetDateTime;
@@ -9,6 +10,8 @@ public record ReviewAssignmentResponse(
         UUID id,
         UUID taskId,
         UUID reviewerUserId,
+        String reviewerUsername,
+        String reviewerDisplayName,
         String role,
         String status,
         OffsetDateTime assignedAt,
@@ -18,6 +21,10 @@ public record ReviewAssignmentResponse(
         OffsetDateTime updatedAt
 ) {
     public static ReviewAssignmentResponse from(ReviewAssignmentEntity entity) {
+        return from(entity, null);
+    }
+
+    public static ReviewAssignmentResponse from(ReviewAssignmentEntity entity, SysUser reviewer) {
         if (entity == null) {
             return null;
         }
@@ -25,6 +32,8 @@ public record ReviewAssignmentResponse(
                 entity.getId(),
                 entity.getTaskId(),
                 entity.getReviewerUserId(),
+                reviewer == null ? null : reviewer.getUsername(),
+                reviewer == null ? null : reviewer.getDisplayName(),
                 entity.getRole(),
                 entity.getStatus(),
                 entity.getAssignedAt(),

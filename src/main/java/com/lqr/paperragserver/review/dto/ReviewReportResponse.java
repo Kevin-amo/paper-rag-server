@@ -1,5 +1,6 @@
 package com.lqr.paperragserver.review.dto;
 
+import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.review.entity.ReviewReportEntity;
 
 import java.math.BigDecimal;
@@ -13,6 +14,8 @@ public record ReviewReportResponse(
         UUID documentId,
         UUID assignmentId,
         UUID reviewerUserId,
+        String reviewerUsername,
+        String reviewerDisplayName,
         Map<String, Object> paperSections,
         Object scores,
         Map<String, Object> comments,
@@ -31,6 +34,10 @@ public record ReviewReportResponse(
         OffsetDateTime updatedAt
 ) {
     public static ReviewReportResponse from(ReviewReportEntity entity) {
+        return from(entity, null);
+    }
+
+    public static ReviewReportResponse from(ReviewReportEntity entity, SysUser reviewer) {
         if (entity == null) {
             return null;
         }
@@ -40,6 +47,8 @@ public record ReviewReportResponse(
                 entity.getDocumentId(),
                 entity.getAssignmentId(),
                 entity.getReviewerUserId(),
+                reviewer == null ? null : reviewer.getUsername(),
+                reviewer == null ? null : reviewer.getDisplayName(),
                 entity.getPaperSections(),
                 entity.getScores(),
                 entity.getComments(),

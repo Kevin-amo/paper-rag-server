@@ -48,6 +48,24 @@ function taskId() {
   return props.taskDetail?.task.id;
 }
 
+function leadReviewerName() {
+  return (
+    consensus.value?.leadReviewerDisplayName ||
+    consensus.value?.leadReviewerUsername ||
+    consensus.value?.leadReviewerUserId ||
+    '-'
+  );
+}
+
+function confirmedByName() {
+  return (
+    consensus.value?.confirmedByDisplayName ||
+    consensus.value?.confirmedByUsername ||
+    consensus.value?.confirmedByUserId ||
+    '-'
+  );
+}
+
 function handleSave() {
   const id = taskId();
   if (!id) return;
@@ -83,8 +101,8 @@ function handleSave() {
 
       <el-descriptions :column="2" border>
         <el-descriptions-item label="共识状态">{{ consensus?.status || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="负责人">{{ consensus?.leadReviewerUserId || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="确认人">{{ consensus?.confirmedByUserId || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="负责人">{{ leadReviewerName() }}</el-descriptions-item>
+        <el-descriptions-item label="确认人">{{ confirmedByName() }}</el-descriptions-item>
         <el-descriptions-item label="确认时间">{{ consensus?.confirmedAt || '-' }}</el-descriptions-item>
       </el-descriptions>
 

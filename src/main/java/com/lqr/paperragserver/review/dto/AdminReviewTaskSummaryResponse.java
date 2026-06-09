@@ -13,6 +13,8 @@ public record AdminReviewTaskSummaryResponse(
         long assignmentCount,
         long submittedCount,
         UUID leadReviewerUserId,
+        String leadReviewerUsername,
+        String leadReviewerDisplayName,
         OffsetDateTime dueAt,
         String consensusStatus,
         OffsetDateTime createdAt,

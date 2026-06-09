@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lqr.paperragserver.ai.service.LlmService;
 import com.lqr.paperragserver.ai.service.PromptConstructionService;
 import com.lqr.paperragserver.document.service.DocumentPersistenceService;
+import com.lqr.paperragserver.document.structured.dto.PaperStructuredParseResponse;
 import com.lqr.paperragserver.document.structured.entity.PaperStructuredParseEntity;
 import com.lqr.paperragserver.document.structured.service.PaperStructuredParseService;
 import com.lqr.paperragserver.review.assessment.ReviewOutputParser;
@@ -317,6 +318,58 @@ class ReviewServiceImplTest {
         verify(llmService, never()).generate(any());
         verify(reportMapper, never()).insert(org.mockito.ArgumentMatchers.any(ReviewReportEntity.class));
         verify(reportMapper, never()).updateById(org.mockito.ArgumentMatchers.any(ReviewReportEntity.class));
+    }
+
+    @Test
+    void getStructuredParseShouldUseTaskSubmitterDocumentForAssignedReviewer() {
+        UUID submitterUserId = UUID.randomUUID();
+        UUID reviewerUserId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
+        ReviewAssignmentMapper assignmentMapper = mock(ReviewAssignmentMapper.class);
+        DocumentPersistenceService documentPersistenceService = mock(DocumentPersistenceService.class);
+        PaperStructuredParseService paperStructuredParseService = mock(PaperStructuredParseService.class);
+        ReviewServiceImpl service = new ReviewServiceImpl(
+                taskMapper,
+                mock(ReviewReportMapper.class),
+                assignmentMapper,
+                mock(ReviewCriterionMapper.class),
+                mock(ReviewAuditLogMapper.class),
+                null,
+                null,
+                documentPersistenceService,
+                paperStructuredParseService,
+                null,
+                null,
+                mock(ReviewOutputParser.class),
+                new ReferenceFormatChecker(),
+                mock(ReviewAuditService.class),
+                mock(ReviewRiskService.class),
+                new ObjectMapper()
+        );
+        ReviewTaskEntity task = task(taskId, null);
+        task.setDocumentId(documentId);
+        task.setSubmitterUserId(submitterUserId);
+        task.setSourceId("source-1");
+        when(taskMapper.selectByIdIncludingDeleted(taskId)).thenReturn(task);
+        when(assignmentMapper.selectByTaskAndReviewer(taskId, reviewerUserId))
+                .thenReturn(assignment(UUID.randomUUID(), taskId, reviewerUserId));
+        when(documentPersistenceService.findReviewDocument(submitterUserId, "source-1"))
+                .thenReturn(Optional.of(document(submitterUserId, "source-1")));
+        PaperStructuredParseEntity structuredParse = structuredParse(submitterUserId, documentId, "source-1");
+        when(paperStructuredParseService.find(submitterUserId, "source-1"))
+                .thenReturn(Optional.of(structuredParse));
+
+        PaperStructuredParseResponse response = service.getStructuredParse(reviewerUserId, false, taskId);
+
+        assertThat(response.sourceId()).isEqualTo("source-1");
+        assertThat(response.documentId()).isEqualTo(documentId);
+        assertThat(response.mergedResult()).isEqualTo(Map.of("title", "Paper A"));
+        verify(documentPersistenceService).findReviewDocument(submitterUserId, "source-1");
+        verify(documentPersistenceService, never()).findReviewDocument(reviewerUserId, "source-1");
+        verify(paperStructuredParseService).find(submitterUserId, "source-1");
+        verify(paperStructuredParseService, never()).find(reviewerUserId, "source-1");
     }
 
     @Test
@@ -680,6 +733,21 @@ class ReviewServiceImplTest {
                 OffsetDateTime.now(),
                 null
         );
+    }
+
+    private PaperStructuredParseEntity structuredParse(UUID ownerUserId, UUID documentId, String sourceId) {
+        PaperStructuredParseEntity entity = new PaperStructuredParseEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setOwnerUserId(ownerUserId);
+        entity.setDocumentId(documentId);
+        entity.setSourceId(sourceId);
+        entity.setStatus("COMPLETED");
+        entity.setMergedResult(Map.of("title", "Paper A"));
+        entity.setMissingFields(List.of());
+        entity.setLowConfidenceFields(List.of());
+        entity.setParsedAt(OffsetDateTime.now());
+        entity.setUpdatedAt(OffsetDateTime.now());
+        return entity;
     }
 
     private ReviewReportEntity report(UUID reportId, UUID taskId) {

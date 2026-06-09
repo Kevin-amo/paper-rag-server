@@ -4,6 +4,7 @@ const shell = readFileSync(new URL('../src/components/admin/AdminShell.vue', imp
 const reviews = readFileSync(new URL('../src/views/admin/AdminReviewDashboardView.vue', import.meta.url), 'utf8');
 const usersView = readFileSync(new URL('../src/views/admin/AdminUsersView.vue', import.meta.url), 'utf8');
 const usersPanel = readFileSync(new URL('../src/components/admin/AdminUsersPanel.vue', import.meta.url), 'utf8');
+const usersComposable = readFileSync(new URL('../src/composables/useAdminUsers.ts', import.meta.url), 'utf8');
 const globalStyle = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
 
 const requiredMenuLabels = ['用户管理', '评审任务', '评审员分配', '评审指标', '共识/归档'];
@@ -38,6 +39,15 @@ if (!usersPanel.includes('users-panel') || !usersPanel.includes('用户列表'))
 }
 if (!/html\s*\{[^}]*scrollbar-gutter:\s*stable[^}]*overflow-y:\s*auto/s.test(globalStyle)) {
   missing.push('Global layout must set html scrollbar-gutter: stable together with overflow-y: auto to prevent admin navigation shift');
+}
+if (!shell.includes('overflow-x: hidden') || !shell.includes('overflow-x: auto')) {
+  missing.push('AdminShell must prevent page-level horizontal scrolling while allowing content-level horizontal scrolling');
+}
+if (usersView.includes(':loading="loading"') || usersView.includes('v-loading="loading"')) {
+  missing.push('User management must not show a full admin shell loading overlay on every navigation');
+}
+if (!usersComposable.includes('adminUsersStore') || !usersComposable.includes('loaded') || !usersPanel.includes('!admin.loaded.value')) {
+  missing.push('User management must cache its list state and skip automatic reloads after the first visit');
 }
 
 if (missing.length) {

@@ -1,5 +1,7 @@
 package com.lqr.paperragserver.review.service.impl;
 
+import com.lqr.paperragserver.auth.entity.SysUser;
+import com.lqr.paperragserver.auth.mapper.SysUserMapper;
 import com.lqr.paperragserver.review.consensus.ConsensusCalculator;
 import com.lqr.paperragserver.review.dto.ReviewConsensusResponse;
 import com.lqr.paperragserver.review.dto.ReviewConsensusUpdateRequest;
@@ -33,11 +35,13 @@ class ReviewConsensusServiceImplTest {
     private final ReviewReportMapper reportMapper = mock(ReviewReportMapper.class);
     private final ReviewAssignmentMapper assignmentMapper = mock(ReviewAssignmentMapper.class);
     private final ReviewTaskMapper taskMapper = mock(ReviewTaskMapper.class);
+    private final SysUserMapper userMapper = mock(SysUserMapper.class);
     private final ReviewConsensusServiceImpl service = new ReviewConsensusServiceImpl(
             consensusMapper,
             reportMapper,
             assignmentMapper,
             taskMapper,
+            userMapper,
             new ConsensusCalculator()
     );
 
@@ -45,13 +49,15 @@ class ReviewConsensusServiceImplTest {
     void recalculateShouldCreateDraftConsensusWithAverageScore() {
         UUID taskId = UUID.randomUUID();
         UUID leadUserId = UUID.randomUUID();
+        UUID reviewerId = UUID.randomUUID();
         ReviewAssignmentEntity lead = assignment(taskId, leadUserId);
         when(reportMapper.selectSubmittedByTaskId(taskId)).thenReturn(List.of(
-                report(taskId, UUID.randomUUID(), 80, "建议通过"),
+                report(taskId, reviewerId, 80, "建议通过"),
                 report(taskId, UUID.randomUUID(), 90, "建议修改后通过")
         ));
         when(consensusMapper.selectByTaskId(taskId)).thenReturn(null);
         when(assignmentMapper.selectLeadByTaskId(taskId)).thenReturn(lead);
+        when(userMapper.selectById(reviewerId)).thenReturn(user(reviewerId, "reviewer-a", "评审员A"));
         markAllSubmitted(taskId, 2L);
 
         ReviewConsensusResponse response = service.recalculate(taskId);
@@ -72,6 +78,8 @@ class ReviewConsensusServiceImplTest {
         assertThat(saved.getUpdatedAt()).isNotNull();
         assertThat(response.finalScore()).isEqualTo(85);
         assertThat(response.submittedReports()).hasSize(2);
+        assertThat(response.submittedReports().getFirst().reviewerUsername()).isEqualTo("reviewer-a");
+        assertThat(response.submittedReports().getFirst().reviewerDisplayName()).isEqualTo("评审员A");
     }
 
 
@@ -171,6 +179,7 @@ class ReviewConsensusServiceImplTest {
         UUID taskId = UUID.randomUUID();
         UUID operatorUserId = UUID.randomUUID();
         ReviewConsensusEntity consensus = consensus(taskId);
+        when(userMapper.selectById(operatorUserId)).thenReturn(user(operatorUserId, "admin", "系统管理员"));
         when(consensusMapper.selectByTaskId(taskId)).thenReturn(consensus);
         when(reportMapper.selectSubmittedByTaskId(taskId)).thenReturn(List.of());
         markAllSubmitted(taskId, 1L);
@@ -179,6 +188,8 @@ class ReviewConsensusServiceImplTest {
 
         assertThat(response.status()).isEqualTo(ReviewConsensusStatuses.CONFIRMED);
         assertThat(response.confirmedByUserId()).isEqualTo(operatorUserId);
+        assertThat(response.confirmedByUsername()).isEqualTo("admin");
+        assertThat(response.confirmedByDisplayName()).isEqualTo("系统管理员");
         assertThat(response.confirmedAt()).isNotNull();
         verify(consensusMapper).updateById(consensus);
         verify(taskMapper).updateTaskStatus(taskId, ReviewTaskStatuses.CONSENSUS_CONFIRMED);
@@ -278,6 +289,14 @@ class ReviewConsensusServiceImplTest {
         assignment.setRole("LEAD");
         assignment.setStatus("ASSIGNED");
         return assignment;
+    }
+
+    private SysUser user(UUID id, String username, String displayName) {
+        SysUser user = new SysUser();
+        user.setId(id);
+        user.setUsername(username);
+        user.setDisplayName(displayName);
+        return user;
     }
 
     private void markAllSubmitted(UUID taskId, long count) {

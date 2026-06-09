@@ -1,6 +1,7 @@
 package com.lqr.paperragserver.review.service.impl;
 
 import com.lqr.paperragserver.auth.mapper.SysUserMapper;
+import com.lqr.paperragserver.auth.entity.SysUser;
 import com.lqr.paperragserver.auth.security.RoleCodes;
 import com.lqr.paperragserver.review.dto.ReviewAssignmentRequest;
 import com.lqr.paperragserver.review.dto.ReviewAssignmentResponse;
@@ -74,14 +75,14 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         assignments.forEach(assignmentMapper::insert);
         taskMapper.updateTaskStatus(taskId, ReviewTaskStatuses.ASSIGNED);
         return assignments.stream()
-                .map(ReviewAssignmentResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
     @Override
     public List<ReviewAssignmentResponse> listAssignments(UUID taskId) {
         return assignmentMapper.selectByTaskId(taskId).stream()
-                .map(ReviewAssignmentResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -96,7 +97,7 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "\u53ea\u80fd\u63d0\u4ea4\u81ea\u5df1\u7684\u8bc4\u5ba1\u4efb\u52a1");
         }
         if (ReviewAssignmentStatuses.SUBMITTED.equals(assignment.getStatus())) {
-            return ReviewAssignmentResponse.from(assignment);
+            return toResponse(assignment);
         }
         assignmentMapper.updateStatus(assignmentId, ReviewAssignmentStatuses.SUBMITTED);
         long activeCount = assignmentMapper.countActiveByTaskId(assignment.getTaskId());
@@ -107,7 +108,7 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         assignment.setStatus(ReviewAssignmentStatuses.SUBMITTED);
         assignment.setSubmittedAt(OffsetDateTime.now());
         assignment.setUpdatedAt(OffsetDateTime.now());
-        return ReviewAssignmentResponse.from(assignment);
+        return toResponse(assignment);
     }
 
     @Override
@@ -136,5 +137,12 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         assignment.setCreatedAt(now);
         assignment.setUpdatedAt(now);
         return assignment;
+    }
+
+    private ReviewAssignmentResponse toResponse(ReviewAssignmentEntity assignment) {
+        SysUser reviewer = assignment == null || assignment.getReviewerUserId() == null
+                ? null
+                : userMapper.selectById(assignment.getReviewerUserId());
+        return ReviewAssignmentResponse.from(assignment, reviewer);
     }
 }

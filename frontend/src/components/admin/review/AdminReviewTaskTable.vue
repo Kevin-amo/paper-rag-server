@@ -29,6 +29,10 @@ function statusType(status: string) {
   if (status === 'REVIEWING') return 'warning';
   return 'info';
 }
+
+function reviewerName(task: AdminReviewTaskSummary) {
+  return task.leadReviewerDisplayName || task.leadReviewerUsername || task.leadReviewerUserId || '-';
+}
 </script>
 
 <template>
@@ -48,7 +52,7 @@ function statusType(status: string) {
       </template>
     </el-table-column>
     <el-table-column label="负责人" min-width="180" show-overflow-tooltip>
-      <template #default="{ row }">{{ row.leadReviewerUserId || '-' }}</template>
+      <template #default="{ row }">{{ reviewerName(row) }}</template>
     </el-table-column>
     <el-table-column label="截止时间" min-width="180">
       <template #default="{ row }">{{ formatDate(row.dueAt) }}</template>
@@ -73,8 +77,19 @@ function statusType(status: string) {
 <style scoped>
 .review-task-table {
   overflow: hidden;
-  border: 1px solid var(--app-border);
-  border-radius: 18px;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
+}
+
+.review-task-table :deep(.el-table__header-wrapper th) {
+  background: #f8fafc;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.review-task-table :deep(.el-table__row:hover > td) {
+  background: #f5f8ff;
 }
 
 .progress-cell {
@@ -85,7 +100,7 @@ function statusType(status: string) {
 }
 
 .progress-cell span {
-  color: var(--app-text-muted);
+  color: #667085;
   font-size: 12px;
 }
 </style>

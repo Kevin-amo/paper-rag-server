@@ -1,6 +1,7 @@
 package com.lqr.paperragserver.review.service;
 
 import com.lqr.paperragserver.document.dto.PageResponse;
+import com.lqr.paperragserver.document.structured.dto.PaperStructuredParseResponse;
 import com.lqr.paperragserver.review.dto.ReviewAssignmentResponse;
 import com.lqr.paperragserver.review.dto.ReviewConsensusResponse;
 import com.lqr.paperragserver.review.dto.ReviewCriterionRequest;
@@ -27,6 +28,10 @@ public interface ReviewService {
     void createTaskForIndexedReviewDocument(UUID ownerUserId, String sourceId);
 
     ReviewReportResponse generateAiReview(UUID currentUserId, boolean admin, UUID taskId);
+
+    PaperStructuredParseResponse getStructuredParse(UUID currentUserId, boolean admin, UUID taskId);
+
+    PaperStructuredParseResponse regenerateStructuredParse(UUID currentUserId, boolean admin, UUID taskId);
 
     ReviewReportResponse updateReport(UUID currentUserId, boolean admin, UUID reportId, ReviewReportUpdateRequest request);
 

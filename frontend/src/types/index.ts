@@ -473,6 +473,8 @@ export interface ReviewAssignment {
   id: string;
   taskId: string;
   reviewerUserId: string;
+  reviewerUsername: string | null;
+  reviewerDisplayName: string | null;
   role: ReviewAssignmentRole;
   status: ReviewAssignmentStatus;
   assignedAt: string | null;
@@ -486,6 +488,8 @@ export interface ReviewConsensus {
   id: string;
   taskId: string;
   leadReviewerUserId: string | null;
+  leadReviewerUsername: string | null;
+  leadReviewerDisplayName: string | null;
   scoreSummary: Record<string, unknown> | null;
   commentSummary: Record<string, unknown> | null;
   disagreementItems: Array<Record<string, unknown>> | null;
@@ -493,6 +497,8 @@ export interface ReviewConsensus {
   finalRecommendation: string | null;
   status: ReviewConsensusStatus;
   confirmedByUserId: string | null;
+  confirmedByUsername: string | null;
+  confirmedByDisplayName: string | null;
   confirmedAt: string | null;
   submittedReports: Array<Record<string, unknown>> | null;
   createdAt: string;
@@ -529,6 +535,8 @@ export interface AdminReviewTaskSummary {
   assignmentCount: number;
   submittedCount: number;
   leadReviewerUserId: string | null;
+  leadReviewerUsername: string | null;
+  leadReviewerDisplayName: string | null;
   dueAt: string | null;
   consensusStatus: ReviewConsensusStatus;
   createdAt: string;
@@ -547,6 +555,8 @@ export interface ReviewReport {
   taskId: string;
   documentId: string;
   reviewerUserId: string | null;
+  reviewerUsername: string | null;
+  reviewerDisplayName: string | null;
   assignmentId: string | null;
   paperSections: Record<string, unknown>;
   scores: ReviewScoreItem[] | unknown;
