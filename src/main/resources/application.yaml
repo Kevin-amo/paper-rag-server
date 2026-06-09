@@ -1,6 +1,6 @@
 spring:
   application:
-    name: paper-rag-server
+    name: paper-mind
   servlet:
     multipart:
       max-request-size: 50MB
@@ -61,25 +61,25 @@ server:
 
 logging:
   level:
-    com.lqr.paperragserver: ${LOG_LEVEL_APP:INFO}
-    com.lqr.paperragserver.document: ${LOG_LEVEL_DOCUMENT:INFO}
-    com.lqr.paperragserver.rag: ${LOG_LEVEL_RAG:INFO}
-    com.lqr.paperragserver.agent: ${LOG_LEVEL_AGENT:INFO}
-    com.lqr.paperragserver.literature: ${LOG_LEVEL_LITERATURE:INFO}
-    com.lqr.paperragserver.vector: ${LOG_LEVEL_VECTOR:INFO}
-    com.lqr.paperragserver.ai: ${LOG_LEVEL_AI:INFO}
+    com.lqr.papermind: ${LOG_LEVEL_APP:INFO}
+    com.lqr.papermind.document: ${LOG_LEVEL_DOCUMENT:INFO}
+    com.lqr.papermind.rag: ${LOG_LEVEL_RAG:INFO}
+    com.lqr.papermind.agent: ${LOG_LEVEL_AGENT:INFO}
+    com.lqr.papermind.literature: ${LOG_LEVEL_LITERATURE:INFO}
+    com.lqr.papermind.vector: ${LOG_LEVEL_VECTOR:INFO}
+    com.lqr.papermind.ai: ${LOG_LEVEL_AI:INFO}
 
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-  type-handlers-package: com.lqr.paperragserver.common.typehandler
+  type-handlers-package: com.lqr.papermind.common.typehandler
 
 app:
   mail:
     resend:
       enabled: ${RESEND_ENABLED:true}
       api-key: ${RESEND_API_KEY:}
-      from: ${RESEND_FROM:PaperRAG <noreply@example.com>}
+      from: ${RESEND_FROM:PaperMind <noreply@example.com>}
       endpoint: ${RESEND_ENDPOINT:https://api.resend.com/emails}
       timeout: ${RESEND_TIMEOUT:10s}
   literature:
@@ -133,7 +133,7 @@ app:
       max-concurrency: ${DOCUMENT_INGESTION_LISTENER_MAX_CONCURRENCY:6}
   security:
     jwt:
-      issuer: ${JWT_ISSUER:paper-rag-server}
+      issuer: ${JWT_ISSUER:paper-mind}
       secret: ${JWT_SECRET:V1kNrJuT67FGQp0fWCJlkzH3KdavGcGYoUz6TdBzheIOVu7E5HfJQVxulvmIh73E}
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:12h}
     register-email-code:

@@ -1,8 +1,8 @@
 import { reactive } from 'vue';
 import type { AuthUser } from '../types';
 
-const TOKEN_KEY = 'paper-rag.accessToken';
-const USER_KEY = 'paper-rag.currentUser';
+const TOKEN_KEY = 'paper-mind.accessToken';
+const USER_KEY = 'paper-mind.currentUser';
 
 export const authState = reactive({
   accessToken: localStorage.getItem(TOKEN_KEY) || '',

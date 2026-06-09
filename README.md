@@ -1,4 +1,4 @@
-﻿# Paper Review Assistant
+# Paper Review Assistant
 
 Paper Review Assistant 是一个面向论文辅助评审场景的平台，支持用户端论文上传与问答、评审端结构化解析与多维评分、AI 辅助评语与风险提示、后台用户和角色管理。系统保留现有 DashScope / Qwen 模型链路，不额外接入文心大模型。
 
@@ -49,10 +49,10 @@ Paper Review Assistant 是一个面向论文辅助评审场景的平台，支持
 ## 目录结构
 
 ```text
-paper-rag-server/
+paper-mind/
 ├── src/
 │   ├── main/
-│   │   ├── java/com/lqr/paperragserver/
+│   │   ├── java/com/lqr/papermind/
 │   │   │   ├── agent/           # Agent 编排、工具调用和流式问答入口
 │   │   │   ├── ai/              # LLM、Embedding、Rerank、Prompt 构造
 │   │   │   ├── auth/            # 认证、用户、角色、JWT、验证码频控
@@ -69,7 +69,7 @@ paper-rag-server/
 │   │   └── resources/
 │   │       ├── application.yaml
 │   │       ├── application-local.example.yaml
-│   │       └── sql/paper-rag.sql
+│   │       └── sql/paper-mind.sql
 │   └── test/                    # 单元测试和 Web 层测试
 ├── frontend/
 │   ├── src/
@@ -357,7 +357,7 @@ src/main/resources/sql
 首次创建容器数据卷时会执行：
 
 ```text
-src/main/resources/sql/paper-rag.sql
+src/main/resources/sql/paper-mind.sql
 ```
 
 如果 SQL 已修改但数据库卷已经存在，需要清理卷后重新初始化：

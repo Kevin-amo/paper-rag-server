@@ -20,7 +20,7 @@ import {
 import { ElMessage } from 'element-plus';
 import type { Conversation } from '../../types';
 
-const PINNED_CONVERSATIONS_STORAGE_KEY = 'paper-rag:pinned-conversations';
+const PINNED_CONVERSATIONS_STORAGE_KEY = 'paper-mind:pinned-conversations';
 
 type ConversationMenuCommand = 'pin' | 'unpin' | 'rename' | 'delete';
 
@@ -187,7 +187,7 @@ function conversationTitle(conversation: Conversation) {
     <div class="brand-block">
       <div class="brand-mark">P</div>
       <div>
-        <strong>Paper Agent</strong>
+        <strong>PaperMind</strong>
         <span>论文智能助手</span>
       </div>
     </div>

@@ -5,12 +5,12 @@
 # JWT_SECRET=至少 32 位随机字符串
 # DASHSCOPE_API_KEY=你的 DashScope API Key
 
-name: paper-rag
+name: paper-mind
 
 x-backend-environment: &backend-environment
   SERVER_PORT: 8080
-  DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-paper_rag}
-  DB_USERNAME: ${POSTGRES_USER:-paper_rag}
+  DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-paper_mind}
+  DB_USERNAME: ${POSTGRES_USER:-paper_mind}
   DB_PASSWORD: ${POSTGRES_PASSWORD:?请设置 POSTGRES_PASSWORD}
   REDIS_HOST: redis
   REDIS_PORT: 6379
@@ -18,10 +18,10 @@ x-backend-environment: &backend-environment
   REDIS_DATABASE: ${REDIS_DATABASE:-0}
   RABBITMQ_HOST: rabbitmq
   RABBITMQ_PORT: 5672
-  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-paper_rag}
+  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-paper_mind}
   RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?请设置 RABBITMQ_PASSWORD}
   DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?请设置 DASHSCOPE_API_KEY}
-  JWT_ISSUER: ${JWT_ISSUER:-paper-rag-server}
+  JWT_ISSUER: ${JWT_ISSUER:-paper-mind}
   JWT_SECRET: ${JWT_SECRET:?请设置 JWT_SECRET}
   JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-2h}
   BOOTSTRAP_ADMIN_ENABLED: ${BOOTSTRAP_ADMIN_ENABLED:-false}
@@ -89,7 +89,7 @@ services:
 
         }
         EOF
-    container_name: paper-rag-frontend
+    container_name: paper-mind-frontend
     restart: unless-stopped
     ports:
       - "${HTTP_PORT:-80}:80"
@@ -103,7 +103,7 @@ services:
       retries: 5
       start_period: 20s
     networks:
-      - paper-rag-net
+      - paper-mind-net
 
   backend:
     build:
@@ -128,7 +128,7 @@ services:
         USER app
         EXPOSE 8080
         ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/app.jar"]
-    container_name: paper-rag-backend
+    container_name: paper-mind-backend
     restart: unless-stopped
     environment:
       <<: *backend-environment
@@ -150,15 +150,15 @@ services:
       retries: 10
       start_period: 90s
     networks:
-      - paper-rag-net
+      - paper-mind-net
 
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: paper-rag-postgres
+    container_name: paper-mind-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-paper_rag}
-      POSTGRES_USER: ${POSTGRES_USER:-paper_rag}
+      POSTGRES_DB: ${POSTGRES_DB:-paper_mind}
+      POSTGRES_USER: ${POSTGRES_USER:-paper_mind}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请设置 POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -172,11 +172,11 @@ services:
       retries: 10
       start_period: 20s
     networks:
-      - paper-rag-net
+      - paper-mind-net
 
   redis:
     image: redis:7.4-alpine
-    container_name: paper-rag-redis
+    container_name: paper-mind-redis
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}
@@ -192,14 +192,14 @@ services:
       retries: 10
       start_period: 10s
     networks:
-      - paper-rag-net
+      - paper-mind-net
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    container_name: paper-rag-rabbitmq
+    container_name: paper-mind-rabbitmq
     restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-paper_rag}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-paper_mind}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?请设置 RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
@@ -213,10 +213,10 @@ services:
       retries: 10
       start_period: 30s
     networks:
-      - paper-rag-net
+      - paper-mind-net
 
 networks:
-  paper-rag-net:
+  paper-mind-net:
     driver: bridge
 
 volumes:
