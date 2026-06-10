@@ -254,6 +254,7 @@ onMounted(async () => {
       @refresh="documentsState.loadDocuments(0)"
       @delete="documentsState.removeDocument"
       @delete-all="documentsState.removeAllDocuments"
+      @upload="handleSelectFiles"
     />
 
     <AccountManagementDialog

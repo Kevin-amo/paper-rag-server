@@ -9,9 +9,10 @@ import {
   listReviewTasks,
   regenerateReviewTaskStructuredParse,
   submitReviewAssignment,
-  uploadReviewPaper,
   updateReviewReport,
   updateReviewRisk,
+  uploadReviewPaper,
+  getReviewUploadJob,
 } from '../api/reviews';
 import { getErrorMessage } from '../api/http';
 import type {
@@ -22,18 +23,17 @@ import type {
   ReviewReportStatus,
   ReviewScoreItem,
   ReviewTask,
-  ReviewTaskStatus,
+  ReviewAssignmentStatus,
   UpdateReviewReportPayload,
-  UploadReviewPaperPayload,
 } from '../types';
 
 export function useReviews() {
   const loading = ref(false);
   const detailLoading = ref(false);
   const generating = ref(false);
+  const uploading = ref(false);
   const saving = ref(false);
   const submittingAssignment = ref(false);
-  const uploading = ref(false);
   const structuredParseLoading = ref(false);
   const regeneratingStructuredParse = ref(false);
   const riskRecords = ref<ReviewRiskRecord[]>([]);
@@ -44,7 +44,7 @@ export function useReviews() {
   const selectedTask = ref<ReviewTask | null>(null);
   const structuredParse = ref<PaperStructuredParse | null>(null);
   const keyword = ref('');
-  const statusFilter = ref<ReviewTaskStatus | ''>('');
+  const statusFilter = ref<ReviewAssignmentStatus | ''>('');
   const pagination = reactive({ page: 0, size: 20, total: 0 });
   const reportForm = reactive({
     totalScore: 0,
@@ -52,9 +52,11 @@ export function useReviews() {
     status: 'ADJUSTED' as ReviewReportStatus,
   });
 
-  const pendingCount = computed(() => tasks.value.filter((item) => item.status === 'PENDING').length);
-  const reviewingCount = computed(() => tasks.value.filter((item) => item.status === 'REVIEWING').length);
-  const completedCount = computed(() => tasks.value.filter((item) => item.status === 'COMPLETED').length);
+  const pendingCount = computed(() => tasks.value.filter((item) => (
+    item.currentAssignment?.status === 'ASSIGNED' || (!item.currentAssignment && item.status === 'PENDING_ASSIGNMENT')
+  )).length);
+  const reviewingCount = computed(() => tasks.value.filter((item) => item.currentAssignment?.status === 'REVIEWING').length);
+  const completedCount = computed(() => tasks.value.filter((item) => item.currentAssignment?.status === 'SUBMITTED').length);
   const selectedReport = computed(() => selectedTask.value?.report ?? null);
   let selectTaskRequestId = 0;
   let structuredParseRequestId = 0;
@@ -97,6 +99,40 @@ export function useReviews() {
       criteria.value = await listReviewCriteria(false);
     } catch (error) {
       ElMessage.error(getErrorMessage(error));
+    }
+  }
+
+  async function uploadPaper(file: File) {
+    if (uploading.value) {
+      return;
+    }
+    uploading.value = true;
+    try {
+      const result = await uploadReviewPaper({
+        file,
+        title: file.name.replace(/\.[^.]+$/, ''),
+      });
+      await waitForUploadIndexed(result.jobId);
+      await loadTasks(0);
+      ElMessage.success('待评审论文已入库');
+    } catch (error) {
+      ElMessage.error(getErrorMessage(error));
+    } finally {
+      uploading.value = false;
+    }
+  }
+
+  async function waitForUploadIndexed(jobId: string) {
+    const maxAttempts = 20;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const job = await getReviewUploadJob(jobId);
+      if (job.status === 'INDEXED') {
+        return;
+      }
+      if (job.status === 'FAILED') {
+        throw new Error(job.errorMessage || '论文入库失败');
+      }
+      await new Promise((resolve) => { setTimeout(resolve, 1500); });
     }
   }
 
@@ -186,7 +222,10 @@ export function useReviews() {
     try {
       const report = await generateReviewReport(taskId);
       if (selectedTask.value?.id === taskId) {
-        selectedTask.value = { ...selectedTask.value, status: 'REVIEWING', report };
+        const currentAssignment = selectedTask.value.currentAssignment
+          ? { ...selectedTask.value.currentAssignment, status: 'REVIEWING' as const }
+          : null;
+        selectedTask.value = { ...selectedTask.value, status: 'IN_REVIEW', currentAssignment, report };
         syncReportForm(report);
         await loadRisks(report.id);
         ElMessage.success('辅助评审报告已生成');
@@ -218,9 +257,13 @@ export function useReviews() {
         status: 'ADJUSTED',
       };
       const nextReport = await updateReviewReport(report.id, payload);
+      const currentAssignment = task.currentAssignment
+        ? { ...task.currentAssignment, status: 'REVIEWING' as const }
+        : null;
       selectedTask.value = {
         ...task,
-        status: task.currentAssignment ? 'IN_REVIEW' : 'REVIEWING',
+        status: currentAssignment ? 'IN_REVIEW' : 'REVIEWING',
+        currentAssignment,
         report: nextReport,
       };
       syncReportForm(nextReport);
@@ -257,21 +300,6 @@ export function useReviews() {
       ElMessage.error(getErrorMessage(error));
     } finally {
       submittingAssignment.value = false;
-    }
-  }
-
-  async function uploadPaper(payload: UploadReviewPaperPayload) {
-    uploading.value = true;
-    try {
-      const result = await uploadReviewPaper(payload);
-      ElMessage.success('评审论文已提交入库，索引完成后会自动进入任务池');
-      await loadTasks(0);
-      return result;
-    } catch (error) {
-      ElMessage.error(getErrorMessage(error));
-      throw error;
-    } finally {
-      uploading.value = false;
     }
   }
 
@@ -381,9 +409,9 @@ export function useReviews() {
     loading,
     detailLoading,
     generating,
+    uploading,
     saving,
     submittingAssignment,
-    uploading,
     structuredParseLoading,
     regeneratingStructuredParse,
     riskRecords,
@@ -403,11 +431,11 @@ export function useReviews() {
     completedCount,
     loadTasks,
     loadCriteria,
+    uploadPaper,
     selectTask,
     runAiReview,
     saveReport,
     submitCurrentAssignment,
-    uploadPaper,
     loadStructuredParse,
     loadRisks,
     setRiskStatus,

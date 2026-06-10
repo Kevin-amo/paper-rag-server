@@ -315,7 +315,7 @@ function handleChunkSizeChange(size: number) {
   word-break: break-all;
 }
 
-.detail-hero .el-tag {
+.detail-hero [class~="el-tag"] {
   flex-shrink: 0;
   align-self: center;
 }

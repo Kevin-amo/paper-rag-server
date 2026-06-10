@@ -196,7 +196,7 @@ watch(
   padding: 48px 0 64px;
 }
 
-.message-list.is-empty :deep(.empty-state) {
+.message-list.is-empty :deep([class~="empty-state"]) {
   width: min(820px, calc(100% - 48px));
   min-height: 230px;
   border-color: rgba(255, 255, 255, 0.76);
@@ -208,11 +208,11 @@ watch(
   -webkit-backdrop-filter: blur(18px) saturate(165%);
 }
 
-.message-list.is-empty :deep(.empty-state p) {
+.message-list.is-empty :deep([class~="empty-state"] p) {
   max-width: 560px;
 }
 
-.message-list.is-empty :deep(.empty-icon) {
+.message-list.is-empty :deep([class~="empty-icon"]) {
   background: rgba(0, 122, 255, 0.1);
 }
 

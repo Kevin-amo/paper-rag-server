@@ -4,16 +4,17 @@ import { useRoute, useRouter } from 'vue-router';
 import AdminShell from '../../components/admin/AdminShell.vue';
 import AdminReviewTaskTable from '../../components/admin/review/AdminReviewTaskTable.vue';
 import ReviewAssignmentDrawer from '../../components/admin/review/ReviewAssignmentDrawer.vue';
+import ReviewBatchGroupPanel from '../../components/admin/review/ReviewBatchGroupPanel.vue';
 import ReviewConsensusDrawer from '../../components/admin/review/ReviewConsensusDrawer.vue';
 import ReviewCriteriaPanel from '../../components/admin/review/ReviewCriteriaPanel.vue';
 import ReviewTaskDetailDrawer from '../../components/admin/review/ReviewTaskDetailDrawer.vue';
 import { useAdminReviews } from '../../composables/useAdminReviews';
-import type { AdminReviewTaskSummary, AssignReviewersPayload, ReviewerLoad, UpdateReviewConsensusPayload } from '../../types';
+import type { AdminReviewTaskSummary, AssignReviewersPayload, UpdateReviewConsensusPayload } from '../../types';
 
 const adminReviews = useAdminReviews();
 const route = useRoute();
 const router = useRouter();
-const validTabs = ['tasks', 'assignments', 'criteria', 'archive'] as const;
+const validTabs = ['config', 'tasks', 'criteria', 'archive'] as const;
 type ReviewAdminTab = (typeof validTabs)[number];
 
 const activeTab = ref<ReviewAdminTab>(normalizeTab(route.query.tab));
@@ -25,10 +26,10 @@ const submittedTotal = computed(() => adminReviews.tasks.value.reduce((sum, task
 const assignmentTotal = computed(() => adminReviews.tasks.value.reduce((sum, task) => sum + task.assignmentCount, 0));
 const activeSectionTitle = computed(() => {
   const titles: Record<ReviewAdminTab, string> = {
-    tasks: '评审任务',
-    assignments: '评审员分配',
+    config: '批次与小组',
+    tasks: '全局进度',
     criteria: '评审指标',
-    archive: '共识/归档',
+    archive: '结果查看/兜底确认',
   };
   return titles[activeTab.value];
 });
@@ -46,7 +47,7 @@ watch(activeTab, async (tab) => {
 });
 
 function normalizeTab(tab: unknown): ReviewAdminTab {
-  return typeof tab === 'string' && validTabs.includes(tab as ReviewAdminTab) ? (tab as ReviewAdminTab) : 'tasks';
+  return typeof tab === 'string' && validTabs.includes(tab as ReviewAdminTab) ? (tab as ReviewAdminTab) : 'config';
 }
 
 async function openTask(task: AdminReviewTaskSummary) {
@@ -77,8 +78,13 @@ async function confirmConsensus(taskId: string) {
   await adminReviews.confirm(taskId);
 }
 
-function reviewerDisplayName(load: ReviewerLoad) {
-  return load.displayName || load.username || load.reviewerUserId;
+function handlePageSizeChange(nextSize: number) {
+  adminReviews.size.value = nextSize;
+  adminReviews.loadTasks(0);
+}
+
+function handlePageChange(nextPage: number) {
+  adminReviews.loadTasks(nextPage - 1);
 }
 
 onMounted(async () => {
@@ -121,10 +127,18 @@ onMounted(async () => {
 
     <section class="dashboard-card app-card">
       <el-tabs v-model="activeTab">
-        <el-tab-pane label="评审任务" name="tasks">
+        <el-tab-pane label="批次与小组" name="config">
           <div class="section-note">
-            <strong>评审任务</strong>
-            <span>查看论文评审任务，按标题或状态筛选，并进入分配与共识操作。</span>
+            <strong>批次与小组</strong>
+            <span>配置评审批次、评审小组、组长和组内成员；普通评审任务分配后续交由组长处理。</span>
+          </div>
+          <ReviewBatchGroupPanel />
+        </el-tab-pane>
+
+        <el-tab-pane label="全局进度" name="tasks">
+          <div class="section-note">
+            <strong>全局进度</strong>
+            <span>查看所有评审任务进度；普通分配主流程由组长处理，admin 仅保留异常兜底改派入口。</span>
           </div>
           <div class="toolbar">
             <el-input
@@ -163,34 +177,10 @@ onMounted(async () => {
               :page-size="adminReviews.size.value"
               :current-page="adminReviews.page.value + 1"
               :page-sizes="[10, 20, 50]"
-              @size-change="(nextSize: number) => { adminReviews.size.value = nextSize; adminReviews.loadTasks(0); }"
-              @current-change="(nextPage: number) => adminReviews.loadTasks(nextPage - 1)"
+              @size-change="handlePageSizeChange"
+              @current-change="handlePageChange"
             />
           </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="评审员分配" name="assignments">
-          <div class="section-note">
-            <strong>评审员分配</strong>
-            <span>先查看评审员负载；需要分配时回到任务表点击“分配”。</span>
-          </div>
-          <div class="load-toolbar">
-            <el-button @click="activeTab = 'tasks'">返回任务列表</el-button>
-            <el-button type="primary" @click="adminReviews.loadReviewerLoads()">刷新</el-button>
-          </div>
-          <el-table :data="adminReviews.reviewerLoads.value" class="load-table">
-            <el-table-column label="评审员" min-width="220" show-overflow-tooltip>
-              <template #default="{ row }">
-                <div class="reviewer-cell">
-                  <strong>{{ reviewerDisplayName(row) }}</strong>
-                  <span>{{ row.username || row.reviewerUserId }}</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column prop="assignedCount" label="待评数量" width="140" />
-            <el-table-column prop="reviewingCount" label="评审中" width="140" />
-            <el-table-column prop="submittedCount" label="已提交" width="140" />
-          </el-table>
         </el-tab-pane>
 
         <el-tab-pane label="评审指标" name="criteria">
@@ -201,13 +191,13 @@ onMounted(async () => {
           <ReviewCriteriaPanel />
         </el-tab-pane>
 
-        <el-tab-pane label="共识/归档" name="archive">
+        <el-tab-pane label="结果查看" name="archive">
           <div class="section-note">
-            <strong>共识/归档</strong>
-            <span>从任务列表打开共识抽屉，完成共识确认；已确认任务作为归档记录保留。</span>
+            <strong>结果查看 / 兜底确认</strong>
+            <span>最终评分主流程由组长处理；admin 在异常场景下从任务列表进入兜底确认。</span>
           </div>
           <div class="archive-helper">
-            <p>当前共识与归档操作仍以任务为入口，避免重复维护两套列表。</p>
+            <p>结果与共识操作仍以任务为入口，避免重复维护两套列表。</p>
             <el-button type="primary" @click="activeTab = 'tasks'">查看评审任务</el-button>
           </div>
         </el-tab-pane>
@@ -338,45 +328,18 @@ onMounted(async () => {
   width: 180px;
 }
 
-.toolbar :deep(.el-input__wrapper),
-.toolbar :deep(.el-select__wrapper) {
+.toolbar :deep([class~="el-input__wrapper"]),
+.toolbar :deep([class~="el-select__wrapper"]) {
   min-height: 38px;
   border-radius: 9px;
   box-shadow: 0 0 0 1px #d0d7e2 inset;
 }
 
-.pagination-wrap,
-.load-toolbar {
+.pagination-wrap {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
-}
-
-.load-toolbar {
-  margin: 0 0 16px;
-}
-
-.load-table {
-  overflow: hidden;
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-}
-
-.reviewer-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.reviewer-cell strong {
-  color: #101828;
-  font-weight: 750;
-}
-
-.reviewer-cell span {
-  color: #667085;
-  font-size: 12px;
 }
 
 .archive-helper {

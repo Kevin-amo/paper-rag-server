@@ -474,8 +474,8 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
   width: 150px;
 }
 
-.toolbar :deep(.el-input__wrapper),
-.toolbar :deep(.el-select__wrapper) {
+.toolbar :deep([class~="el-input__wrapper"]),
+.toolbar :deep([class~="el-select__wrapper"]) {
   min-height: 38px;
   border-radius: 9px;
   box-shadow: 0 0 0 1px #d0d7e2 inset;
@@ -563,22 +563,22 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
   gap: 8px;
 }
 
-.role-choice-list :deep(.el-checkbox-button__inner),
-.status-choice-list :deep(.el-radio-button__inner) {
+.role-choice-list :deep([class~="el-checkbox-button__inner"]),
+.status-choice-list :deep([class~="el-radio-button__inner"]) {
   border: 1px solid #d0d7e2;
   border-radius: 999px;
   box-shadow: none;
   font-weight: 700;
 }
 
-.role-choice-list :deep(.el-checkbox-button:first-child .el-checkbox-button__inner),
-.status-choice-list :deep(.el-radio-button:first-child .el-radio-button__inner) {
+.role-choice-list :deep([class~="el-checkbox-button"]:first-child [class~="el-checkbox-button__inner"]),
+.status-choice-list :deep([class~="el-radio-button"]:first-child [class~="el-radio-button__inner"]) {
   border-left: 1px solid #d0d7e2;
   border-radius: 999px;
 }
 
-.role-choice-list :deep(.el-checkbox-button.is-checked .el-checkbox-button__inner),
-.status-choice-list :deep(.el-radio-button.is-active .el-radio-button__inner) {
+.role-choice-list :deep([class~="el-checkbox-button"][class~="is-checked"] [class~="el-checkbox-button__inner"]),
+.status-choice-list :deep([class~="el-radio-button"][class~="is-active"] [class~="el-radio-button__inner"]) {
   border-color: var(--app-primary);
   background: var(--app-primary);
   box-shadow: none;
@@ -631,27 +631,27 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
   width: 100%;
 }
 
-:global(.admin-inline-popover) {
+:global([class~="admin-inline-popover"]) {
   border: 1px solid rgba(209, 209, 214, 0.78);
   border-radius: 14px;
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
 }
 
-:global(.user-actions-menu) {
+:global([class~="user-actions-menu"]) {
   min-width: 132px;
 }
 
-:global(.user-actions-menu .danger-menu-item) {
+:global([class~="user-actions-menu"] [class~="danger-menu-item"]) {
   color: var(--app-danger);
   font-weight: 800;
 }
 
-:global(.user-actions-menu .danger-menu-item:not(.is-disabled):hover) {
+:global([class~="user-actions-menu"] [class~="danger-menu-item"]:not([class~="is-disabled"]):hover) {
   background: rgba(255, 59, 48, 0.1);
   color: #d70015;
 }
 
-:global(.danger-confirm-button) {
+:global([class~="danger-confirm-button"]) {
   --el-button-bg-color: var(--app-danger);
   --el-button-border-color: var(--app-danger);
   --el-button-hover-bg-color: #ff6259;

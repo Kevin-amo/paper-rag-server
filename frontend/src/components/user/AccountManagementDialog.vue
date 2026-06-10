@@ -364,7 +364,7 @@ defineExpose({ clearPasswordForm });
   font-size: 16px;
 }
 
-.account-form :deep(.el-form-item) {
+.account-form :deep([class~="el-form-item"]) {
   margin-bottom: 14px;
 }
 
@@ -387,7 +387,7 @@ defineExpose({ clearPasswordForm });
   gap: 10px;
 }
 
-:global(.el-dialog.account-dialog) {
+:global([class~="el-dialog"][class~="account-dialog"]) {
   height: min(760px, 88vh);
   display: flex;
   flex-direction: column;
@@ -395,15 +395,15 @@ defineExpose({ clearPasswordForm });
   border-radius: 24px;
 }
 
-:global(.el-dialog.account-dialog .el-dialog__body) {
+:global([class~="el-dialog"][class~="account-dialog"] [class~="el-dialog__body"]) {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding-top: 10px;
 }
 
-:global(.account-dialog .el-button),
-:global(.account-dialog .el-input__wrapper) {
+:global([class~="account-dialog"] [class~="el-button"]),
+:global([class~="account-dialog"] [class~="el-input__wrapper"]) {
   border-radius: 12px;
 }
 

@@ -1,6 +1,6 @@
 # frontend
 
-一个用于和 `paper-rag-server` 本地联调的 Vue 3 + Element Plus Demo。
+一个用于和 `paper-mind` 本地联调的 Vue 3 + Element Plus Demo。
 
 ## 启动
 

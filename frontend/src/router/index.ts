@@ -36,6 +36,12 @@ const router = createRouter({
       meta: { roles: ['REVIEWER', 'ADMIN'] },
     },
     {
+      path: '/review-leader',
+      name: 'review-leader-workspace',
+      component: () => import('../views/review-leader/ReviewLeaderWorkspaceView.vue'),
+      meta: { roles: ['REVIEWER', 'ADMIN'] },
+    },
+    {
       path: '/admin',
       name: 'admin-users',
       component: () => import('../views/admin/AdminUsersView.vue'),

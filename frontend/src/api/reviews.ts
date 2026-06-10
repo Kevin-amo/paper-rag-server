@@ -1,6 +1,7 @@
 import { http, uploadHttp } from './http';
 import type {
   DocumentUploadAcceptedResponse,
+  DocumentJobResponse,
   ListReviewTasksParams,
   PageResponse,
   PaperStructuredParse,
@@ -40,6 +41,11 @@ export async function uploadReviewPaper(payload: UploadReviewPaperPayload) {
     },
   });
 
+  return data;
+}
+
+export async function getReviewUploadJob(jobId: string) {
+  const { data } = await http.get<DocumentJobResponse>(`/documents/jobs/${jobId}`);
   return data;
 }
 

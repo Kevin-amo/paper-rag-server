@@ -247,13 +247,13 @@ function statusLabel(status: UploadQueueItem['status']) {
   line-height: 1.45;
 }
 
-.queue-enter-active,
-.queue-leave-active {
+[class~="queue-enter-active"],
+[class~="queue-leave-active"] {
   transition: all 0.25s ease;
 }
 
-.queue-enter-from,
-.queue-leave-to {
+[class~="queue-enter-from"],
+[class~="queue-leave-to"] {
   opacity: 0;
   transform: translateY(10px) scale(0.98);
 }

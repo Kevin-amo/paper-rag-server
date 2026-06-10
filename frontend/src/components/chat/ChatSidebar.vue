@@ -20,7 +20,7 @@ import {
 import { ElMessage } from 'element-plus';
 import type { Conversation } from '../../types';
 
-const PINNED_CONVERSATIONS_STORAGE_KEY = 'paper-rag:pinned-conversations';
+const PINNED_CONVERSATIONS_STORAGE_KEY = 'paper-mind:pinned-conversations';
 
 type ConversationMenuCommand = 'pin' | 'unpin' | 'rename' | 'delete';
 
@@ -187,7 +187,7 @@ function conversationTitle(conversation: Conversation) {
     <div class="brand-block">
       <div class="brand-mark">P</div>
       <div>
-        <strong>Paper Agent</strong>
+        <strong>PaperMind</strong>
         <span>论文智能助手</span>
       </div>
     </div>
@@ -381,8 +381,7 @@ function conversationTitle(conversation: Conversation) {
 }
 
 .brand-block span,
-.user-meta span,
-.avatar-action {
+.user-meta span {
   display: block;
   margin-top: 3px;
   color: var(--app-text-muted);
@@ -564,7 +563,7 @@ function conversationTitle(conversation: Conversation) {
   background: rgba(17, 24, 39, 0.04);
 }
 
-:global(.conversation-action-popper) {
+:global([class~="conversation-action-popper"]) {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.72) !important;
   border-radius: 18px !important;
@@ -574,16 +573,16 @@ function conversationTitle(conversation: Conversation) {
   -webkit-backdrop-filter: blur(22px) saturate(170%);
 }
 
-:global(.conversation-action-popper .el-popper__arrow) {
+:global([class~="conversation-action-popper"] [class~="el-popper__arrow"]) {
   display: none;
 }
 
-:global(.conversation-action-menu) {
+:global([class~="conversation-action-menu"]) {
   min-width: 156px;
   padding: 6px;
 }
 
-:global(.conversation-action-menu .el-dropdown-menu__item) {
+:global([class~="conversation-action-menu"] [class~="el-dropdown-menu__item"]) {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -595,18 +594,18 @@ function conversationTitle(conversation: Conversation) {
   font-weight: 700;
 }
 
-:global(.conversation-action-menu .el-dropdown-menu__item:not(.is-disabled):focus),
-:global(.conversation-action-menu .el-dropdown-menu__item:not(.is-disabled):hover) {
+:global([class~="conversation-action-menu"] [class~="el-dropdown-menu__item"]:not([class~="is-disabled"]):focus),
+:global([class~="conversation-action-menu"] [class~="el-dropdown-menu__item"]:not([class~="is-disabled"]):hover) {
   background: #f7f8fa;
   color: #111827;
 }
 
-:global(.conversation-action-menu .el-dropdown-menu__item.danger) {
+:global([class~="conversation-action-menu"] [class~="el-dropdown-menu__item"][class~="danger"]) {
   color: #dc2626;
 }
 
-:global(.conversation-action-menu .el-dropdown-menu__item.danger:not(.is-disabled):focus),
-:global(.conversation-action-menu .el-dropdown-menu__item.danger:not(.is-disabled):hover) {
+:global([class~="conversation-action-menu"] [class~="el-dropdown-menu__item"][class~="danger"]:not([class~="is-disabled"]):focus),
+:global([class~="conversation-action-menu"] [class~="el-dropdown-menu__item"][class~="danger"]:not([class~="is-disabled"]):hover) {
   background: #fef2f2;
   color: #dc2626;
 }
@@ -633,23 +632,23 @@ function conversationTitle(conversation: Conversation) {
   line-height: 1.6;
 }
 
-:global(.conversation-dialog .el-dialog) {
+:global([class~="conversation-dialog"] [class~="el-dialog"]) {
   border-radius: 22px;
 }
 
-:global(.conversation-dialog .el-button) {
+:global([class~="conversation-dialog"] [class~="el-button"]) {
   border-radius: 12px;
 }
 
-:global(.danger-dialog .delete-confirm-button),
-:global(.logout-dialog .logout-confirm-button) {
+:global([class~="danger-dialog"] [class~="delete-confirm-button"]),
+:global([class~="logout-dialog"] [class~="logout-confirm-button"]) {
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
-:global(.danger-dialog .delete-confirm-button:hover),
-:global(.danger-dialog .delete-confirm-button:focus),
-:global(.logout-dialog .logout-confirm-button:hover),
-:global(.logout-dialog .logout-confirm-button:focus) {
+:global([class~="danger-dialog"] [class~="delete-confirm-button"]:hover),
+:global([class~="danger-dialog"] [class~="delete-confirm-button"]:focus),
+:global([class~="logout-dialog"] [class~="logout-confirm-button"]:hover),
+:global([class~="logout-dialog"] [class~="logout-confirm-button"]:focus) {
   background: var(--el-color-danger);
   border-color: var(--el-color-danger);
   color: #ffffff;
@@ -694,18 +693,6 @@ function conversationTitle(conversation: Conversation) {
 
 .user-avatar:hover {
   box-shadow: var(--app-focus-ring);
-}
-
-.avatar-action {
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  text-align: left;
-}
-
-.avatar-action:hover {
-  color: var(--app-primary);
 }
 
 .user-meta {

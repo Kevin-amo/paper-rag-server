@@ -160,13 +160,13 @@ function handleCurrentChange(value: number) {
 }
 
 .library-toolbar .el-button,
-.library-toolbar :deep(.el-input__wrapper) {
+.library-toolbar :deep([class~="el-input__wrapper"]) {
   height: 38px;
   border-radius: 999px;
   box-shadow: none;
 }
 
-.library-toolbar :deep(.el-input__wrapper) {
+.library-toolbar :deep([class~="el-input__wrapper"]) {
   background: rgba(255, 255, 255, 0.82);
 }
 

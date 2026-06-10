@@ -84,8 +84,8 @@ function handleSubmit() {
   <el-drawer v-model="visible" size="min(560px, 94vw)" destroy-on-close>
     <template #header>
       <div>
-        <span class="eyebrow">Review Assignment</span>
-        <h3>分配评审人</h3>
+        <span class="eyebrow">Admin Override</span>
+        <h3>异常兜底处理</h3>
       </div>
     </template>
 
@@ -94,7 +94,7 @@ function handleSubmit() {
       <el-alert :title="task.task.title" type="info" :closable="false" />
       <el-alert
         v-if="hasExistingAssignments"
-        title="该任务已完成评审人分配，当前版本不支持在抽屉中重复保存或改派。"
+        title="该任务已存在有效分配；当前版本仅保留未分配任务的 admin 兜底分配，已分配任务的取消/改派将在异常处理阶段接入。"
         type="warning"
         :closable="false"
       />
@@ -125,7 +125,7 @@ function handleSubmit() {
 
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :disabled="!task || hasExistingAssignments || assignmentInvalid" @click="handleSubmit">保存分配</el-button>
+      <el-button type="primary" :disabled="!task || hasExistingAssignments || assignmentInvalid" @click="handleSubmit">保存兜底分配</el-button>
     </template>
   </el-drawer>
 </template>

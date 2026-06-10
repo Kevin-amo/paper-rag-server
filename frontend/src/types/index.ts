@@ -185,6 +185,22 @@ export interface DocumentUploadAcceptedResponse {
   message: string;
 }
 
+export interface DocumentJobResponse {
+  jobId: string;
+  ownerUserId: string;
+  sourceId: string;
+  fileName: string;
+  title: string;
+  status: string;
+  progress: number;
+  errorMessage: string | null;
+  retryCount: number;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
 export interface BatchDocumentIngestionItemResponse {
   index: number;
   fileName: string;
@@ -391,7 +407,70 @@ export type ReviewTaskStatus = 'PENDING' | 'PENDING_ASSIGNMENT' | 'ASSIGNED' | '
 export type ReviewAssignmentRole = 'LEAD' | 'REVIEWER' | 'ARBITER';
 export type ReviewAssignmentStatus = 'ASSIGNED' | 'REVIEWING' | 'SUBMITTED' | 'RETURNED' | 'CANCELLED';
 export type ReviewConsensusStatus = 'DRAFT' | 'IN_DISCUSSION' | 'CONFIRMED' | 'ARCHIVED' | string;
+export type ReviewBatchStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED' | 'ARCHIVED' | string;
+export type ReviewGroupStatus = 'ACTIVE' | 'DISABLED' | string;
+export type ReviewGroupMemberRole = 'LEADER' | 'REVIEWER' | string;
 export type ReviewReportStatus = 'AI_GENERATED' | 'ADJUSTED' | 'CONFIRMED' | 'COMPLETED' | string;
+
+export interface ReviewBatch {
+  id: string;
+  name: string;
+  description: string | null;
+  status: ReviewBatchStatus;
+  startsAt: string | null;
+  endsAt: string | null;
+  createdByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewBatchPayload {
+  name: string;
+  description?: string | null;
+  status?: ReviewBatchStatus;
+  startsAt?: string | null;
+  endsAt?: string | null;
+}
+
+export interface ReviewGroup {
+  id: string;
+  batchId: string;
+  name: string;
+  leaderUserId: string;
+  leaderUsername: string | null;
+  leaderDisplayName: string | null;
+  status: ReviewGroupStatus;
+  memberCount: number;
+  taskCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewGroupPayload {
+  batchId: string;
+  name: string;
+  leaderUserId: string;
+  status?: ReviewGroupStatus;
+}
+
+export interface ReviewGroupMember {
+  id: string;
+  groupId: string;
+  userId: string;
+  username: string | null;
+  displayName: string | null;
+  memberRole: ReviewGroupMemberRole;
+  status: string;
+  joinedAt: string | null;
+  removedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewGroupMemberUpdatePayload {
+  leaderUserId: string;
+  memberUserIds: string[];
+}
 
 export interface UploadReviewPaperPayload {
   file: File;
@@ -511,6 +590,11 @@ export interface AssignReviewersPayload {
   dueAt?: string | null;
 }
 
+export interface LeaderAssignReviewersPayload {
+  reviewerUserIds: string[];
+  dueAt?: string | null;
+}
+
 export interface UpdateReviewConsensusPayload {
   finalScore?: number | null;
   finalRecommendation?: string | null;
@@ -597,7 +681,7 @@ export interface ReviewTask {
 
 export interface ListReviewTasksParams {
   keyword?: string;
-  status?: ReviewTaskStatus | '';
+  status?: ReviewAssignmentStatus | '';
   page?: number;
   size?: number;
 }

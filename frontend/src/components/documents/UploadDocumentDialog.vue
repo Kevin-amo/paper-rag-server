@@ -215,7 +215,7 @@ function formatFileSize(size: number) {
   font-size: 34px;
 }
 
-.compact-upload :deep(.el-upload-dragger) {
+.compact-upload :deep([class~="el-upload-dragger"]) {
   padding: 22px;
   border-radius: 18px;
   background: #fbfdff;

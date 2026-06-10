@@ -67,8 +67,8 @@ function reviewerName(task: AdminReviewTaskSummary) {
     <el-table-column label="操作" width="250" fixed="right">
       <template #default="{ row }">
         <el-button text type="primary" @click="emit('open', row)">详情</el-button>
-        <el-button text type="primary" @click="emit('assign', row)">分配</el-button>
-        <el-button text type="primary" @click="emit('consensus', row)">共识</el-button>
+        <el-button text type="primary" @click="emit('assign', row)">兜底处理</el-button>
+        <el-button text type="primary" @click="emit('consensus', row)">结果/共识</el-button>
       </template>
     </el-table-column>
   </el-table>
@@ -81,14 +81,14 @@ function reviewerName(task: AdminReviewTaskSummary) {
   border-radius: 10px;
 }
 
-.review-task-table :deep(.el-table__header-wrapper th) {
+.review-task-table :deep([class~="el-table__header-wrapper"] th) {
   background: #f8fafc;
   color: #475467;
   font-size: 12px;
   font-weight: 750;
 }
 
-.review-task-table :deep(.el-table__row:hover > td) {
+.review-task-table :deep([class~="el-table__row"]:hover > td) {
   background: #f5f8ff;
 }
 

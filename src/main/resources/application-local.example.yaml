@@ -23,20 +23,20 @@ spring:
 
 logging:
   level:
-    com.lqr.paperragserver: INFO
-    com.lqr.paperragserver.document: ${LOG_LEVEL_DOCUMENT:INFO}
-    com.lqr.paperragserver.rag: ${LOG_LEVEL_RAG:INFO}
-    com.lqr.paperragserver.agent: ${LOG_LEVEL_AGENT:INFO}
-    com.lqr.paperragserver.literature: ${LOG_LEVEL_LITERATURE:INFO}
-    com.lqr.paperragserver.vector: ${LOG_LEVEL_VECTOR:INFO}
-    com.lqr.paperragserver.ai: ${LOG_LEVEL_AI:INFO}
+    com.lqr.papermind: INFO
+    com.lqr.papermind.document: ${LOG_LEVEL_DOCUMENT:INFO}
+    com.lqr.papermind.rag: ${LOG_LEVEL_RAG:INFO}
+    com.lqr.papermind.agent: ${LOG_LEVEL_AGENT:INFO}
+    com.lqr.papermind.literature: ${LOG_LEVEL_LITERATURE:INFO}
+    com.lqr.papermind.vector: ${LOG_LEVEL_VECTOR:INFO}
+    com.lqr.papermind.ai: ${LOG_LEVEL_AI:INFO}
 
 app:
   mail:
     resend:
       enabled: true
       api-key: ${RESEND_API_KEY:}
-      from: PaperRAG <noreply@example.com>
+      from: PaperMind <noreply@example.com>
       endpoint: https://api.resend.com/emails
       timeout: 10s
   literature:

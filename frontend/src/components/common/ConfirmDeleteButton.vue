@@ -53,7 +53,7 @@ const emit = defineEmits<{
   transform: scale(1.06);
 }
 
-:global(.confirm-delete-popper .el-button--danger) {
+:global([class~="confirm-delete-popper"] [class~="el-button--danger"]) {
   --el-button-text-color: #ffffff;
   --el-button-bg-color: var(--app-danger);
   --el-button-border-color: var(--app-danger);
@@ -67,7 +67,7 @@ const emit = defineEmits<{
   transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
 
-:global(.confirm-delete-popper .el-button--danger:hover) {
+:global([class~="confirm-delete-popper"] [class~="el-button--danger"]:hover) {
   transform: scale(1.06);
 }
 </style>

@@ -44,5 +44,6 @@ frontend/.env.local
 .cursor/
 .claude/
 .agent/
+.agents/
 .superpowers/
 docs/

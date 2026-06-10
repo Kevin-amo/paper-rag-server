@@ -184,7 +184,7 @@ onUnmounted(() => {
       <el-card class="form-card" shadow="never">
         <div class="form-heading">
           <p>{{ activeMode === 'login' ? '账号登录' : '邮箱注册' }}</p>
-          <h2>{{ activeMode === 'login' ? '欢迎回来' : '创建普通用户账号' }}</h2>
+          <h2>{{ activeMode === 'login' ? '欢迎回来' : '创建账号' }}</h2>
           <span>{{ activeMode === 'login' ? '登录后将根据角色进入对应工作台。' : '验证码将发送到你的邮箱，用于完成注册。' }}</span>
         </div>
 
@@ -423,7 +423,7 @@ onUnmounted(() => {
   box-shadow: none;
 }
 
-.form-card :deep(.el-card__body) {
+.form-card :deep([class~="el-card__body"]) {
   width: 100%;
   padding-top: 24px;
 }
@@ -460,24 +460,24 @@ onUnmounted(() => {
   margin-top: 12px;
 }
 
-.auth-tabs.mode-register {
+.auth-tabs[class~="mode-register"] {
   --auth-tab-offset: 100%;
 }
 
-.auth-tabs :deep(.el-tabs__header) {
+.auth-tabs :deep([class~="el-tabs__header"]) {
   margin-bottom: 24px;
 }
 
-.auth-tabs :deep(.el-tabs__content) {
+.auth-tabs :deep([class~="el-tabs__content"]) {
   display: none;
 }
 
-.auth-tabs :deep(.el-tabs__nav-wrap::after),
-.auth-tabs :deep(.el-tabs__active-bar) {
+.auth-tabs :deep([class~="el-tabs__nav-wrap"]::after),
+.auth-tabs :deep([class~="el-tabs__active-bar"]) {
   display: none;
 }
 
-.auth-tabs :deep(.el-tabs__nav-scroll) {
+.auth-tabs :deep([class~="el-tabs__nav-scroll"]) {
   overflow: hidden;
   padding: 4px;
   border: 1px solid rgba(209, 209, 214, 0.72);
@@ -485,12 +485,12 @@ onUnmounted(() => {
   background: rgba(242, 242, 247, 0.82);
 }
 
-.auth-tabs :deep(.el-tabs__nav) {
+.auth-tabs :deep([class~="el-tabs__nav"]) {
   position: relative;
   width: 100%;
 }
 
-.auth-tabs :deep(.el-tabs__nav::before) {
+.auth-tabs :deep([class~="el-tabs__nav"]::before) {
   position: absolute;
   inset: 0 auto 0 0;
   z-index: 0;
@@ -503,7 +503,7 @@ onUnmounted(() => {
   transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
 }
 
-.auth-tabs :deep(.el-tabs__item) {
+.auth-tabs :deep([class~="el-tabs__item"]) {
   z-index: 1;
   height: 38px;
   border-radius: 999px;
@@ -512,7 +512,7 @@ onUnmounted(() => {
   transition: color 0.18s ease, transform 0.18s ease;
 }
 
-.auth-tabs :deep(.el-tabs__item.is-active) {
+.auth-tabs :deep([class~="el-tabs__item"][class~="is-active"]) {
   background: transparent;
   box-shadow: none;
   color: var(--auth-ink);
@@ -526,45 +526,45 @@ onUnmounted(() => {
   will-change: height;
 }
 
-.auth-form-frame.mode-register {
+.auth-form-frame[class~="mode-register"] {
   height: 510px;
 }
 
-.auth-form-frame :deep(.el-form) {
+.auth-form-frame :deep([class~="el-form"]) {
   padding-bottom: 28px;
 }
 
-.auth-pane-forward-enter-active,
-.auth-pane-forward-leave-active,
-.auth-pane-back-enter-active,
-.auth-pane-back-leave-active {
+[class~="auth-pane-forward-enter-active"],
+[class~="auth-pane-forward-leave-active"],
+[class~="auth-pane-back-enter-active"],
+[class~="auth-pane-back-leave-active"] {
   transition: opacity 0.2s ease, transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.auth-pane-forward-enter-from,
-.auth-pane-back-leave-to {
+[class~="auth-pane-forward-enter-from"],
+[class~="auth-pane-back-leave-to"] {
   opacity: 0;
   transform: translateX(18px) scale(0.985);
 }
 
-.auth-pane-forward-leave-to,
-.auth-pane-back-enter-from {
+[class~="auth-pane-forward-leave-to"],
+[class~="auth-pane-back-enter-from"] {
   opacity: 0;
   transform: translateX(-18px) scale(0.985);
 }
 
-.form-card :deep(.el-form-item) {
+.form-card :deep([class~="el-form-item"]) {
   margin-bottom: 17px;
 }
 
-.form-card :deep(.el-form-item__label) {
+.form-card :deep([class~="el-form-item__label"]) {
   padding-bottom: 7px;
   color: var(--auth-ink);
   font-size: 13px;
   font-weight: 800;
 }
 
-.form-card :deep(.el-input__wrapper) {
+.form-card :deep([class~="el-input__wrapper"]) {
   min-height: 48px;
   border-radius: 16px;
   background: rgba(247, 247, 250, 0.86);
@@ -574,28 +574,28 @@ onUnmounted(() => {
   transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
-.form-card :deep(.el-input__wrapper:hover) {
+.form-card :deep([class~="el-input__wrapper"]:hover) {
   background: rgba(255, 255, 255, 0.96);
 }
 
-.form-card :deep(.el-input__wrapper.is-focus) {
+.form-card :deep([class~="el-input__wrapper"][class~="is-focus"]) {
   background: #ffffff;
   box-shadow:
     0 0 0 4px rgba(0, 122, 255, 0.13),
     inset 0 0 0 1px rgba(0, 122, 255, 0.48);
 }
 
-.form-card :deep(.el-input__inner) {
+.form-card :deep([class~="el-input__inner"]) {
   color: var(--auth-ink);
   font-weight: 650;
 }
 
-.form-card :deep(.el-input__inner::placeholder) {
+.form-card :deep([class~="el-input__inner"]::placeholder) {
   color: #a1a1a6;
   font-weight: 500;
 }
 
-.form-card :deep(.el-input-group__append) {
+.form-card :deep([class~="el-input-group__append"]) {
   border-radius: 0 16px 16px 0;
   background: rgba(255, 255, 255, 0.8);
   box-shadow:
@@ -603,7 +603,7 @@ onUnmounted(() => {
     inset 1px 0 0 rgba(209, 209, 214, 0.65);
 }
 
-.form-card :deep(.el-input-group__append .el-button) {
+.form-card :deep([class~="el-input-group__append"] [class~="el-button"]) {
   border: none;
   color: var(--auth-accent);
   font-weight: 800;
@@ -630,8 +630,8 @@ onUnmounted(() => {
   color: #ffffff;
 }
 
-.primary-button.is-disabled,
-.primary-button.is-loading {
+.primary-button[class~="is-disabled"],
+.primary-button[class~="is-loading"] {
   box-shadow: none;
 }
 
@@ -649,7 +649,7 @@ onUnmounted(() => {
     border-left: none;
   }
 
-  .form-card :deep(.el-card__body) {
+  .form-card :deep([class~="el-card__body"]) {
     padding-top: 0;
   }
 }

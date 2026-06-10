@@ -2,21 +2,20 @@
 import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import type { UploadUserFile } from 'element-plus';
 import MainLayout from '../../layouts/MainLayout.vue';
 import PageHeader from '../../components/common/PageHeader.vue';
 import { getErrorMessage } from '../../api/http';
 import { useAuth } from '../../composables/useAuth';
 import { useReviews } from '../../composables/useReviews';
+import { useReviewLeaderAccess } from '../../composables/useReviewLeaderAccess';
 import type { PaperStructuredContent, ReviewRiskRecord, ReviewScoreItem } from '../../types';
 
 const router = useRouter();
 const auth = useAuth();
 const reviews = useReviews();
-const uploadDialogVisible = ref(false);
-const uploadFileList = ref<UploadUserFile[]>([]);
-const uploadTitle = ref('');
+const { canAccessLeaderWorkspace, refreshLeaderWorkspaceAccess } = useReviewLeaderAccess();
 const activeReviewTab = ref('parse');
+const reviewFileInputRef = ref<HTMLInputElement | null>(null);
 
 const currentUserName = computed(() => auth.state.user?.displayName || auth.state.user?.username || '评审员');
 const selectedTask = computed(() => reviews.selectedTask.value);
@@ -43,10 +42,12 @@ const statusLabelMap: Record<string, string> = {
   REVIEWING: '评审中',
   COMPLETED: '已完成',
   PENDING_ASSIGNMENT: '待分配',
-  ASSIGNED: '已分配',
+  ASSIGNED: '待评审',
   IN_REVIEW: '评审中',
   SUBMITTED: '已提交',
-  CONSENSUS_CONFIRMED: '共识已确认',
+  RETURNED: '已退回',
+  CANCELLED: '已取消',
+  CONSENSUS_CONFIRMED: '最终已确认',
   NEEDS_REVIEW: '需复核',
 };
 
@@ -109,10 +110,6 @@ function isRiskActionDisabled(
   return isRiskUpdating(risk.id) || risk.status === status;
 }
 
-function buildReviewSourceId(file: File) {
-  return `review-${file.name}-${file.size}-${file.lastModified}`.replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 128);
-}
-
 function handlePageChange(page: number) {
   reviews.loadTasks(page - 1);
 }
@@ -121,20 +118,18 @@ function handleScoreInput(item: ReviewScoreItem, value: number | number[]) {
   reviews.updateScore(item.code, Array.isArray(value) ? value[0] : value);
 }
 
-async function submitReviewUpload() {
-  const rawFile = uploadFileList.value[0]?.raw;
-  if (!(rawFile instanceof File)) {
-    ElMessage.warning('请先选择待评审论文');
+function handleSelectReviewPaper() {
+  reviewFileInputRef.value?.click();
+}
+
+async function handleReviewPaperChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) {
     return;
   }
-  await reviews.uploadPaper({
-    file: rawFile,
-    sourceId: buildReviewSourceId(rawFile),
-    title: uploadTitle.value.trim() || rawFile.name.replace(/\.[^.]+$/, ''),
-  });
-  uploadDialogVisible.value = false;
-  uploadFileList.value = [];
-  uploadTitle.value = '';
+  await reviews.uploadPaper(file);
+  target.value = '';
 }
 
 async function handleLogout() {
@@ -147,7 +142,11 @@ onMounted(async () => {
     if (!auth.state.user) {
       await auth.hydrateCurrentUser();
     }
-    await Promise.all([reviews.loadCriteria(), reviews.loadTasks(0)]);
+    await Promise.all([
+      reviews.loadCriteria(),
+      reviews.loadTasks(0),
+      refreshLeaderWorkspaceAccess(),
+    ]);
   } catch (error) {
     ElMessage.error(getErrorMessage(error));
     await router.replace('/login');
@@ -164,7 +163,8 @@ onMounted(async () => {
     >
       <template #actions>
         <el-tag type="primary" size="large">{{ currentUserName }} · 评审端</el-tag>
-        <el-button type="primary" :loading="reviews.uploading.value" @click="uploadDialogVisible = true">上传评审论文</el-button>
+        <el-button type="primary" :loading="reviews.uploading.value" @click="handleSelectReviewPaper">上传待评审论文</el-button>
+        <el-button v-if="canAccessLeaderWorkspace" @click="router.push('/review-leader')">组长工作台</el-button>
         <el-button v-if="auth.hasRole('USER')" @click="router.push('/user')">用户端</el-button>
         <el-button v-if="auth.isAdmin.value" @click="router.push('/admin')">管理后台</el-button>
         <el-button @click="handleLogout">退出登录</el-button>
@@ -194,8 +194,8 @@ onMounted(async () => {
       <aside class="task-panel app-card">
         <div class="panel-header">
           <div>
-            <p>Review Queue</p>
-            <h2>论文任务池</h2>
+            <p>My Assignments</p>
+            <h2>我的评审任务</h2>
           </div>
           <el-button :loading="reviews.loading.value" @click="reviews.loadTasks(0)">刷新</el-button>
         </div>
@@ -208,10 +208,10 @@ onMounted(async () => {
             @keyup.enter="reviews.loadTasks(0)"
           />
           <el-select v-model="reviews.statusFilter.value" clearable placeholder="状态">
-            <el-option label="待评审" value="PENDING" />
+            <el-option label="待评审" value="ASSIGNED" />
             <el-option label="评审中" value="REVIEWING" />
-            <el-option label="已完成" value="COMPLETED" />
-            <el-option label="需复核" value="NEEDS_REVIEW" />
+            <el-option label="已提交" value="SUBMITTED" />
+            <el-option label="已退回" value="RETURNED" />
           </el-select>
           <el-button type="primary" @click="reviews.loadTasks(0)">筛选</el-button>
         </div>
@@ -228,7 +228,7 @@ onMounted(async () => {
             <span class="task-title">{{ task.title }}</span>
             <span class="task-meta">{{ task.sourceId }}</span>
             <span class="task-bottom">
-              <el-tag size="small" effect="plain">{{ statusLabel(task.status) }}</el-tag>
+              <el-tag size="small" effect="plain">{{ statusLabel(task.currentAssignment?.status ?? task.status) }}</el-tag>
               <span>{{ formatDate(task.updatedAt) }}</span>
             </span>
           </button>
@@ -256,9 +256,8 @@ onMounted(async () => {
               <span>{{ selectedTask.sourceId }} · {{ formatDate(selectedTask.createdAt) }}</span>
             </div>
             <div class="hero-actions">
-              <el-tag size="large" effect="plain">{{ statusLabel(selectedTask.status) }}</el-tag>
               <el-tag v-if="selectedTask.currentAssignment" size="large" effect="plain">
-                {{ selectedTask.currentAssignment.role }} / {{ selectedTask.currentAssignment.status }}
+                {{ statusLabel(selectedTask.currentAssignment.status) }}
               </el-tag>
               <el-button type="primary" :disabled="assignmentSubmitted" :loading="reviews.generating.value" @click="reviews.runAiReview">
                 {{ selectedReport ? '重新生成辅助评审' : '生成辅助评审' }}
@@ -537,49 +536,19 @@ onMounted(async () => {
         <el-empty v-else description="请选择一篇论文进行评审" />
       </main>
     </section>
-
-    <el-dialog v-model="uploadDialogVisible" title="上传评审论文" width="min(560px, 92vw)" destroy-on-close>
-      <div class="review-upload-form">
-        <el-upload
-          v-model:file-list="uploadFileList"
-          drag
-          :auto-upload="false"
-          :limit="1"
-          :show-file-list="true"
-        >
-          <div class="review-upload-drop">
-            <strong>拖拽论文文件到这里</strong>
-            <span>或点击选择文件；索引完成后自动生成评审任务。</span>
-          </div>
-        </el-upload>
-        <el-input v-model="uploadTitle" clearable placeholder="论文标题，可留空使用文件名" />
-      </div>
-      <template #footer>
-        <el-button @click="uploadDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="reviews.uploading.value" @click="submitReviewUpload">提交</el-button>
-      </template>
-    </el-dialog>
+    <input
+      ref="reviewFileInputRef"
+      type="file"
+      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      style="display: none"
+      @change="handleReviewPaperChange"
+    />
   </MainLayout>
 </template>
 
 <style scoped>
 .review-page {
   gap: 18px;
-}
-
-.review-upload-form {
-  display: grid;
-  gap: 14px;
-}
-
-.review-upload-drop {
-  display: grid;
-  gap: 8px;
-  color: var(--app-text-muted);
-}
-
-.review-upload-drop strong {
-  color: var(--app-text);
 }
 
 .summary-grid {
@@ -759,8 +728,7 @@ onMounted(async () => {
 
 .section-grid article,
 .score-card,
-.comments-card,
-.risk-card {
+.comments-card {
   border: 1px solid rgba(209, 213, 219, 0.7);
   border-radius: 18px;
   padding: 16px;
@@ -813,12 +781,6 @@ onMounted(async () => {
   grid-template-columns: 140px minmax(0, 1fr) auto;
   gap: 12px;
   margin-top: 16px;
-}
-
-.comments-risk-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
-  gap: 14px;
 }
 
 .comment-columns {
@@ -931,7 +893,6 @@ onMounted(async () => {
 
 @media (max-width: 1180px) {
   .review-layout,
-  .comments-risk-grid,
   .manual-form {
     grid-template-columns: 1fr;
   }
@@ -973,7 +934,7 @@ onMounted(async () => {
     #f6f8fb;
 }
 
-.review-page :deep(.page-header) {
+.review-page :deep([class~="page-header"]) {
   border: 1px solid #dde3ee;
   border-radius: 10px;
   padding: 20px 22px;
@@ -983,60 +944,60 @@ onMounted(async () => {
   -webkit-backdrop-filter: none;
 }
 
-.review-page :deep(.page-eyebrow) {
+.review-page :deep([class~="page-eyebrow"]) {
   margin-bottom: 6px;
   color: #155eef;
   font-size: 12px;
   letter-spacing: 0.04em;
 }
 
-.review-page :deep(.page-header h1) {
+.review-page :deep([class~="page-header"] h1) {
   color: #101828;
   font-size: clamp(22px, 2.2vw, 30px);
   letter-spacing: 0;
 }
 
-.review-page :deep(.page-description) {
+.review-page :deep([class~="page-description"]) {
   margin-top: 8px;
   color: #475467;
   line-height: 1.6;
 }
 
-.review-page :deep(.el-button) {
+.review-page :deep([class~="el-button"]) {
   border-radius: 8px;
   font-weight: 700;
 }
 
-.review-page :deep(.el-button--primary) {
+.review-page :deep([class~="el-button--primary"]) {
   box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
 }
 
-.review-page :deep(.el-input__wrapper),
-.review-page :deep(.el-select__wrapper),
-.review-page :deep(.el-textarea__inner),
-.review-page :deep(.el-input-number .el-input__wrapper) {
+.review-page :deep([class~="el-input__wrapper"]),
+.review-page :deep([class~="el-select__wrapper"]),
+.review-page :deep([class~="el-textarea__inner"]),
+.review-page :deep([class~="el-input-number"] [class~="el-input__wrapper"]) {
   border-radius: 9px;
   box-shadow: 0 0 0 1px #d0d7e2 inset;
 }
 
-.review-page :deep(.el-tabs__item) {
+.review-page :deep([class~="el-tabs__item"]) {
   color: #475467;
   font-weight: 700;
 }
 
-.review-page :deep(.el-tabs__item.is-active) {
+.review-page :deep([class~="el-tabs__item"][class~="is-active"]) {
   color: #155eef;
 }
 
-.review-page :deep(.el-tabs__active-bar) {
+.review-page :deep([class~="el-tabs__active-bar"]) {
   background: #155eef;
 }
 
-.review-page :deep(.el-collapse) {
+.review-page :deep([class~="el-collapse"]) {
   border-color: #edf1f7;
 }
 
-.review-page :deep(.el-collapse-item__header) {
+.review-page :deep([class~="el-collapse-item__header"]) {
   color: #101828;
   font-weight: 750;
 }

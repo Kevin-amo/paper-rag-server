@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.lqr</groupId>
-    <artifactId>paper-rag-server</artifactId>
+    <artifactId>paper-mind</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>paper-rag-server</name>
-    <description>paper-rag-server</description>
+    <name>paper-mind</name>
+    <description>paper-mind</description>
     <url/>
     <licenses>
         <license/>

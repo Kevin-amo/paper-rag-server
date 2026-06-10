@@ -149,7 +149,7 @@ defineExpose({ fillQuestion });
   -webkit-backdrop-filter: blur(24px) saturate(170%);
 }
 
-.composer-box :deep(.el-textarea__inner) {
+.composer-box :deep([class~="el-textarea__inner"]) {
   min-height: 56px !important;
   border: 0;
   background: transparent;
@@ -160,11 +160,11 @@ defineExpose({ fillQuestion });
   padding: 2px 4px;
 }
 
-.composer-box :deep(.el-textarea__inner:focus) {
+.composer-box :deep([class~="el-textarea__inner"]:focus) {
   box-shadow: none;
 }
 
-.composer-box :deep(.el-textarea__inner::placeholder) {
+.composer-box :deep([class~="el-textarea__inner"]::placeholder) {
   color: var(--app-text-subtle);
 }
 
@@ -213,8 +213,8 @@ defineExpose({ fillQuestion });
   box-shadow: 0 14px 28px rgba(0, 122, 255, 0.28);
 }
 
-.send-button.is-disabled,
-.send-button.is-disabled:hover {
+.send-button[class~="is-disabled"],
+.send-button[class~="is-disabled"]:hover {
   background: rgba(174, 174, 178, 0.82);
   color: #ffffff;
   box-shadow: none;
@@ -284,11 +284,11 @@ defineExpose({ fillQuestion });
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
-:global(.advanced-dialog .el-dialog) {
+:global([class~="advanced-dialog"] [class~="el-dialog"]) {
   border-radius: 26px;
 }
 
-:global(.advanced-dialog .el-dialog__title) {
+:global([class~="advanced-dialog"] [class~="el-dialog__title"]) {
   color: var(--app-text);
   font-weight: 850;
 }
@@ -307,15 +307,11 @@ defineExpose({ fillQuestion });
     align-items: flex-end;
   }
 
-  .hide-on-small {
-    display: none;
-  }
-
   .topk-options {
     grid-template-columns: repeat(5, minmax(42px, 1fr));
   }
 
-  :global(.advanced-dialog) {
+  :global([class~="advanced-dialog"]) {
     width: calc(100% - 28px) !important;
   }
 }

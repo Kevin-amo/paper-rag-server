@@ -1,19 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   Bell,
-  Connection,
   DataAnalysis,
   Files,
   FolderChecked,
   Search,
+  Setting,
   SwitchButton,
   User,
 } from '@element-plus/icons-vue';
 import { useAuth } from '../../composables/useAuth';
+import { useReviewLeaderAccess } from '../../composables/useReviewLeaderAccess';
 
-type AdminSection = 'users' | 'tasks' | 'assignments' | 'criteria' | 'archive';
+type AdminSection = 'users' | 'config' | 'tasks' | 'criteria' | 'archive';
 
 const props = defineProps<{
   active: AdminSection;
@@ -24,6 +25,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const auth = useAuth();
+const { canAccessLeaderWorkspace, refreshLeaderWorkspaceAccess } = useReviewLeaderAccess();
 
 const navItems: Array<{
   key: AdminSection;
@@ -41,20 +43,20 @@ const navItems: Array<{
     icon: User,
   },
   {
+    key: 'config',
+    title: '批次与小组',
+    description: '批次、组长、成员',
+    path: '/admin/reviews',
+    query: { tab: 'config' },
+    icon: Setting,
+  },
+  {
     key: 'tasks',
-    title: '评审任务',
-    description: '任务列表与筛选',
+    title: '全局进度',
+    description: '任务、进度、兜底',
     path: '/admin/reviews',
     query: { tab: 'tasks' },
     icon: Files,
-  },
-  {
-    key: 'assignments',
-    title: '评审员分配',
-    description: '负载与分配入口',
-    path: '/admin/reviews',
-    query: { tab: 'assignments' },
-    icon: Connection,
   },
   {
     key: 'criteria',
@@ -66,8 +68,8 @@ const navItems: Array<{
   },
   {
     key: 'archive',
-    title: '共识/归档',
-    description: '共识确认与留档',
+    title: '结果查看',
+    description: '共识与归档',
     path: '/admin/reviews',
     query: { tab: 'archive' },
     icon: FolderChecked,
@@ -92,6 +94,10 @@ async function handleLogout() {
   await auth.logout();
   await router.replace('/login');
 }
+
+onMounted(() => {
+  refreshLeaderWorkspaceAccess();
+});
 </script>
 
 <template>
@@ -134,6 +140,7 @@ async function handleLogout() {
         <div class="topbar-actions">
           <el-button circle :icon="Bell" aria-label="通知" />
           <el-tag type="info" effect="plain">{{ currentUserName }} · 管理员</el-tag>
+          <el-button v-if="canAccessLeaderWorkspace" @click="router.push('/review-leader')">组长工作台</el-button>
           <el-button @click="router.push('/review')">评审工作台</el-button>
           <el-button v-if="auth.hasRole('USER')" @click="router.push('/user')">用户端</el-button>
           <el-button :icon="SwitchButton" @click="handleLogout">退出登录</el-button>
@@ -299,34 +306,34 @@ async function handleLogout() {
   line-height: 1.2;
 }
 
-.topbar-search :deep(.el-input__wrapper) {
+.topbar-search :deep([class~="el-input__wrapper"]) {
   min-height: 40px;
   border-radius: 10px;
   box-shadow: 0 0 0 1px #d0d7e2 inset;
 }
 
-.admin-layout :deep(.el-button) {
+.admin-layout :deep([class~="el-button"]) {
   border-radius: 8px;
   font-weight: 700;
 }
 
-.admin-layout :deep(.el-button--primary) {
+.admin-layout :deep([class~="el-button--primary"]) {
   box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
 }
 
-.admin-layout :deep(.el-tag) {
+.admin-layout :deep([class~="el-tag"]) {
   border-radius: 7px;
   font-weight: 700;
 }
 
-.admin-layout :deep(.el-table__header-wrapper th) {
+.admin-layout :deep([class~="el-table__header-wrapper"] th) {
   background: #f8fafc;
   color: #475467;
   font-size: 12px;
   font-weight: 750;
 }
 
-.admin-layout :deep(.el-table__row:hover > td) {
+.admin-layout :deep([class~="el-table__row"]:hover > td) {
   background: #f5f8ff;
 }
 
