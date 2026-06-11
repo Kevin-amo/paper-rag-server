@@ -1,12 +1,18 @@
 import { apiPrefix } from './http';
-import { clearAuthSession, getAccessToken } from '../composables/authState';
+import { clearAuthSession } from '../composables/authState';
 import type { AgentAskPayload, AgentStreamEvent } from '../types';
+
+let tokenProvider: (() => string) | null = null;
+
+export function setAgentTokenProvider(provider: () => string) {
+  tokenProvider = provider;
+}
 
 export async function askAgentStream(
   payload: AgentAskPayload,
   onEvent: (event: AgentStreamEvent) => void,
 ) {
-  const token = getAccessToken();
+  const token = tokenProvider?.();
   const response = await fetch(`${apiPrefix}/agent/ask/stream`, {
     method: 'POST',
     headers: {

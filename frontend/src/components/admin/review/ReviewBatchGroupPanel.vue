@@ -377,7 +377,15 @@ function toPayloadDateTime(value: string) {
       </section>
     </div>
 
-    <el-dialog v-model="batchDialogVisible" :title="batchDialogTitle" width="520px">
+    <el-dialog
+      v-model="batchDialogVisible"
+      :title="batchDialogTitle"
+      width="min(520px, calc(100vw - 32px))"
+      class="review-config-dialog"
+      append-to-body
+      destroy-on-close
+      align-center
+    >
       <el-form label-position="top">
         <el-form-item label="批次名称" required>
           <el-input v-model="batchForm.name" placeholder="例如 2026 春季论文评审" />
@@ -408,7 +416,15 @@ function toPayloadDateTime(value: string) {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="groupDialogVisible" :title="groupDialogTitle" width="520px">
+    <el-dialog
+      v-model="groupDialogVisible"
+      :title="groupDialogTitle"
+      width="min(520px, calc(100vw - 32px))"
+      class="review-config-dialog"
+      append-to-body
+      destroy-on-close
+      align-center
+    >
       <el-form label-position="top">
         <el-form-item label="小组名称" required>
           <el-input v-model="groupForm.name" placeholder="例如 第一评审组" />
@@ -439,7 +455,13 @@ function toPayloadDateTime(value: string) {
       </template>
     </el-dialog>
 
-    <el-drawer v-model="memberDrawerVisible" title="小组成员" size="480px">
+    <el-drawer
+      v-model="memberDrawerVisible"
+      title="小组成员"
+      size="min(480px, 92vw)"
+      append-to-body
+      destroy-on-close
+    >
       <template v-if="selectedGroup">
         <div class="drawer-heading">
           <strong>{{ selectedGroup.name }}</strong>
@@ -603,6 +625,19 @@ function toPayloadDateTime(value: string) {
 
 .member-tag {
   max-width: 100%;
+}
+
+:global([class~="el-dialog"][class~="review-config-dialog"]) {
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+:global([class~="el-dialog"][class~="review-config-dialog"] [class~="el-dialog__body"]) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 @media (max-width: 1080px) {

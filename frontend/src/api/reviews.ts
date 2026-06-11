@@ -1,4 +1,5 @@
 import { http, uploadHttp } from './http';
+import { compactParams } from '../utils/params';
 import type {
   DocumentUploadAcceptedResponse,
   DocumentJobResponse,
@@ -16,12 +17,6 @@ import type {
   UpdateReviewRiskPayload,
   UploadReviewPaperPayload,
 } from '../types';
-
-function compactParams(params: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''),
-  );
-}
 
 export async function uploadReviewPaper(payload: UploadReviewPaperPayload) {
   const formData = new FormData();
