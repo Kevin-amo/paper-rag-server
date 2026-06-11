@@ -39,8 +39,11 @@ public class DefaultPaperStructuredModelCompleter implements PaperStructuredMode
         }
         String rawOutput = null;
         try {
-            rawOutput = llmService.generate(buildPrompt(document, ruleResult, targetFields));
-            Map<String, Object> parsed = parseJson(rawOutput);
+            PromptConstructionService.Prompt prompt = buildPrompt(document, ruleResult, targetFields);
+            rawOutput = llmService.generate(prompt);
+            ParsedModelOutput parsedOutput = parseJsonWithRepair(rawOutput, prompt, targetFields);
+            rawOutput = parsedOutput.rawOutput();
+            Map<String, Object> parsed = parsedOutput.parsed();
             PaperStructuredContent content = PaperStructuredContentSupport.fromMap(parsed);
             Map<String, StructuredFieldEvidence> evidence = evidence(content, targetFields);
             return new ModelCompletionResult(
@@ -48,8 +51,10 @@ public class DefaultPaperStructuredModelCompleter implements PaperStructuredMode
                     rawOutput,
                     null
             );
+        } catch (ModelOutputParseException ex) {
+            return fallbackResult(ruleResult, ex.rawOutput(), safeMessage(ex));
         } catch (RuntimeException ex) {
-            return new ModelCompletionResult(ModelCompletionResult.empty().result(), rawOutput, safeMessage(ex));
+            return fallbackResult(ruleResult, rawOutput, safeMessage(ex));
         }
     }
 
@@ -62,11 +67,12 @@ public class DefaultPaperStructuredModelCompleter implements PaperStructuredMode
     private PromptConstructionService.Prompt buildPrompt(DocumentPersistenceService.DocumentDetail document,
                                                          StructuredParseResult ruleResult,
                                                          List<String> targetFields) {
-        String systemMessage = "你是论文结构化解析助手。只输出严格 JSON，不要 Markdown，不要解释性前后缀。";
+        String systemMessage = "你是论文结构化解析助手。只输出一个严格 JSON 对象；第一个字符必须是 {，最后一个字符必须是 }。禁止 Markdown、代码围栏、解释文字、前后缀。";
         String userMessage = "请基于论文文本补全结构化解析字段。\n"
                 + "只补全这些字段：" + targetFields + "\n"
-                + "输出 JSON 必须只包含以下键：title, abstract, introduction, literatureReview, methodology, experimentResults, discussion, conclusion, references, keywords, researchObject, researchQuestion, innovationPoints, methodPath, experimentDataSummary, mainConclusions。\n"
+                + "输出 JSON 必须包含且只包含以下键：title, abstract, introduction, literatureReview, methodology, experimentResults, discussion, conclusion, references, keywords, researchObject, researchQuestion, innovationPoints, methodPath, experimentDataSummary, mainConclusions。\n"
                 + "keywords、innovationPoints、mainConclusions 必须是字符串数组；其他字段为字符串或 null。不能编造论文没有依据的内容，没有依据时返回 null 或空数组。\n\n"
+                + "输出模板：\n" + jsonTemplate() + "\n\n"
                 + "文档元数据：\n"
                 + "标题：" + nullToEmpty(document.title()) + "\n"
                 + "摘要：" + nullToEmpty(document.abstractText()) + "\n"
@@ -74,6 +80,48 @@ public class DefaultPaperStructuredModelCompleter implements PaperStructuredMode
                 + "规则解析结果：\n" + jsonText(ruleResult.content()) + "\n\n"
                 + "论文全文片段：\n" + truncate(document.contentText(), FULL_TEXT_LIMIT);
         return new PromptConstructionService.Prompt(systemMessage, userMessage);
+    }
+
+    private ParsedModelOutput parseJsonWithRepair(String firstOutput,
+                                                  PromptConstructionService.Prompt originalPrompt,
+                                                  List<String> targetFields) {
+        try {
+            return new ParsedModelOutput(parseJson(firstOutput), firstOutput);
+        } catch (RuntimeException firstFailure) {
+            String repairOutput = llmService.generate(repairPrompt(originalPrompt, firstOutput, firstFailure.getMessage(), targetFields));
+            String combinedOutput = combinedRawOutput(firstOutput, repairOutput);
+            try {
+                return new ParsedModelOutput(parseJson(repairOutput), combinedOutput);
+            } catch (RuntimeException repairFailure) {
+                throw new ModelOutputParseException(combinedOutput, repairFailure);
+            }
+        }
+    }
+
+    private String combinedRawOutput(String firstOutput, String repairOutput) {
+        return "第一次输出：\n" + nullToEmpty(firstOutput) + "\n\n修复输出：\n" + nullToEmpty(repairOutput);
+    }
+
+    private PromptConstructionService.Prompt repairPrompt(PromptConstructionService.Prompt originalPrompt,
+                                                          String badOutput,
+                                                          String parseError,
+                                                          List<String> targetFields) {
+        String systemMessage = "你是 JSON 修复器。只输出一个严格 JSON 对象；第一个字符必须是 {，最后一个字符必须是 }。禁止 Markdown、解释文字、前后缀。";
+        String userMessage = "上一次论文结构化解析输出无法被系统解析。\n"
+                + "解析错误：" + nullToEmpty(parseError) + "\n"
+                + "上一次输出：\n" + nullToEmpty(badOutput) + "\n\n"
+                + "请重新基于原始任务输出 JSON。只补全这些字段：" + targetFields + "\n"
+                + "JSON 必须包含且只包含以下键：title, abstract, introduction, literatureReview, methodology, experimentResults, discussion, conclusion, references, keywords, researchObject, researchQuestion, innovationPoints, methodPath, experimentDataSummary, mainConclusions。\n"
+                + "keywords、innovationPoints、mainConclusions 必须是字符串数组；其他字段为字符串或 null。没有依据时返回 null 或空数组。\n\n"
+                + "输出模板：\n" + jsonTemplate() + "\n\n"
+                + "原始任务：\n" + originalPrompt.userMessage();
+        return new PromptConstructionService.Prompt(systemMessage, userMessage);
+    }
+
+    private String jsonTemplate() {
+        return """
+                {"title":null,"abstract":null,"introduction":null,"literatureReview":null,"methodology":null,"experimentResults":null,"discussion":null,"conclusion":null,"references":null,"keywords":[],"researchObject":null,"researchQuestion":null,"innovationPoints":[],"methodPath":null,"experimentDataSummary":null,"mainConclusions":[]}
+                """.trim();
     }
 
     private Map<String, Object> parseJson(String value) {
@@ -120,6 +168,68 @@ public class DefaultPaperStructuredModelCompleter implements PaperStructuredMode
         return evidence;
     }
 
+    private ModelCompletionResult fallbackResult(StructuredParseResult ruleResult, String rawOutput, String errorMessage) {
+        PaperStructuredContent content = ruleResult.content();
+        content = putIfMissing(content, "researchObject", inferResearchObject(content));
+        content = putIfMissing(content, "researchQuestion", firstSentence(content.introduction(), content.methodology()));
+        content = putIfMissing(content, "methodPath", firstSentence(content.methodology()));
+        content = putIfMissing(content, "experimentDataSummary", firstSentence(content.experimentResults()));
+        content = putIfMissing(content, "mainConclusions", conclusionItems(content.conclusion()));
+
+        Map<String, StructuredFieldEvidence> evidence = PaperStructuredContentSupport.emptyEvidence("MODEL");
+        for (String field : List.of("researchObject", "researchQuestion", "methodPath", "experimentDataSummary", "mainConclusions")) {
+            Object value = PaperStructuredContentSupport.value(content, field);
+            if (!PaperStructuredContentSupport.isEmpty(value)) {
+                evidence.put(field, new StructuredFieldEvidence(field, "RULE_DERIVED", 0.62, false, "模型补全失败后由规则解析内容兜底生成"));
+            }
+        }
+        return new ModelCompletionResult(
+                new StructuredParseResult(content, evidence, PaperStructuredContentSupport.emptyFields(content), lowConfidenceFields(evidence)),
+                rawOutput,
+                errorMessage
+        );
+    }
+
+    private PaperStructuredContent putIfMissing(PaperStructuredContent content, String field, Object value) {
+        if (PaperStructuredContentSupport.isEmpty(PaperStructuredContentSupport.value(content, field)) && !PaperStructuredContentSupport.isEmpty(value)) {
+            return PaperStructuredContentSupport.withValue(content, field, value);
+        }
+        return content;
+    }
+
+    private String inferResearchObject(PaperStructuredContent content) {
+        String title = content.title();
+        if (title != null) {
+            String cleaned = title.replace("课程设计", "").replace("论文", "").trim();
+            if (!cleaned.isBlank()) {
+                return cleaned;
+            }
+        }
+        return firstSentence(content.abstractText(), content.introduction());
+    }
+
+    private String firstSentence(String... values) {
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            String normalized = value.strip();
+            String[] parts = normalized.split("(?<=[。！？!?])\\s*|\\R+");
+            for (String part : parts) {
+                String sentence = part.strip();
+                if (!sentence.isBlank()) {
+                    return sentence.length() <= 240 ? sentence : sentence.substring(0, 240);
+                }
+            }
+        }
+        return null;
+    }
+
+    private List<String> conclusionItems(String conclusion) {
+        String sentence = firstSentence(conclusion);
+        return sentence == null ? List.of() : List.of(sentence);
+    }
+
     private List<String> lowConfidenceFields(Map<String, StructuredFieldEvidence> evidence) {
         return evidence.values().stream()
                 .filter(item -> !item.missing() && item.confidence() < 0.7)
@@ -149,5 +259,21 @@ public class DefaultPaperStructuredModelCompleter implements PaperStructuredMode
     private String safeMessage(Throwable ex) {
         String message = ex.getMessage();
         return message == null || message.isBlank() ? "模型补全失败" : message;
+    }
+
+    private static class ModelOutputParseException extends IllegalStateException {
+        private final String rawOutput;
+
+        private ModelOutputParseException(String rawOutput, Throwable cause) {
+            super(cause.getMessage(), cause);
+            this.rawOutput = rawOutput;
+        }
+
+        private String rawOutput() {
+            return rawOutput;
+        }
+    }
+
+    private record ParsedModelOutput(Map<String, Object> parsed, String rawOutput) {
     }
 }

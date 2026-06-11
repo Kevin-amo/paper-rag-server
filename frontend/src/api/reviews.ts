@@ -1,4 +1,4 @@
-import { http, uploadHttp } from './http';
+import { http, longRunningHttp, uploadHttp } from './http';
 import { compactParams } from '../utils/params';
 import type {
   DocumentUploadAcceptedResponse,
@@ -62,7 +62,7 @@ export async function getReviewTask(taskId: string) {
 }
 
 export async function generateReviewReport(taskId: string) {
-  const { data } = await http.post<ReviewReport>(`/reviews/tasks/${taskId}/ai-review`);
+  const { data } = await longRunningHttp.post<ReviewReport>(`/reviews/tasks/${taskId}/ai-review`);
   return data;
 }
 
@@ -72,7 +72,7 @@ export async function getReviewTaskStructuredParse(taskId: string) {
 }
 
 export async function regenerateReviewTaskStructuredParse(taskId: string) {
-  const { data } = await http.post<PaperStructuredParse>(`/reviews/tasks/${taskId}/structured-parse/regenerate`);
+  const { data } = await longRunningHttp.post<PaperStructuredParse>(`/reviews/tasks/${taskId}/structured-parse/regenerate`);
   return data;
 }
 

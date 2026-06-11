@@ -158,7 +158,8 @@ public class DefaultPaperSectionRuleParser implements PaperSectionRuleParser {
 
     private String stripHeading(String line) {
         String candidate = NUMBERED_PREFIX.matcher(line.trim()).replaceFirst("").trim();
-        return candidate.replaceAll("^[#\\s]+", "").replaceAll("[：:]+$", "").trim();
+        candidate = candidate.replaceAll("^[#\\s]+", "").replaceAll("[：:]+$", "").trim();
+        return candidate.replaceAll("(?<=\\p{IsHan})\\d{1,3}$", "").trim();
     }
 
     private String inlineHeadingContent(String line) {

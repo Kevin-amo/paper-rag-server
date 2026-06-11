@@ -35,9 +35,9 @@ spring:
       chat:
         enabled: true
         options:
-          model: kimi-k2.6
+          model: qwen3.6-27b
           temperature: 0.2
-          max-tokens: 2048
+          max-tokens: 6144
           enable-thinking: false
           multi-model: true
       embedding:

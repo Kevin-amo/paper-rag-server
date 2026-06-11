@@ -1,4 +1,4 @@
-import { apiPrefix, http, uploadHttp } from './http';
+import { apiPrefix, http, longRunningHttp, uploadHttp } from './http';
 import { compactParams } from '../utils/params';
 import type {
   BatchDocumentIngestionResponse,
@@ -94,7 +94,7 @@ export async function getPaperStructuredParseStatus(sourceId: string) {
 }
 
 export async function regeneratePaperStructuredParse(sourceId: string) {
-  const { data } = await http.post<PaperStructuredParse>(`/documents/${sourceId}/structured-parse/regenerate`);
+  const { data } = await longRunningHttp.post<PaperStructuredParse>(`/documents/${sourceId}/structured-parse/regenerate`);
   return data;
 }
 

@@ -30,7 +30,7 @@ defineEmits<{
           {{ structuredParse?.status || '未生成' }}
         </el-tag>
         <el-button size="small" :disabled="assignmentSubmitted" :loading="regeneratingStructuredParse" @click="$emit('rerunStructuredParse')">
-          重新解析
+          生成解析
         </el-button>
       </div>
     </div>
