@@ -14,6 +14,12 @@ import java.util.UUID;
 
 public interface ReviewReportMapper extends BaseMapper<ReviewReportEntity> {
 
+    /**
+     * 查询指定评审任务的最新评审报告
+     *
+     * @param taskId 评审任务ID
+     * @return 最新的评审报告，不存在则返回null
+     */
     @Select("""
             select *
             from public.review_report
@@ -32,6 +38,12 @@ public interface ReviewReportMapper extends BaseMapper<ReviewReportEntity> {
     })
     ReviewReportEntity selectLatestByTaskId(@Param("taskId") UUID taskId);
 
+    /**
+     * 根据分配记录ID查询评审报告
+     *
+     * @param assignmentId 分配记录ID
+     * @return 评审报告，不存在则返回null
+     */
     @Select("""
             select *
             from public.review_report
@@ -42,6 +54,12 @@ public interface ReviewReportMapper extends BaseMapper<ReviewReportEntity> {
     @ResultMap("reviewReportResultMap")
     ReviewReportEntity selectByAssignmentId(@Param("assignmentId") UUID assignmentId);
 
+    /**
+     * 查询指定任务下已提交的评审报告（包括关联分配已提交的和独立确认/完成的报告）
+     *
+     * @param taskId 评审任务ID
+     * @return 已提交的评审报告列表
+     */
     @Select("""
             select r.*
             from public.review_report r
@@ -56,6 +74,12 @@ public interface ReviewReportMapper extends BaseMapper<ReviewReportEntity> {
     @ResultMap("reviewReportResultMap")
     List<ReviewReportEntity> selectSubmittedByTaskId(@Param("taskId") UUID taskId);
 
+    /**
+     * 查询指定任务下所有有效分配的评审报告（排除已取消的分配）
+     *
+     * @param taskId 评审任务ID
+     * @return 评审报告列表
+     */
     @Select("""
             select r.*
             from public.review_report r
@@ -67,6 +91,12 @@ public interface ReviewReportMapper extends BaseMapper<ReviewReportEntity> {
     @ResultMap("reviewReportResultMap")
     List<ReviewReportEntity> selectActiveAssignmentReportsByTaskId(@Param("taskId") UUID taskId);
 
+    /**
+     * 查询指定任务下已提交的有效分配的评审报告
+     *
+     * @param taskId 评审任务ID
+     * @return 已提交的评审报告列表
+     */
     @Select("""
             select r.*
             from public.review_report r

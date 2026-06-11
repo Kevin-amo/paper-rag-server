@@ -11,6 +11,12 @@ import java.util.UUID;
 
 public interface ReviewGroupMemberMapper extends BaseMapper<ReviewGroupMemberEntity> {
 
+    /**
+     * 查询指定评审组的有效成员，组长排在最前
+     *
+     * @param groupId 评审组ID
+     * @return 有效成员列表
+     */
     @Select("""
             select *
             from public.review_group_member
@@ -20,6 +26,13 @@ public interface ReviewGroupMemberMapper extends BaseMapper<ReviewGroupMemberEnt
             """)
     List<ReviewGroupMemberEntity> selectActiveByGroupId(@Param("groupId") UUID groupId);
 
+    /**
+     * 查询指定评审组和用户的有效成员记录
+     *
+     * @param groupId 评审组ID
+     * @param userId 用户ID
+     * @return 有效成员记录，不存在则返回null
+     */
     @Select("""
             select *
             from public.review_group_member
@@ -30,6 +43,12 @@ public interface ReviewGroupMemberMapper extends BaseMapper<ReviewGroupMemberEnt
             """)
     ReviewGroupMemberEntity selectActiveByGroupAndUser(@Param("groupId") UUID groupId, @Param("userId") UUID userId);
 
+    /**
+     * 统计指定评审组的有效成员数量
+     *
+     * @param groupId 评审组ID
+     * @return 有效成员数量
+     */
     @Select("""
             select count(*)
             from public.review_group_member
@@ -38,6 +57,12 @@ public interface ReviewGroupMemberMapper extends BaseMapper<ReviewGroupMemberEnt
             """)
     long countActiveByGroupId(@Param("groupId") UUID groupId);
 
+    /**
+     * 将指定评审组的所有有效成员标记为已移除
+     *
+     * @param groupId 评审组ID
+     * @return 更新的记录数
+     */
     @Update("""
             update public.review_group_member
             set status = 'REMOVED', removed_at = now(), updated_at = now()

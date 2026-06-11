@@ -12,6 +12,12 @@ import java.util.UUID;
 
 public interface ReviewAssignmentMapper extends BaseMapper<ReviewAssignmentEntity> {
 
+    /**
+     * 根据评审任务ID查询所有分配记录
+     *
+     * @param taskId 评审任务ID
+     * @return 分配记录列表
+     */
     @Select("""
             select *
             from public.review_assignment
@@ -20,6 +26,13 @@ public interface ReviewAssignmentMapper extends BaseMapper<ReviewAssignmentEntit
             """)
     List<ReviewAssignmentEntity> selectByTaskId(@Param("taskId") UUID taskId);
 
+    /**
+     * 查询指定任务和审核人的有效分配记录（最近一条）
+     *
+     * @param taskId 评审任务ID
+     * @param reviewerUserId 审核人用户ID
+     * @return 有效分配记录，不存在则返回null
+     */
     @Select("""
             select *
             from public.review_assignment
@@ -32,6 +45,12 @@ public interface ReviewAssignmentMapper extends BaseMapper<ReviewAssignmentEntit
     ReviewAssignmentEntity selectActiveByTaskAndReviewer(@Param("taskId") UUID taskId,
                                                     @Param("reviewerUserId") UUID reviewerUserId);
 
+    /**
+     * 查询指定任务的组长分配记录
+     *
+     * @param taskId 评审任务ID
+     * @return 组长分配记录，不存在则返回null
+     */
     @Select("""
             select *
             from public.review_assignment
@@ -43,6 +62,12 @@ public interface ReviewAssignmentMapper extends BaseMapper<ReviewAssignmentEntit
             """)
     ReviewAssignmentEntity selectLeadByTaskId(@Param("taskId") UUID taskId);
 
+    /**
+     * 统计指定任务的有效分配数量（排除已取消）
+     *
+     * @param taskId 评审任务ID
+     * @return 有效分配数量
+     */
     @Select("""
             select count(*)
             from public.review_assignment
@@ -51,6 +76,12 @@ public interface ReviewAssignmentMapper extends BaseMapper<ReviewAssignmentEntit
             """)
     long countActiveByTaskId(@Param("taskId") UUID taskId);
 
+    /**
+     * 统计指定任务已提交的分配数量
+     *
+     * @param taskId 评审任务ID
+     * @return 已提交的分配数量
+     */
     @Select("""
             select count(*)
             from public.review_assignment
@@ -59,6 +90,13 @@ public interface ReviewAssignmentMapper extends BaseMapper<ReviewAssignmentEntit
             """)
     long countSubmittedByTaskId(@Param("taskId") UUID taskId);
 
+    /**
+     * 更新分配记录状态
+     *
+     * @param id 分配记录ID
+     * @param status 新状态
+     * @return 更新的记录数
+     */
     @Update("""
             update public.review_assignment
             set status = #{status},
@@ -68,6 +106,12 @@ public interface ReviewAssignmentMapper extends BaseMapper<ReviewAssignmentEntit
             """)
     int updateStatus(@Param("id") UUID id, @Param("status") String status);
 
+    /**
+     * 查询指定任务的最大截止时间
+     *
+     * @param taskId 评审任务ID
+     * @return 最大截止时间，无有效记录则返回null
+     */
     @Select("""
             select max(due_at)
             from public.review_assignment
@@ -76,6 +120,13 @@ public interface ReviewAssignmentMapper extends BaseMapper<ReviewAssignmentEntit
             """)
     OffsetDateTime maxDueAtByTaskId(@Param("taskId") UUID taskId);
 
+    /**
+     * 统计指定审核人和状态的分配记录数量
+     *
+     * @param reviewerUserId 审核人用户ID
+     * @param status 分配状态
+     * @return 分配记录数量
+     */
     @Select("""
             select count(*)
             from public.review_assignment
@@ -84,6 +135,11 @@ public interface ReviewAssignmentMapper extends BaseMapper<ReviewAssignmentEntit
             """)
     long countByReviewerAndStatus(@Param("reviewerUserId") UUID reviewerUserId, @Param("status") String status);
 
+    /**
+     * 查询所有已分配审核人的用户ID（去重，排除已取消）
+     *
+     * @return 审核人用户ID列表
+     */
     @Select("""
             select distinct reviewer_user_id
             from public.review_assignment

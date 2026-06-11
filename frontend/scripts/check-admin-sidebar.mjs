@@ -5,22 +5,32 @@ const reviews = readFileSync(new URL('../src/views/admin/AdminReviewDashboardVie
 const usersView = readFileSync(new URL('../src/views/admin/AdminUsersView.vue', import.meta.url), 'utf8');
 const usersPanel = readFileSync(new URL('../src/components/admin/AdminUsersPanel.vue', import.meta.url), 'utf8');
 const usersComposable = readFileSync(new URL('../src/composables/useAdminUsers.ts', import.meta.url), 'utf8');
-const globalStyle = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+const globalStyle = [
+  readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'),
+  readFileSync(new URL('../src/styles/reset.css', import.meta.url), 'utf8'),
+].join('\n');
 
-const requiredMenuLabels = ['用户管理', '评审任务', '评审员分配', '评审指标', '共识/归档'];
+const requiredMenuMarkers = [
+  "key: 'users'",
+  "key: 'config'",
+  "key: 'tasks'",
+  "key: 'criteria'",
+];
 const requiredReviewTabs = [
+  'name="config"',
   'name="tasks"',
-  'name="assignments"',
   'name="criteria"',
-  'name="archive"',
 ];
 
 const missing = [];
-for (const label of requiredMenuLabels) {
-  if (!shell.includes(label)) missing.push(`AdminShell missing menu label: ${label}`);
+for (const marker of requiredMenuMarkers) {
+  if (!shell.includes(marker)) missing.push(`AdminShell missing menu marker: ${marker}`);
 }
 for (const tab of requiredReviewTabs) {
   if (!reviews.includes(tab)) missing.push(`AdminReviewDashboardView missing tab marker: ${tab}`);
+}
+if (shell.includes("key: 'archive'") || reviews.includes('name="archive"')) {
+  missing.push('Admin review archive/result-view entry must not be present');
 }
 if (!shell.includes('admin-layout') || !shell.includes('admin-sidebar')) {
   missing.push('AdminShell missing conventional sidebar layout classes');

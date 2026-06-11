@@ -1,5 +1,5 @@
-import { apiPrefix, http, uploadHttp } from './http';
-import { getAccessToken } from '../composables/authState';
+import { apiPrefix, http, longRunningHttp, uploadHttp } from './http';
+import { compactParams } from '../utils/params';
 import type {
   BatchDocumentIngestionResponse,
   BatchUploadDocumentPayload,
@@ -16,10 +16,10 @@ import type {
   UploadDocumentPayload,
 } from '../types';
 
-function compactParams(params: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''),
-  );
+let tokenProvider: (() => string) | null = null;
+
+export function setDocumentsTokenProvider(provider: () => string) {
+  tokenProvider = provider;
 }
 
 export async function uploadDocument(payload: UploadDocumentPayload) {
@@ -94,7 +94,7 @@ export async function getPaperStructuredParseStatus(sourceId: string) {
 }
 
 export async function regeneratePaperStructuredParse(sourceId: string) {
-  const { data } = await http.post<PaperStructuredParse>(`/documents/${sourceId}/structured-parse/regenerate`);
+  const { data } = await longRunningHttp.post<PaperStructuredParse>(`/documents/${sourceId}/structured-parse/regenerate`);
   return data;
 }
 
@@ -120,7 +120,7 @@ export async function listDocumentAssets(sourceId: string, assetIds: string[]) {
 }
 
 export function getDocumentAssetContentUrl(sourceId: string, assetId: string) {
-  const token = getAccessToken();
+  const token = tokenProvider?.();
   const query = token ? `?access_token=${encodeURIComponent(token)}` : '';
   return `${apiPrefix}/documents/${encodeURIComponent(sourceId)}/assets/${encodeURIComponent(assetId)}/content${query}`;
 }

@@ -51,6 +51,14 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
     private final SysRoleMapper roleMapper;
     private final ReviewAuditService reviewAuditService;
 
+    /**
+     * 管理员兜底分配评审人
+     *
+     * @param taskId          评审任务ID
+     * @param operatorUserId  操作人用户ID
+     * @param request         评审分配请求，包含评审人ID列表、组长ID和截止时间
+     * @return 分配结果列表
+     */
     @Override
     @Transactional
     public List<ReviewAssignmentResponse> assignReviewers(UUID taskId, UUID operatorUserId, ReviewAssignmentRequest request) {
@@ -59,7 +67,6 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "评审任务不存在");
         }
         if (ReviewTaskStatuses.SUBMITTED.equals(task.getStatus())
-                || ReviewTaskStatuses.COMPLETED.equals(task.getStatus())
                 || ReviewTaskStatuses.CONSENSUS_CONFIRMED.equals(task.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "当前任务状态不允许重新分配评审人");
         }
@@ -97,6 +104,15 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
                 .toList();
     }
 
+    /**
+     * 组长分配本组评审任务
+     *
+     * @param currentUserId 当前操作用户ID（组长）
+     * @param groupId       评审小组ID
+     * @param taskId        评审任务ID
+     * @param request       组长评审分配请求，包含评审人ID列表和截止时间
+     * @return 分配结果列表
+     */
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public List<ReviewAssignmentResponse> assignReviewersByLeader(UUID currentUserId, UUID groupId, UUID taskId, LeaderReviewAssignmentRequest request) {
@@ -143,6 +159,12 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
                 .toList();
     }
 
+    /**
+     * 查询评审任务的所有分配记录
+     *
+     * @param taskId 评审任务ID
+     * @return 该任务的所有评审分配响应列表
+     */
     @Override
     public List<ReviewAssignmentResponse> listAssignments(UUID taskId) {
         return assignmentMapper.selectByTaskId(taskId).stream()
@@ -150,6 +172,13 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
                 .toList();
     }
 
+    /**
+     * 评审人提交评审分配任务
+     *
+     * @param currentUserId 当前操作用户ID（评审人）
+     * @param assignmentId  评审分配ID
+     * @return 更新后的评审分配响应
+     */
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public ReviewAssignmentResponse submitAssignment(UUID currentUserId, UUID assignmentId) {
@@ -189,6 +218,11 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         return toResponse(assignment);
     }
 
+    /**
+     * 查询所有评审人的工作负载情况
+     *
+     * @return 评审人负载信息列表，包含各状态下的分配数量
+     */
     @Override
     public List<ReviewerLoadResponse> listReviewerLoads() {
         return userMapper.selectActiveByRole(RoleCodes.REVIEWER).stream()
@@ -203,6 +237,13 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
                 .toList();
     }
 
+    /**
+     * 验证当前用户是否有权管理指定小组，并返回有效的评审小组实体
+     *
+     * @param currentUserId 当前操作用户ID
+     * @param groupId       评审小组ID
+     * @return 有效的评审小组实体
+     */
     private ReviewGroupEntity requireManagedGroup(UUID currentUserId, UUID groupId) {
         ReviewGroupEntity group = groupMapper.selectById(groupId);
         if (group == null) {
@@ -217,6 +258,12 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         return group;
     }
 
+    /**
+     * 验证指定用户是否为有效的小组评审员
+     *
+     * @param groupId    评审小组ID
+     * @param reviewerId 评审员用户ID
+     */
     private void requireActiveGroupReviewer(UUID groupId, UUID reviewerId) {
         ReviewGroupMemberEntity member = memberMapper.selectActiveByGroupAndUser(groupId, reviewerId);
         if (member == null || !MEMBER_ROLE_REVIEWER.equals(member.getMemberRole())) {
@@ -228,6 +275,12 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         }
     }
 
+    /**
+     * 验证评审人ID列表非空且无重复项
+     *
+     * @param reviewerIds 评审人ID列表
+     * @return 验证通过的评审人ID列表
+     */
     private List<UUID> requireUniqueReviewerIds(List<UUID> reviewerIds) {
         if (reviewerIds == null || reviewerIds.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "评审人列表不能为空");
@@ -242,10 +295,28 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         return reviewerIds;
     }
 
+    /**
+     * 判断任务状态是否为待分配状态
+     *
+     * @param status 任务状态
+     * @return 如果状态为待分配则返回true
+     */
     private boolean isPendingAssignmentStatus(String status) {
-        return ReviewTaskStatuses.PENDING_ASSIGNMENT.equals(status) || ReviewTaskStatuses.PENDING.equals(status);
+        return ReviewTaskStatuses.PENDING_ASSIGNMENT.equals(status);
     }
 
+    /**
+     * 创建评审分配实体，自动设置组长角色
+     *
+     * @param taskId              评审任务ID
+     * @param groupId             评审小组ID
+     * @param assignedByUserId    分配人用户ID
+     * @param reviewerId          评审员用户ID
+     * @param leadReviewerUserId  组长用户ID
+     * @param dueAt               截止时间
+     * @param now                 当前时间
+     * @return 新创建的评审分配实体
+     */
     private ReviewAssignmentEntity newAssignment(UUID taskId,
                                                  UUID groupId,
                                                  UUID assignedByUserId,
@@ -258,6 +329,17 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         return assignment;
     }
 
+    /**
+     * 创建评审员分配实体
+     *
+     * @param taskId           评审任务ID
+     * @param groupId          评审小组ID
+     * @param assignedByUserId 分配人用户ID
+     * @param reviewerId       评审员用户ID
+     * @param dueAt            截止时间
+     * @param now              当前时间
+     * @return 新创建的评审员分配实体
+     */
     private ReviewAssignmentEntity newReviewerAssignment(UUID taskId,
                                                          UUID groupId,
                                                          UUID assignedByUserId,
@@ -279,6 +361,12 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         return assignment;
     }
 
+    /**
+     * 创建评审任务变更前的快照
+     *
+     * @param task 评审任务实体
+     * @return 包含任务当前状态信息的快照Map
+     */
     private Map<String, Object> assignmentBeforeSnapshot(ReviewTaskEntity task) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("taskStatus", task.getStatus());
@@ -290,6 +378,18 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         return snapshot;
     }
 
+    /**
+     * 创建评审任务分配后的快照
+     *
+     * @param task             评审任务实体
+     * @param groupId          评审小组ID
+     * @param assignedByUserId 分配人用户ID
+     * @param leaderUserId     组长用户ID
+     * @param reviewerIds      评审人ID列表
+     * @param assignments      评审分配实体列表
+     * @param dueAt            截止时间
+     * @return 包含分配后任务状态信息的快照Map
+     */
     private Map<String, Object> assignmentAfterSnapshot(ReviewTaskEntity task,
                                                         UUID groupId,
                                                         UUID assignedByUserId,
@@ -310,6 +410,15 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         return snapshot;
     }
 
+    /**
+     * 创建评审分配状态变更快照
+     *
+     * @param assignment      评审分配实体
+     * @param taskStatus      任务状态
+     * @param activeCount     活跃分配数量
+     * @param submittedCount  已提交分配数量
+     * @return 包含分配状态信息的快照Map
+     */
     private Map<String, Object> assignmentStatusSnapshot(ReviewAssignmentEntity assignment,
                                                          String taskStatus,
                                                          Long activeCount,
@@ -328,6 +437,12 @@ public class ReviewAssignmentServiceImpl implements ReviewAssignmentService {
         return snapshot;
     }
 
+    /**
+     * 将评审分配实体转换为响应对象
+     *
+     * @param assignment 评审分配实体
+     * @return 包含评审员信息的评审分配响应对象
+     */
     private ReviewAssignmentResponse toResponse(ReviewAssignmentEntity assignment) {
         SysUser reviewer = assignment == null || assignment.getReviewerUserId() == null
                 ? null

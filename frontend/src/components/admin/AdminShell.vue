@@ -5,7 +5,6 @@ import {
   Bell,
   DataAnalysis,
   Files,
-  FolderChecked,
   Search,
   Setting,
   SwitchButton,
@@ -14,7 +13,7 @@ import {
 import { useAuth } from '../../composables/useAuth';
 import { useReviewLeaderAccess } from '../../composables/useReviewLeaderAccess';
 
-type AdminSection = 'users' | 'config' | 'tasks' | 'criteria' | 'archive';
+type AdminSection = 'users' | 'config' | 'tasks' | 'criteria';
 
 const props = defineProps<{
   active: AdminSection;
@@ -65,14 +64,6 @@ const navItems: Array<{
     path: '/admin/reviews',
     query: { tab: 'criteria' },
     icon: DataAnalysis,
-  },
-  {
-    key: 'archive',
-    title: '结果查看',
-    description: '共识与归档',
-    path: '/admin/reviews',
-    query: { tab: 'archive' },
-    icon: FolderChecked,
   },
 ];
 

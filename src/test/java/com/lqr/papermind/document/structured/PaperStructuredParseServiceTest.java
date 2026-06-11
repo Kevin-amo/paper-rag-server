@@ -122,6 +122,31 @@ class PaperStructuredParseServiceTest {
     }
 
     @Test
+    void generateShouldPersistRuleParsedWhenModelCompletionFails() {
+        DocumentPersistenceService.DocumentDetail document = document("论文标题", "摘要文本", "全文");
+        DocumentEntity entity = documentEntity(document);
+        StructuredParseResult ruleResult = new StructuredParseResult(PaperStructuredContentSupport.emptyContent(), PaperStructuredContentSupport.emptyEvidence("RULE"), List.of("conclusion"), List.of());
+        StructuredParseResult modelResult = new StructuredParseResult(PaperStructuredContentSupport.emptyContent(), PaperStructuredContentSupport.emptyEvidence("MODEL"), List.of(), List.of());
+        PaperStructuredParseEntity saved = new PaperStructuredParseEntity();
+        saved.setId(UUID.randomUUID());
+        saved.setOwnerUserId(ownerUserId);
+        saved.setSourceId("source-1");
+        saved.setStatus("RULE_PARSED");
+
+        when(documentPersistenceService.findAnyDocument(ownerUserId, "source-1")).thenReturn(Optional.of(document));
+        when(documentMapper.selectOne(any(Wrapper.class))).thenReturn(entity);
+        when(ruleParser.parse(document)).thenReturn(ruleResult);
+        when(modelCompleter.complete(document, ruleResult)).thenReturn(new ModelCompletionResult(modelResult, "模型没有输出 JSON", "模型结构化解析结果缺少 JSON 对象"));
+        when(mergePolicy.merge(ruleResult, modelResult)).thenReturn(ruleResult);
+        when(structuredParseMapper.selectOne(any(Wrapper.class))).thenReturn(saved);
+
+        PaperStructuredParseEntity result = service.generate(ownerUserId, "source-1");
+
+        assertThat(result.getStatus()).isEqualTo("RULE_PARSED");
+        verify(structuredParseMapper).upsertResult(any(UUID.class), eq(ownerUserId), eq(entity.getId()), eq("source-1"), eq("全文"), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), eq("模型没有输出 JSON"), eq("RULE_PARSED"), eq("模型结构化解析结果缺少 JSON 对象"));
+    }
+
+    @Test
     void generateShouldPersistFailureWhenParserFails() {
         DocumentPersistenceService.DocumentDetail document = document("论文标题", "摘要文本", "全文");
         DocumentEntity entity = documentEntity(document);

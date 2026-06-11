@@ -73,7 +73,7 @@ public class PaperStructuredParseServiceImpl implements PaperStructuredParseServ
             StructuredParseResult ruleResult = ruleParser.parse(document);
             ModelCompletionResult modelCompletion = modelCompleter.complete(document, ruleResult);
             StructuredParseResult mergedResult = mergePolicy.merge(ruleResult, modelCompletion.result());
-            String status = modelCompletion.errorMessage() == null ? "COMPLETED" : "COMPLETED";
+            String status = modelCompletion.errorMessage() == null ? "COMPLETED" : "RULE_PARSED";
             structuredParseMapper.upsertResult(
                     UUID.randomUUID(),
                     ownerUserId,

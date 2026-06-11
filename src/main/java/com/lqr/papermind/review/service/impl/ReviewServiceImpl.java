@@ -88,6 +88,17 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewRiskService reviewRiskService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 分页查询评审任务列表
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param keyword       搜索关键词（按标题或来源ID模糊匹配）
+     * @param status        任务状态过滤
+     * @param page          页码（从0开始）
+     * @param size          每页大小
+     * @return 分页后的评审任务列表
+     */
     @Override
     public PageResponse<ReviewTaskResponse> listTasks(UUID currentUserId, boolean admin, String keyword, String status, int page, int size) {
         taskMapper.syncFromDocuments();
@@ -129,12 +140,27 @@ public class ReviewServiceImpl implements ReviewService {
         return new PageResponse<>(items, safePage, safeSize, result.getTotal());
     }
 
+    /**
+     * 获取单个评审任务详情
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param taskId        任务ID
+     * @return 评审任务详情
+     */
     @Override
     public ReviewTaskResponse getTask(UUID currentUserId, boolean admin, UUID taskId) {
         ReviewTaskEntity task = requireTask(taskId);
         return toTaskResponse(task, true, currentUserId, admin);
     }
 
+    /**
+     * 创建评审任务
+     *
+     * @param currentUserId 当前用户ID
+     * @param request       创建请求参数
+     * @return 创建的评审任务
+     */
     @Override
     @Transactional
     public ReviewTaskResponse createTask(UUID currentUserId, ReviewTaskCreateRequest request) {
@@ -156,6 +182,12 @@ public class ReviewServiceImpl implements ReviewService {
         return toTaskResponse(task, true, currentUserId, true);
     }
 
+    /**
+     * 为已索引的评审文档自动创建任务
+     *
+     * @param ownerUserId 文档所有者用户ID
+     * @param sourceId    文档来源标识
+     */
     @Override
     @Transactional
     public void createTaskForIndexedReviewDocument(UUID ownerUserId, String sourceId) {
@@ -185,6 +217,14 @@ public class ReviewServiceImpl implements ReviewService {
         appendAudit(task.getId(), ownerUserId, "CREATE_TASK", "评审文档入库完成后自动创建任务", Map.of("sourceId", sourceId));
     }
 
+    /**
+     * 生成AI辅助评审报告
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param taskId        任务ID
+     * @return 生成的评审报告
+     */
     @Override
     @Transactional
     public ReviewReportResponse generateAiReview(UUID currentUserId, boolean admin, UUID taskId) {
@@ -219,7 +259,7 @@ public class ReviewServiceImpl implements ReviewService {
             }
             taskMapper.updateTaskStatus(task.getId(), ReviewTaskStatuses.IN_REVIEW);
         } else {
-            taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
+            taskMapper.updateTaskStatus(task.getId(), ReviewTaskStatuses.IN_REVIEW);
         }
         String modelText = llmService.generate(buildReviewPrompt(document, criteria));
         Map<String, Object> parsed;
@@ -267,6 +307,14 @@ public class ReviewServiceImpl implements ReviewService {
                 : reportMapper.selectByAssignmentId(assignment.getId()));
     }
 
+    /**
+     * 获取论文结构化解析结果
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param taskId        任务ID
+     * @return 结构化解析结果
+     */
     @Override
     public PaperStructuredParseResponse getStructuredParse(UUID currentUserId, boolean admin, UUID taskId) {
         ReviewTaskEntity task = requireAccessibleTask(currentUserId, admin, taskId);
@@ -276,6 +324,14 @@ public class ReviewServiceImpl implements ReviewService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "结构化解析结果不存在"));
     }
 
+    /**
+     * 重新生成论文结构化解析结果
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param taskId        任务ID
+     * @return 重新生成的结构化解析结果
+     */
     @Override
     @Transactional
     public PaperStructuredParseResponse regenerateStructuredParse(UUID currentUserId, boolean admin, UUID taskId) {
@@ -286,6 +342,15 @@ public class ReviewServiceImpl implements ReviewService {
         );
     }
 
+    /**
+     * 更新评审报告
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param reportId      报告ID
+     * @param request       更新请求参数
+     * @return 更新后的评审报告
+     */
     @Override
     @Transactional
     public ReviewReportResponse updateReport(UUID currentUserId, boolean admin, UUID reportId, ReviewReportUpdateRequest request) {
@@ -352,9 +417,9 @@ public class ReviewServiceImpl implements ReviewService {
         if (assignment != null) {
             taskMapper.updateTaskStatus(task.getId(), ReviewTaskStatuses.IN_REVIEW);
         } else if ("CONFIRMED".equals(nextStatus) || "COMPLETED".equals(nextStatus)) {
-            taskMapper.updateStatus(task.getId(), currentUserId, "COMPLETED");
+            taskMapper.updateTaskStatus(task.getId(), ReviewTaskStatuses.SUBMITTED);
         } else {
-            taskMapper.updateStatus(task.getId(), currentUserId, "REVIEWING");
+            taskMapper.updateTaskStatus(task.getId(), ReviewTaskStatuses.IN_REVIEW);
         }
         if (risksProvided) {
             reviewRiskService.replaceReportRisks(report.getId(), task.getId(), report.getRisks());
@@ -363,6 +428,14 @@ public class ReviewServiceImpl implements ReviewService {
         return ReviewReportResponse.from(reportMapper.selectById(reportId));
     }
 
+    /**
+     * 获取评审报告的风险项列表
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param reportId      报告ID
+     * @return 风险项列表
+     */
     @Override
     public List<ReviewRiskItemResponse> listRisks(UUID currentUserId, boolean admin, UUID reportId) {
         ReviewReportEntity report = requireReport(reportId);
@@ -370,6 +443,15 @@ public class ReviewServiceImpl implements ReviewService {
         return reviewRiskService.listByReportId(reportId);
     }
 
+    /**
+     * 更新风险项状态和评审备注
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param riskId        风险项ID
+     * @param request       更新请求参数，包含状态和评审备注
+     * @return 更新后的风险项
+     */
     @Override
     public ReviewRiskItemResponse updateRisk(UUID currentUserId, boolean admin, UUID riskId, ReviewRiskUpdateRequest request) {
         ReviewRiskItemEntity risk = reviewRiskService.findById(riskId);
@@ -382,6 +464,13 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
 
+    /**
+     * 提交评审分配
+     *
+     * @param currentUserId 当前用户ID
+     * @param assignmentId  评审分配ID
+     * @return 提交后的评审分配
+     */
     @Override
     @Transactional
     public ReviewAssignmentResponse submitAssignment(UUID currentUserId, UUID assignmentId) {
@@ -402,6 +491,14 @@ public class ReviewServiceImpl implements ReviewService {
         return assignmentService.submitAssignment(currentUserId, assignmentId);
     }
 
+    /**
+     * 获取评审共识汇总
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param taskId        任务ID
+     * @return 评审共识汇总
+     */
     @Override
     public ReviewConsensusResponse getConsensus(UUID currentUserId, boolean admin, UUID taskId) {
         if (!consensusService.canAccessConsensus(currentUserId, admin, taskId)) {
@@ -410,6 +507,15 @@ public class ReviewServiceImpl implements ReviewService {
         return consensusService.getForTask(taskId);
     }
 
+    /**
+     * 更新评审共识汇总
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param taskId        任务ID
+     * @param request       更新请求参数
+     * @return 更新后的评审共识汇总
+     */
     @Override
     public ReviewConsensusResponse updateConsensus(UUID currentUserId, boolean admin, UUID taskId, ReviewConsensusUpdateRequest request) {
         if (!consensusService.canAccessConsensus(currentUserId, admin, taskId)) {
@@ -418,6 +524,14 @@ public class ReviewServiceImpl implements ReviewService {
         return consensusService.update(taskId, currentUserId, request);
     }
 
+    /**
+     * 确认评审共识汇总
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param taskId        任务ID
+     * @return 确认后的评审共识汇总
+     */
     @Override
     public ReviewConsensusResponse confirmConsensus(UUID currentUserId, boolean admin, UUID taskId) {
         if (!consensusService.canAccessConsensus(currentUserId, admin, taskId)) {
@@ -426,6 +540,12 @@ public class ReviewServiceImpl implements ReviewService {
         return consensusService.confirm(taskId, currentUserId);
     }
 
+    /**
+     * 获取评审指标列表
+     *
+     * @param includeDisabled 是否包含已禁用的指标
+     * @return 评审指标列表
+     */
     @Override
     public List<ReviewCriterionResponse> listCriteria(boolean includeDisabled) {
         LambdaQueryWrapper<ReviewCriterionEntity> wrapper = new LambdaQueryWrapper<ReviewCriterionEntity>()
@@ -439,6 +559,12 @@ public class ReviewServiceImpl implements ReviewService {
                 .toList();
     }
 
+    /**
+     * 创建评审指标
+     *
+     * @param request 评审指标创建请求
+     * @return 创建的评审指标
+     */
     @Override
     @Transactional
     public ReviewCriterionResponse createCriterion(ReviewCriterionRequest request) {
@@ -452,6 +578,13 @@ public class ReviewServiceImpl implements ReviewService {
         return ReviewCriterionResponse.from(entity);
     }
 
+    /**
+     * 更新评审指标
+     *
+     * @param id      评审指标ID
+     * @param request 评审指标更新请求
+     * @return 更新后的评审指标
+     */
     @Override
     @Transactional
     public ReviewCriterionResponse updateCriterion(UUID id, ReviewCriterionRequest request) {
@@ -465,6 +598,15 @@ public class ReviewServiceImpl implements ReviewService {
         return ReviewCriterionResponse.from(criterionMapper.selectById(id));
     }
 
+    /**
+     * 将评审任务实体转换为响应对象
+     *
+     * @param task          评审任务实体
+     * @param includeDocument 是否包含文档详情
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @return 评审任务响应对象
+     */
     private ReviewTaskResponse toTaskResponse(ReviewTaskEntity task, boolean includeDocument, UUID currentUserId, boolean admin) {
         if (!admin) {
             ReviewAssignmentEntity currentAssignment = assignmentMapper.selectActiveByTaskAndReviewer(task.getId(), currentUserId);
@@ -493,6 +635,12 @@ public class ReviewServiceImpl implements ReviewService {
         return ReviewTaskResponse.from(task, document, report, null, assignments);
     }
 
+    /**
+     * 根据报告ID获取评审报告，不存在则抛出异常
+     *
+     * @param reportId 报告ID
+     * @return 评审报告实体
+     */
     private ReviewReportEntity requireReport(UUID reportId) {
         ReviewReportEntity report = reportMapper.selectById(reportId);
         if (report == null) {
@@ -501,6 +649,13 @@ public class ReviewServiceImpl implements ReviewService {
         return report;
     }
 
+    /**
+     * 断言当前用户有权访问指定评审报告
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param report        评审报告实体
+     */
     private void assertReportAccess(UUID currentUserId, boolean admin, ReviewReportEntity report) {
         if (admin) {
             return;
@@ -522,6 +677,13 @@ public class ReviewServiceImpl implements ReviewService {
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能访问自己的评审风险项");
     }
 
+    /**
+     * 构建AI评审提示词
+     *
+     * @param document 文档详情
+     * @param criteria 评审标准列表
+     * @return AI提示词对象
+     */
     private PromptConstructionService.Prompt buildReviewPrompt(DocumentPersistenceService.DocumentDetail document, List<ReviewCriterionResponse> criteria) {
         String criteriaText = criteria.stream()
                 .map(item -> "- " + item.code() + " / " + item.name() + "：满分 " + item.maxScore() + "，权重 " + item.weight() + "。" + nullToEmpty(item.description()))
@@ -561,6 +723,12 @@ public class ReviewServiceImpl implements ReviewService {
         return new PromptConstructionService.Prompt(systemMessage, userMessage);
     }
 
+    /**
+     * 解析模型输出的JSON文本
+     *
+     * @param modelText 模型输出的原始文本
+     * @return 解析后的键值对映射
+     */
     private Map<String, Object> parseModelOutput(String modelText) {
         String json = extractJson(modelText);
         try {
@@ -577,6 +745,12 @@ public class ReviewServiceImpl implements ReviewService {
         }
     }
 
+    /**
+     * 从模型输出中提取JSON字符串
+     *
+     * @param value 模型原始输出
+     * @return 提取的JSON字符串
+     */
     private String extractJson(String value) {
         if (value == null || value.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型评审结果为空");
@@ -593,6 +767,12 @@ public class ReviewServiceImpl implements ReviewService {
         return text.substring(start, end + 1);
     }
 
+    /**
+     * 去除文本中的Markdown代码围栏
+     *
+     * @param value 包含代码围栏的文本
+     * @return 去除围栏后的文本
+     */
     private String stripCodeFence(String value) {
         String text = value.trim();
         if (text.startsWith("```")) {
@@ -601,6 +781,13 @@ public class ReviewServiceImpl implements ReviewService {
         return text;
     }
 
+    /**
+     * 通过括号匹配找到JSON对象的结束位置
+     *
+     * @param text  待解析的文本
+     * @param start 左花括号的起始位置
+     * @return 匹配的右花括号位置，未找到返回-1
+     */
     private int balancedObjectEnd(String text, int start) {
         int depth = 0;
         boolean inString = false;
@@ -634,10 +821,22 @@ public class ReviewServiceImpl implements ReviewService {
         return -1;
     }
 
+    /**
+     * 修复JSON中常见的尾逗号问题
+     *
+     * @param json 待修复的JSON字符串
+     * @return 修复后的JSON字符串
+     */
     private String repairJson(String json) {
         return json.replaceAll(",\\s*([}\\]])", "$1");
     }
 
+    /**
+     * 根据任务ID获取评审任务，不存在则抛出异常
+     *
+     * @param taskId 任务ID
+     * @return 评审任务实体
+     */
     private ReviewTaskEntity requireTask(UUID taskId) {
         ReviewTaskEntity task = taskMapper.selectByIdIncludingDeleted(taskId);
         if (task == null) {
@@ -646,6 +845,14 @@ public class ReviewServiceImpl implements ReviewService {
         return task;
     }
 
+    /**
+     * 获取当前用户可访问的评审任务，无权限则抛出异常
+     *
+     * @param currentUserId 当前用户ID
+     * @param admin         是否为管理员
+     * @param taskId        任务ID
+     * @return 评审任务实体
+     */
     private ReviewTaskEntity requireAccessibleTask(UUID currentUserId, boolean admin, UUID taskId) {
         ReviewTaskEntity task = requireTask(taskId);
         if (!admin
@@ -656,6 +863,13 @@ public class ReviewServiceImpl implements ReviewService {
         return task;
     }
 
+    /**
+     * 判断是否为用户自己创建的、未分配评审人的待处理任务
+     *
+     * @param task          评审任务实体
+     * @param currentUserId 当前用户ID
+     * @return 是否为自己的未分配待处理任务
+     */
     private boolean isOwnUnassignedPendingTask(ReviewTaskEntity task, UUID currentUserId) {
         return task != null
                 && currentUserId != null
@@ -665,11 +879,24 @@ public class ReviewServiceImpl implements ReviewService {
                 .noneMatch(assignment -> !ReviewAssignmentStatuses.CANCELLED.equals(assignment.getStatus()));
     }
 
+    /**
+     * 获取评审任务关联的文档详情，不存在则抛出异常
+     *
+     * @param task 评审任务实体
+     * @return 文档详情
+     */
     private DocumentPersistenceService.DocumentDetail requireDocument(ReviewTaskEntity task) {
         return documentPersistenceService.findReviewDocument(task.getSubmitterUserId(), task.getSourceId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "论文文档不存在"));
     }
 
+    /**
+     * 根据用户ID和来源ID查找文档实体
+     *
+     * @param ownerUserId 文档所有者用户ID
+     * @param sourceId    文档来源标识
+     * @return 文档实体
+     */
     private DocumentEntity findDocumentEntity(UUID ownerUserId, String sourceId) {
         DocumentEntity entity = documentMapper.selectOne(new LambdaQueryWrapper<DocumentEntity>()
                 .eq(DocumentEntity::getOwnerUserId, ownerUserId)
@@ -680,6 +907,13 @@ public class ReviewServiceImpl implements ReviewService {
         return entity;
     }
 
+    /**
+     * 根据用户ID和来源ID查找评审文档实体
+     *
+     * @param ownerUserId 文档所有者用户ID
+     * @param sourceId    文档来源标识
+     * @return 评审文档实体
+     */
     private DocumentEntity findReviewDocumentEntity(UUID ownerUserId, String sourceId) {
         DocumentEntity entity = documentMapper.selectOne(new LambdaQueryWrapper<DocumentEntity>()
                 .eq(DocumentEntity::getOwnerUserId, ownerUserId)
@@ -691,6 +925,12 @@ public class ReviewServiceImpl implements ReviewService {
         return entity;
     }
 
+    /**
+     * 将评审指标请求应用到评审指标实体
+     *
+     * @param entity  评审指标实体
+     * @param request 评审指标请求
+     */
     private void applyCriterionRequest(ReviewCriterionEntity entity, ReviewCriterionRequest request) {
         entity.setCode(requireText(request.code(), "指标编码不能为空").toUpperCase());
         entity.setName(requireText(request.name(), "指标名称不能为空"));
@@ -701,6 +941,15 @@ public class ReviewServiceImpl implements ReviewService {
         entity.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
     }
 
+    /**
+     * 追加审计日志
+     *
+     * @param taskId         任务ID
+     * @param operatorUserId 操作用户ID
+     * @param action         操作类型
+     * @param note           操作备注
+     * @param snapshot       操作快照
+     */
     private void appendAudit(UUID taskId, UUID operatorUserId, String action, String note, Map<String, Object> snapshot) {
         ReviewAuditLogEntity log = new ReviewAuditLogEntity();
         log.setId(UUID.randomUUID());
@@ -713,6 +962,12 @@ public class ReviewServiceImpl implements ReviewService {
         auditLogMapper.insert(log);
     }
 
+    /**
+     * 生成评审报告快照
+     *
+     * @param report 评审报告实体
+     * @return 报告快照映射
+     */
     private Map<String, Object> reportSnapshot(ReviewReportEntity report) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("reportId", report.getId() == null ? null : report.getId().toString());
@@ -726,6 +981,13 @@ public class ReviewServiceImpl implements ReviewService {
         return snapshot;
     }
 
+    /**
+     * 计算人工调整的差异
+     *
+     * @param before 调整前快照
+     * @param after  调整后快照
+     * @return 差异映射
+     */
     private Map<String, Object> manualDelta(Map<String, Object> before, Map<String, Object> after) {
         return Map.of(
                 "scoreChanged", !Objects.equals(before.get("scores"), after.get("scores")) || !Objects.equals(before.get("totalScore"), after.get("totalScore")),
@@ -735,18 +997,37 @@ public class ReviewServiceImpl implements ReviewService {
         );
     }
 
+    /**
+     * 合并解析结果和原始模型输出
+     *
+     * @param parsed    解析后的结果
+     * @param modelText 模型原始输出
+     * @return 合并后的输出
+     */
     private Map<String, Object> rawOutput(Map<String, Object> parsed, String modelText) {
         Map<String, Object> raw = new LinkedHashMap<>(parsed);
         raw.put("rawText", modelText);
         return raw;
     }
 
+    /**
+     * 获取文档的结构化解析文本
+     *
+     * @param document 文档详情
+     * @return 结构化解析的JSON文本
+     */
     private String structuredParseText(DocumentPersistenceService.DocumentDetail document) {
         return paperStructuredParseService.find(document.ownerUserId(), document.sourceId())
                 .map(result -> toJsonText(result.getMergedResult()))
                 .orElse("{}");
     }
 
+    /**
+     * 将对象值转换为Map
+     *
+     * @param value 待转换的值
+     * @return 转换后的Map，如果无法转换则返回空Map
+     */
     private Map<String, Object> mapValue(Object value) {
         if (value instanceof Map<?, ?> map) {
             Map<String, Object> result = new LinkedHashMap<>();
@@ -756,10 +1037,23 @@ public class ReviewServiceImpl implements ReviewService {
         return new LinkedHashMap<>();
     }
 
+    /**
+     * 获取值或返回默认值
+     *
+     * @param value    原始值
+     * @param fallback 默认值
+     * @return 原始值或默认值
+     */
     private Object valueOrDefault(Object value, Object fallback) {
         return value == null ? fallback : value;
     }
 
+    /**
+     * 从解析结果中提取参考文献文本
+     *
+     * @param parsed 解析后的结果
+     * @return 参考文献文本
+     */
     private String structuredReferences(Map<String, Object> parsed) {
         Object sections = parsed.get("paperSections");
         if (sections instanceof Map<?, ?> map) {
@@ -768,6 +1062,13 @@ public class ReviewServiceImpl implements ReviewService {
         return "";
     }
 
+    /**
+     * 获取参考文献检查器的输入文本
+     *
+     * @param document 文档详情
+     * @param parsed   解析后的结果
+     * @return 参考文献文本
+     */
     private String referenceCheckerInput(DocumentPersistenceService.DocumentDetail document, Map<String, Object> parsed) {
         String structuredParseReferences = paperStructuredParseService.find(document.ownerUserId(), document.sourceId())
                 .map(result -> referencesFromStructuredParse(result.getMergedResult()))
@@ -775,6 +1076,12 @@ public class ReviewServiceImpl implements ReviewService {
         return structuredParseReferences.isBlank() ? structuredReferences(parsed) : structuredParseReferences;
     }
 
+    /**
+     * 从结构化解析结果中提取参考文献
+     *
+     * @param mergedResult 合并后的结构化解析结果
+     * @return 参考文献文本
+     */
     private String referencesFromStructuredParse(Object mergedResult) {
         if (mergedResult instanceof Map<?, ?> map) {
             String directReferences = referencesText(map.get("references"));
@@ -789,6 +1096,12 @@ public class ReviewServiceImpl implements ReviewService {
         return "";
     }
 
+    /**
+     * 将参考文献对象转换为文本
+     *
+     * @param references 参考文献对象（可以是List、数组或单个对象）
+     * @return 参考文献文本
+     */
     private String referencesText(Object references) {
         if (references == null) {
             return "";
@@ -806,6 +1119,13 @@ public class ReviewServiceImpl implements ReviewService {
         return String.valueOf(references);
     }
 
+    /**
+     * 合并模型风险项和参考文献格式检查风险项
+     *
+     * @param modelRisks      模型生成的风险项
+     * @param referenceRisks  参考文献格式检查风险项
+     * @return 合并后的风险项列表
+     */
     private Object mergeRisks(Object modelRisks, List<ReferenceFormatChecker.ReferenceRisk> referenceRisks) {
         List<Object> merged = new ArrayList<>();
         if (modelRisks instanceof List<?> list) {
@@ -824,6 +1144,12 @@ public class ReviewServiceImpl implements ReviewService {
         return merged;
     }
 
+    /**
+     * 计算总分（取各指标分数的平均值）
+     *
+     * @param scores 各指标分数列表
+     * @return 计算后的总分
+     */
     private int calculateTotalScore(Object scores) {
         if (!(scores instanceof List<?> list) || list.isEmpty()) {
             return 0;
@@ -843,6 +1169,12 @@ public class ReviewServiceImpl implements ReviewService {
         return (int) Math.round(values.stream().mapToInt(Integer::intValue).average().orElse(0));
     }
 
+    /**
+     * 将对象值转换为Integer，无法转换则返回null
+     *
+     * @param value 待转换的值
+     * @return 转换后的Integer，无法转换返回null
+     */
     private Integer intOrNull(Object value) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -857,11 +1189,25 @@ public class ReviewServiceImpl implements ReviewService {
         return null;
     }
 
+    /**
+     * 将对象值转换为int，无法转换则返回默认值
+     *
+     * @param value    待转换的值
+     * @param fallback 默认值
+     * @return 转换后的int值
+     */
     private int intValue(Object value, int fallback) {
         Integer parsed = intOrNull(value);
         return parsed == null ? fallback : parsed;
     }
 
+    /**
+     * 将对象值转换为String，无法转换则返回默认值
+     *
+     * @param value    待转换的值
+     * @param fallback 默认值
+     * @return 转换后的字符串
+     */
     private String stringValue(Object value, String fallback) {
         if (value == null) {
             return fallback;
@@ -870,6 +1216,13 @@ public class ReviewServiceImpl implements ReviewService {
         return text.isEmpty() ? fallback : text;
     }
 
+    /**
+     * 要求文本非空，为空则抛出异常
+     *
+     * @param value   待验证的值
+     * @param message 错误信息
+     * @return 验证后的文本
+     */
     private String requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
@@ -877,28 +1230,52 @@ public class ReviewServiceImpl implements ReviewService {
         return value.trim();
     }
 
+    /**
+     * 将空字符串或null转换为null
+     *
+     * @param value 待处理的字符串
+     * @return 处理后的字符串，空或null返回null
+     */
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /**
+     * 将评审人任务状态标准化为评审分配状态
+     *
+     * @param status 评审人任务状态
+     * @return 标准化后的评审分配状态
+     */
     private String normalizeReviewerAssignmentStatus(String status) {
         if (status == null || status.isBlank()) {
             return null;
         }
         String normalized = status.trim().toUpperCase();
         return switch (normalized) {
-            case ReviewTaskStatuses.PENDING, ReviewTaskStatuses.ASSIGNED -> ReviewAssignmentStatuses.ASSIGNED;
-            case ReviewTaskStatuses.REVIEWING, ReviewTaskStatuses.IN_REVIEW -> ReviewAssignmentStatuses.REVIEWING;
-            case ReviewTaskStatuses.SUBMITTED, ReviewTaskStatuses.COMPLETED -> ReviewAssignmentStatuses.SUBMITTED;
+            case ReviewTaskStatuses.ASSIGNED -> ReviewAssignmentStatuses.ASSIGNED;
+            case ReviewTaskStatuses.IN_REVIEW -> ReviewAssignmentStatuses.REVIEWING;
+            case ReviewTaskStatuses.SUBMITTED -> ReviewAssignmentStatuses.SUBMITTED;
             case ReviewAssignmentStatuses.RETURNED -> ReviewAssignmentStatuses.RETURNED;
             default -> normalized;
         };
     }
 
+    /**
+     * 将null值转换为空字符串
+     *
+     * @param value 待处理的值
+     * @return 处理后的字符串，null返回空字符串
+     */
     private String nullToEmpty(Object value) {
         return value == null ? "" : String.valueOf(value);
     }
 
+    /**
+     * 返回第一个非空的字符串
+     *
+     * @param values 候选字符串数组
+     * @return 第一个非空的字符串，都为空则返回空字符串
+     */
     private String nonBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank()) {
@@ -908,6 +1285,13 @@ public class ReviewServiceImpl implements ReviewService {
         return "";
     }
 
+    /**
+     * 截断字符串到指定长度
+     *
+     * @param value 待截断的字符串
+     * @param limit 最大长度
+     * @return 截断后的字符串
+     */
     private String truncate(String value, int limit) {
         if (value == null || value.length() <= limit) {
             return nullToEmpty(value);
@@ -915,6 +1299,12 @@ public class ReviewServiceImpl implements ReviewService {
         return value.substring(0, limit) + "\n[后续内容因长度限制已截断]";
     }
 
+    /**
+     * 将对象转换为JSON文本
+     *
+     * @param value 待转换的对象
+     * @return JSON文本，转换失败返回字符串表示
+     */
     private String toJsonText(Object value) {
         if (value == null) {
             return "[]";

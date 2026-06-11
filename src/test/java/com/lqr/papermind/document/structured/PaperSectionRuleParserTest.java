@@ -137,6 +137,65 @@ class PaperSectionRuleParserTest {
         assertThat(result.content().conclusion()).contains("主要功能");
     }
 
+    @Test
+    void parseShouldIgnoreContentsPageNumbersBeforeBodySections() {
+        String text = """
+                软件分析与建模技术课程设计
+
+                1 引言1
+                1.1 项目背景2
+                1.2 研究内容3
+                2 需求分析3
+                2.1 业务分析3
+                3 系统设计6
+                4 系统测试18
+                5 总结22
+
+                1 引言
+                本课程设计围绕博客系统展开。
+
+                2 需求分析
+                系统需要支持用户登录、文章管理和评论管理。
+
+                3 系统设计
+                系统采用 Spring Boot、Vue 3 和数据库建模。
+
+                4 系统测试
+                对登录、发布文章和评论流程进行测试。
+
+                5 总结
+                本文完成博客系统主要功能设计与实现。
+                """;
+
+        StructuredParseResult result = parser.parse(document("软件分析与建模技术课程设计", null, null, text));
+
+        assertThat(result.content().introduction()).contains("课程设计围绕博客系统");
+        assertThat(result.content().methodology()).contains("用户登录、文章管理和评论管理");
+        assertThat(result.content().methodology()).doesNotContain("2.1 业务分析3");
+        assertThat(result.content().experimentResults()).contains("登录、发布文章和评论流程");
+        assertThat(result.content().conclusion()).contains("主要功能设计与实现");
+    }
+
+    @Test
+    void parseShouldRecognizeHeadingsWithTrailingPageNumbers() {
+        String text = """
+                2 需求分析3
+                系统需要支持用户登录、文章管理和评论管理。
+
+                3 系统测试18
+                对登录、发布文章和评论流程进行测试。
+
+                5 总结22
+                本文完成博客系统主要功能设计与实现。
+                """;
+
+        StructuredParseResult result = parser.parse(document("软件分析与建模技术课程设计", null, null, text));
+
+        assertThat(result.content().methodology()).contains("用户登录、文章管理和评论管理");
+        assertThat(result.content().experimentResults()).contains("发布文章和评论流程");
+        assertThat(result.content().conclusion()).contains("博客系统主要功能");
+    }
+
     private DocumentPersistenceService.DocumentDetail document(String title, String abstractText, Object keywords, String contentText) {
         OffsetDateTime now = OffsetDateTime.now();
         return new DocumentPersistenceService.DocumentDetail(

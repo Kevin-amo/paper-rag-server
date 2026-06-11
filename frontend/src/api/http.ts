@@ -1,9 +1,15 @@
 import axios from 'axios';
-import { clearAuthSession, getAccessToken } from '../composables/authState';
+import { clearAuthSession } from '../composables/authState';
 
 const rawPrefix = import.meta.env.VITE_API_PREFIX?.trim() ?? '/api';
 
 export const apiPrefix = rawPrefix === '/' ? '' : rawPrefix.replace(/\/$/, '');
+
+let tokenProvider: (() => string) | null = null;
+
+export function setTokenProvider(provider: () => string) {
+  tokenProvider = provider;
+}
 
 export const http = axios.create({
   baseURL: apiPrefix,
@@ -15,14 +21,19 @@ export const literatureHttp = axios.create({
   timeout: 120000,
 });
 
+export const longRunningHttp = axios.create({
+  baseURL: apiPrefix,
+  timeout: 180000,
+});
+
 export const uploadHttp = axios.create({
   baseURL: apiPrefix,
   timeout: 300000,
 });
 
-[http, literatureHttp, uploadHttp].forEach((client) => {
+[http, literatureHttp, longRunningHttp, uploadHttp].forEach((client) => {
   client.interceptors.request.use((config) => {
-    const token = getAccessToken();
+    const token = tokenProvider?.();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

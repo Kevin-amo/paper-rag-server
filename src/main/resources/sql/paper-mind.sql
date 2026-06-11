@@ -660,11 +660,11 @@ create table if not exists public.review_task (
     updated_at timestamptz not null default now(),
 
     constraint uq_review_task_document unique (document_id),
-    constraint chk_review_task_status check (status in ('PENDING', 'PENDING_ASSIGNMENT', 'ASSIGNED', 'REVIEWING', 'IN_REVIEW', 'SUBMITTED', 'COMPLETED', 'CONSENSUS_CONFIRMED', 'NEEDS_REVIEW'))
+    constraint chk_review_task_status check (status in ('PENDING_ASSIGNMENT', 'ASSIGNED', 'IN_REVIEW', 'SUBMITTED', 'CONSENSUS_CONFIRMED', 'NEEDS_REVIEW'))
 );
 
 comment on table public.review_task is '论文评审任务表';
-comment on column public.review_task.status is '评审状态：PENDING、PENDING_ASSIGNMENT、ASSIGNED、REVIEWING、IN_REVIEW、SUBMITTED、COMPLETED、CONSENSUS_CONFIRMED、NEEDS_REVIEW';
+comment on column public.review_task.status is '评审状态：PENDING_ASSIGNMENT、ASSIGNED、IN_REVIEW、SUBMITTED、CONSENSUS_CONFIRMED、NEEDS_REVIEW';
 
 create index if not exists idx_review_task_status_updated_at
     on public.review_task using btree (status, updated_at desc);

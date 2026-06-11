@@ -14,7 +14,7 @@ import type { AdminReviewTaskSummary, AssignReviewersPayload, UpdateReviewConsen
 const adminReviews = useAdminReviews();
 const route = useRoute();
 const router = useRouter();
-const validTabs = ['config', 'tasks', 'criteria', 'archive'] as const;
+const validTabs = ['config', 'tasks', 'criteria'] as const;
 type ReviewAdminTab = (typeof validTabs)[number];
 
 const activeTab = ref<ReviewAdminTab>(normalizeTab(route.query.tab));
@@ -29,7 +29,6 @@ const activeSectionTitle = computed(() => {
     config: '批次与小组',
     tasks: '全局进度',
     criteria: '评审指标',
-    archive: '结果查看/兜底确认',
   };
   return titles[activeTab.value];
 });
@@ -153,9 +152,6 @@ onMounted(async () => {
               <el-option label="评审中" value="IN_REVIEW" />
               <el-option label="已提交" value="SUBMITTED" />
               <el-option label="共识已确认" value="CONSENSUS_CONFIRMED" />
-              <el-option label="旧状态：待处理" value="PENDING" />
-              <el-option label="旧状态：评审中" value="REVIEWING" />
-              <el-option label="旧状态：已完成" value="COMPLETED" />
             </el-select>
             <el-button @click="adminReviews.loadTasks(0)">搜索</el-button>
             <el-button type="primary" @click="adminReviews.loadTasks(adminReviews.page.value)">刷新</el-button>
@@ -189,17 +185,6 @@ onMounted(async () => {
             <span>查看当前评审标准、评分维度和权重说明。</span>
           </div>
           <ReviewCriteriaPanel />
-        </el-tab-pane>
-
-        <el-tab-pane label="结果查看" name="archive">
-          <div class="section-note">
-            <strong>结果查看 / 兜底确认</strong>
-            <span>最终评分主流程由组长处理；admin 在异常场景下从任务列表进入兜底确认。</span>
-          </div>
-          <div class="archive-helper">
-            <p>结果与共识操作仍以任务为入口，避免重复维护两套列表。</p>
-            <el-button type="primary" @click="activeTab = 'tasks'">查看评审任务</el-button>
-          </div>
         </el-tab-pane>
       </el-tabs>
     </section>
@@ -340,18 +325,6 @@ onMounted(async () => {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
-}
-
-.archive-helper {
-  border: 1px dashed #c4cfdd;
-  border-radius: 10px;
-  padding: 22px;
-  background: #f8fafc;
-}
-
-.archive-helper p {
-  margin: 0 0 14px;
-  color: #4b5563;
 }
 
 @media (max-width: 980px) {

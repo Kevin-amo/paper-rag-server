@@ -12,6 +12,12 @@ import java.util.UUID;
 
 public interface ReviewConsensusMapper extends BaseMapper<ReviewConsensusEntity> {
 
+    /**
+     * 根据评审任务ID查询共识记录
+     *
+     * @param taskId 评审任务ID
+     * @return 共识记录，不存在则返回null
+     */
     @Select("""
             select *
             from public.review_consensus

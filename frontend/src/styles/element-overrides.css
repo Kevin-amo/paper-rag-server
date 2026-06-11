@@ -1,0 +1,120 @@
+.el-card,
+.el-dialog,
+.el-drawer {
+  --el-border-radius-base: 16px;
+}
+
+.el-button {
+  --el-button-hover-bg-color: rgba(255, 255, 255, 0.88);
+  --el-button-hover-border-color: rgba(0, 122, 255, 0.26);
+  border-radius: 999px;
+  font-weight: 750;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--app-primary);
+  --el-button-border-color: var(--app-primary);
+  --el-button-hover-bg-color: var(--app-primary-dark);
+  --el-button-hover-border-color: var(--app-primary-dark);
+  box-shadow: 0 12px 26px rgba(0, 122, 255, 0.2);
+}
+
+.el-button--success {
+  --el-button-bg-color: var(--app-success);
+  --el-button-border-color: var(--app-success);
+  --el-button-hover-bg-color: #28b84d;
+  --el-button-hover-border-color: #28b84d;
+  --el-button-active-bg-color: #229f42;
+  --el-button-active-border-color: #229f42;
+  --el-button-text-color: #fff;
+  --el-button-hover-text-color: #fff;
+  --el-button-active-text-color: #fff;
+}
+
+.el-drawer {
+  background: rgba(248, 249, 252, 0.92);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+}
+
+.el-drawer__header {
+  margin-bottom: 0;
+  padding: 24px 26px 16px;
+  border-bottom: 1px solid rgba(209, 209, 214, 0.58);
+}
+
+.el-drawer__body {
+  padding: 22px 26px 26px;
+  background: transparent;
+}
+
+.el-dialog {
+  overflow: hidden;
+  border: 1px solid rgba(209, 209, 214, 0.72);
+  border-radius: 26px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
+}
+
+.el-dialog__title {
+  color: var(--app-text);
+  font-weight: 850;
+}
+
+.el-message {
+  --apple-message-accent: #007aff;
+  --el-message-bg-color: rgba(255, 255, 255, 0.76);
+  --el-message-border-color: rgba(255, 255, 255, 0.62);
+  --el-message-text-color: #1d1d1f;
+  min-width: min(420px, calc(100vw - 32px));
+  padding: 13px 18px 13px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(246, 247, 251, 0.74)) !important;
+  box-shadow:
+    0 18px 45px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  color: #1d1d1f;
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+}
+
+.el-message::before {
+  width: 9px;
+  height: 9px;
+  margin-right: 12px;
+  border-radius: 999px;
+  background: var(--apple-message-accent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--apple-message-accent) 16%, transparent);
+  content: '';
+  flex: 0 0 auto;
+}
+
+.el-message .el-message__icon {
+  margin-right: 10px;
+  color: var(--apple-message-accent);
+  font-size: 18px;
+}
+
+.el-message .el-message__content {
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.el-message--success {
+  --apple-message-accent: #34c759;
+}
+
+.el-message--warning {
+  --apple-message-accent: #ff9f0a;
+}
+
+.el-message--error {
+  --apple-message-accent: #ff3b30;
+}
+
+.el-message--info {
+  --apple-message-accent: #007aff;
+}

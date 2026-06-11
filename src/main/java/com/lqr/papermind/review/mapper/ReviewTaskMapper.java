@@ -12,6 +12,12 @@ import java.util.UUID;
 
 public interface ReviewTaskMapper extends BaseMapper<ReviewTaskEntity> {
 
+    /**
+     * 根据文档ID检查评审任务是否存在
+     *
+     * @param documentId 文档ID
+     * @return 是否存在
+     */
     @Select("""
             select exists(
                 select 1
@@ -21,6 +27,11 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTaskEntity> {
             """)
     boolean existsByDocumentId(@Param("documentId") UUID documentId);
 
+    /**
+     * 从已索引的评审文档同步创建评审任务
+     *
+     * @return 插入的记录数
+     */
     @Update("""
             insert into public.review_task (document_id, submitter_user_id, source_id, title, status)
             select d.id, d.owner_user_id, d.source_id, d.title, 'PENDING_ASSIGNMENT'
@@ -34,6 +45,12 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTaskEntity> {
             """)
     int syncFromDocuments();
 
+    /**
+     * 根据ID查询评审任务，包含已删除的记录
+     *
+     * @param id 评审任务ID
+     * @return 评审任务实体
+     */
     @Select("""
             select *
             from public.review_task
@@ -41,26 +58,52 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTaskEntity> {
             """)
     ReviewTaskEntity selectByIdIncludingDeleted(@Param("id") UUID id);
 
+    /**
+     * 更新评审任务状态，同时更新审核人、分配时间和完成时间
+     *
+     * @param id 评审任务ID
+     * @param reviewerUserId 审核人用户ID
+     * @param status 新状态
+     * @return 更新的记录数
+     */
     @Update("""
             update public.review_task
             set status = #{status},
                 reviewer_user_id = coalesce(cast(#{reviewerUserId,typeHandler=com.lqr.papermind.common.typehandler.UuidTypeHandler} as uuid), reviewer_user_id),
                 assigned_at = case when cast(#{reviewerUserId,typeHandler=com.lqr.papermind.common.typehandler.UuidTypeHandler} as uuid) is null then assigned_at else coalesce(assigned_at, now()) end,
-                completed_at = case when #{status} = 'COMPLETED' then now() else completed_at end,
+                completed_at = case when #{status} in ('SUBMITTED', 'CONSENSUS_CONFIRMED') then now() else completed_at end,
                 updated_at = now()
             where id = #{id,typeHandler=com.lqr.papermind.common.typehandler.UuidTypeHandler}
             """)
     int updateStatus(@Param("id") UUID id, @Param("reviewerUserId") UUID reviewerUserId, @Param("status") String status);
 
+    /**
+     * 仅更新评审任务状态，不修改审核人信息
+     *
+     * @param id 评审任务ID
+     * @param status 新状态
+     * @return 更新的记录数
+     */
     @Update("""
             update public.review_task
             set status = #{status},
-                completed_at = case when #{status} = 'COMPLETED' then now() else completed_at end,
+                completed_at = case when #{status} in ('SUBMITTED', 'CONSENSUS_CONFIRMED') then now() else completed_at end,
                 updated_at = now()
             where id = #{id}
             """)
     int updateTaskStatus(@Param("id") UUID id, @Param("status") String status);
 
+    /**
+     * 由组长标记评审任务为已分配状态，设置分组、审核人、分配人和截止时间
+     *
+     * @param id 评审任务ID
+     * @param groupId 评审组ID
+     * @param assignedByUserId 分配人用户ID
+     * @param leaderUserId 组长用户ID
+     * @param reviewerUserId 审核人用户ID
+     * @param dueAt 截止时间
+     * @return 更新的记录数
+     */
     @Update("""
             update public.review_task
             set status = 'ASSIGNED',
@@ -80,6 +123,13 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTaskEntity> {
                              @Param("reviewerUserId") UUID reviewerUserId,
                              @Param("dueAt") OffsetDateTime dueAt);
 
+    /**
+     * 管理员查询评审任务列表，支持按关键词和状态过滤
+     *
+     * @param keyword 关键词，匹配source_id和title
+     * @param status 任务状态
+     * @return 评审任务列表
+     */
     @Select("""
             <script>
             select *
@@ -99,6 +149,14 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTaskEntity> {
             """)
     List<ReviewTaskEntity> selectAdminTasks(@Param("keyword") String keyword, @Param("status") String status);
 
+    /**
+     * 查询审核人相关的评审任务，包括已分配给该审核人的任务和待分配的提交任务
+     *
+     * @param reviewerUserId 审核人用户ID
+     * @param keyword 关键词，匹配source_id和title
+     * @param status 任务状态
+     * @return 评审任务列表
+     */
     @Select("""
             <script>
             select t.*
@@ -141,6 +199,12 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTaskEntity> {
                                                @Param("keyword") String keyword,
                                                @Param("status") String status);
 
+    /**
+     * 根据评审组ID查询该组下所有评审任务
+     *
+     * @param groupId 评审组ID
+     * @return 评审任务列表
+     */
     @Select("""
             select t.*
             from public.review_task t
@@ -149,11 +213,17 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTaskEntity> {
             """)
     List<ReviewTaskEntity> selectByGroupId(@Param("groupId") UUID groupId);
 
+    /**
+     * 查询评审组下未分配的评审任务（状态为待分配或待处理，且无有效分配记录）
+     *
+     * @param groupId 评审组ID
+     * @return 未分配的评审任务列表
+     */
     @Select("""
             select t.*
             from public.review_task t
             where t.group_id = #{groupId}
-              and t.status in ('PENDING_ASSIGNMENT', 'PENDING')
+              and t.status = 'PENDING_ASSIGNMENT'
               and not exists (
                   select 1
                   from public.review_assignment a

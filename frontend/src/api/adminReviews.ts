@@ -1,4 +1,5 @@
 import { http } from './http';
+import { compactParams } from '../utils/params';
 import type {
   AdminReviewTaskDetail,
   AdminReviewTaskSummary,
@@ -15,12 +16,6 @@ import type {
   ReviewerLoad,
   UpdateReviewConsensusPayload,
 } from '../types';
-
-function compactParams(params: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''),
-  );
-}
 
 export async function listReviewBatches(params: { page?: number; size?: number } = {}) {
   const { data } = await http.get<PageResponse<ReviewBatch>>('/admin/reviews/batches', {

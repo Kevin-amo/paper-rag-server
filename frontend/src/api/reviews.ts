@@ -1,4 +1,5 @@
-import { http, uploadHttp } from './http';
+import { http, longRunningHttp, uploadHttp } from './http';
+import { compactParams } from '../utils/params';
 import type {
   DocumentUploadAcceptedResponse,
   DocumentJobResponse,
@@ -16,12 +17,6 @@ import type {
   UpdateReviewRiskPayload,
   UploadReviewPaperPayload,
 } from '../types';
-
-function compactParams(params: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''),
-  );
-}
 
 export async function uploadReviewPaper(payload: UploadReviewPaperPayload) {
   const formData = new FormData();
@@ -67,7 +62,7 @@ export async function getReviewTask(taskId: string) {
 }
 
 export async function generateReviewReport(taskId: string) {
-  const { data } = await http.post<ReviewReport>(`/reviews/tasks/${taskId}/ai-review`);
+  const { data } = await longRunningHttp.post<ReviewReport>(`/reviews/tasks/${taskId}/ai-review`);
   return data;
 }
 
@@ -77,7 +72,7 @@ export async function getReviewTaskStructuredParse(taskId: string) {
 }
 
 export async function regenerateReviewTaskStructuredParse(taskId: string) {
-  const { data } = await http.post<PaperStructuredParse>(`/reviews/tasks/${taskId}/structured-parse/regenerate`);
+  const { data } = await longRunningHttp.post<PaperStructuredParse>(`/reviews/tasks/${taskId}/structured-parse/regenerate`);
   return data;
 }
 

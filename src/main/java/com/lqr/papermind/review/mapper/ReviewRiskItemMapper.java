@@ -14,9 +14,21 @@ import java.util.UUID;
 
 public interface ReviewRiskItemMapper extends BaseMapper<ReviewRiskItemEntity> {
 
+    /**
+     * 根据评审报告ID删除所有风险项
+     *
+     * @param reportId 评审报告ID
+     * @return 删除的记录数
+     */
     @Delete("delete from public.review_risk_item where report_id = #{reportId}")
     int deleteByReportId(@Param("reportId") UUID reportId);
 
+    /**
+     * 根据评审报告ID查询所有风险项
+     *
+     * @param reportId 评审报告ID
+     * @return 风险项列表
+     */
     @Select("select * from public.review_risk_item where report_id = #{reportId} order by created_at asc")
     @Results(id = "reviewRiskItemResultMap", value = {
             @Result(column = "evidence_location", property = "evidenceLocation", typeHandler = JsonbTypeHandler.class)

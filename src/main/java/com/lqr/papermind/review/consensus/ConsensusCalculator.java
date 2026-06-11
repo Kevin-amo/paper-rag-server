@@ -15,12 +15,27 @@ public class ConsensusCalculator {
     private static final int OVERALL_DISAGREEMENT_THRESHOLD = 15;
     private static final int CRITERION_DISAGREEMENT_THRESHOLD = 20;
 
+    /**
+     * 共识计算结果记录。
+     *
+     * @param scoreSummary     分数摘要（包含 overallAverage、criteria 等）
+     * @param commentSummary   评审意见摘要（包含 recommendations）
+     * @param disagreementItems 分歧项列表
+     * @param finalScore       最终共识分数
+     */
     public record Result(Map<String, Object> scoreSummary,
                          Map<String, Object> commentSummary,
                          List<Map<String, Object>> disagreementItems,
                          Integer finalScore) {
     }
 
+    /**
+     * 对多份评审报告进行共识计算。
+     * 汇总总分平均值、各评审标准分数、评审意见，以及检测评分分歧。
+     *
+     * @param reports 评审报告列表
+     * @return 共识计算结果
+     */
     public Result calculate(List<ReviewReportEntity> reports) {
         List<ReviewReportEntity> safeReports = reports == null
                 ? List.of()
@@ -55,6 +70,13 @@ public class ConsensusCalculator {
         return new Result(scoreSummary, commentSummary, disagreementItems, overallAverage);
     }
 
+    /**
+     * 汇总各评审标准的分数统计信息，并检测标准级别的评分分歧。
+     *
+     * @param reports           评审报告列表
+     * @param disagreementItems 分歧项列表（会将检测到的标准分歧追加到此列表）
+     * @return 各评审标准的摘要列表（包含 criterionCode、average、minScore、maxScore、participantCount）
+     */
     private List<Map<String, Object>> summarizeCriteria(List<ReviewReportEntity> reports,
                                                         List<Map<String, Object>> disagreementItems) {
         Map<String, List<Integer>> scoresByCode = new LinkedHashMap<>();
@@ -99,6 +121,12 @@ public class ConsensusCalculator {
         return criteria;
     }
 
+    /**
+     * 从各评审报告中提取最终评审建议。
+     *
+     * @param reports 评审报告列表
+     * @return 包含 reportId、reviewerUserId、finalRecommendation 的建议列表
+     */
     private List<Map<String, Object>> recommendations(List<ReviewReportEntity> reports) {
         List<Map<String, Object>> recommendations = new ArrayList<>();
         for (ReviewReportEntity report : reports) {
@@ -114,6 +142,16 @@ public class ConsensusCalculator {
         return recommendations;
     }
 
+    /**
+     * 构建一个分歧项描述。
+     *
+     * @param type         分歧类型（OVERALL_SCORE 或 CRITERION_SCORE）
+     * @param criterionCode 评审标准代码（总分分歧时为 null）
+     * @param minScore     最低分
+     * @param maxScore     最高分
+     * @param threshold    分歧阈值
+     * @return 分歧项映射
+     */
     private Map<String, Object> disagreement(String type, String criterionCode, int minScore, int maxScore, int threshold) {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("type", type);
@@ -127,6 +165,12 @@ public class ConsensusCalculator {
         return item;
     }
 
+    /**
+     * 将任意值安全转换为整数分数。支持 Number 和可解析的字符串。
+     *
+     * @param value 原始值
+     * @return 转换后的整数分数，无法解析时返回 null
+     */
     private Integer numericScore(Object value) {
         if (value instanceof Number number) {
             return (int) Math.round(number.doubleValue());
@@ -141,6 +185,12 @@ public class ConsensusCalculator {
         return null;
     }
 
+    /**
+     * 计算整数列表的四舍五入平均值。
+     *
+     * @param scores 整数分数列表
+     * @return 四舍五入后的平均值，列表为空时返回 0
+     */
     private int roundedAverage(List<Integer> scores) {
         if (scores.isEmpty()) {
             return 0;
