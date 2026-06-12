@@ -22,26 +22,25 @@ defineEmits<{
 </script>
 
 <template>
-  <aside class="task-panel app-card">
+  <aside class="task-panel">
     <div class="panel-header">
-      <div>
-        <p>My Assignments</p>
-        <h2>我的评审任务</h2>
-      </div>
-      <el-button :loading="loading" @click="$emit('search')">刷新</el-button>
+      <h2>评审任务</h2>
+      <el-button size="small" :loading="loading" @click="$emit('search')">刷新</el-button>
     </div>
 
     <div class="task-toolbar">
       <el-input
         :model-value="keyword"
         clearable
-        placeholder="搜索标题 / 文档标识"
+        size="small"
+        placeholder="搜索标题"
         @update:model-value="$emit('update:keyword', $event)"
         @keyup.enter="$emit('search')"
       />
       <el-select
         :model-value="statusFilter"
         clearable
+        size="small"
         placeholder="状态"
         @update:model-value="$emit('update:statusFilter', $event)"
       >
@@ -50,7 +49,7 @@ defineEmits<{
         <el-option label="已提交" value="SUBMITTED" />
         <el-option label="已退回" value="RETURNED" />
       </el-select>
-      <el-button type="primary" @click="$emit('search')">筛选</el-button>
+      <el-button size="small" type="primary" @click="$emit('search')">筛选</el-button>
     </div>
 
     <div v-loading="loading" class="task-list">
@@ -62,12 +61,16 @@ defineEmits<{
         type="button"
         @click="$emit('select', task.id)"
       >
-        <span class="task-title">{{ task.title }}</span>
-        <span class="task-meta">{{ task.sourceId }}</span>
-        <span class="task-bottom">
-          <el-tag size="small" effect="plain">{{ statusLabel(task.currentAssignment?.status ?? task.status) }}</el-tag>
-          <span>{{ formatDate(task.updatedAt) }}</span>
-        </span>
+        <div class="task-item-top">
+          <span class="task-title">{{ task.title }}</span>
+          <span class="task-status-badge" :class="task.currentAssignment?.status ?? task.status">
+            {{ statusLabel(task.currentAssignment?.status ?? task.status) }}
+          </span>
+        </div>
+        <div class="task-item-bottom">
+          <span class="task-id">{{ task.sourceId }}</span>
+          <span class="task-date">{{ formatDate(task.updatedAt) }}</span>
+        </div>
       </button>
       <el-empty v-if="!loading && !tasks.length" description="暂无评审任务" />
     </div>
@@ -87,107 +90,124 @@ defineEmits<{
 
 <style scoped>
 .task-panel {
-  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface);
+  padding: 16px;
+  gap: 12px;
 }
 
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid #edf1f7;
-}
-
-.panel-header p {
-  margin: 0;
-  color: #155eef;
-  font-size: 12px;
-  font-weight: 850;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .panel-header h2 {
-  margin: 4px 0 0;
-  color: #101828;
+  margin: 0;
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .task-toolbar {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  margin: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .task-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-height: 420px;
+  gap: 4px;
+  min-height: 400px;
+  overflow-y: auto;
 }
 
 .task-item {
-  position: relative;
   width: 100%;
   border: 1px solid transparent;
-  border-radius: 9px;
-  padding: 12px 12px 12px 14px;
-  background: #fff;
-  box-shadow: inset 0 -1px 0 #edf1f7;
+  border-radius: var(--app-radius-sm);
+  padding: 12px 14px;
+  background: transparent;
   color: inherit;
   cursor: pointer;
   text-align: left;
-  transition: all 0.18s ease;
+  transition: all 0.15s ease;
 }
 
 .task-item:hover {
-  border-color: #c7d7fe;
-  background: #f5f8ff;
+  background: var(--app-surface-soft);
+  border-color: var(--app-border);
 }
 
 .task-item.active {
-  border-color: #b2ccff;
-  background: #f0f6ff;
+  background: var(--app-primary-soft);
+  border-color: var(--app-primary);
 }
 
-.task-item.active::before {
-  position: absolute;
-  left: 0;
-  top: 10px;
-  bottom: 10px;
-  width: 3px;
-  border-radius: 0 999px 999px 0;
-  background: #155eef;
-  content: '';
-}
-
-.task-title,
-.task-meta,
-.task-bottom {
-  display: block;
+.task-item-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .task-title {
-  color: #101828;
-  font-weight: 750;
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.task-meta {
-  color: #667085;
-  font-size: 12px;
+.task-status-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: var(--app-radius-xs);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.task-bottom {
+.task-status-badge.ASSIGNED {
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+}
+
+.task-status-badge.REVIEWING {
+  background: var(--app-warning-soft);
+  color: #b45309;
+}
+
+.task-status-badge.SUBMITTED {
+  background: var(--app-success-soft);
+  color: #047857;
+}
+
+.task-status-badge.RETURNED {
+  background: var(--app-danger-soft);
+  color: var(--app-danger);
+}
+
+.task-item-bottom {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
-.task-bottom span:last-child {
-  color: #667085;
+.task-id,
+.task-date {
+  color: var(--app-text-subtle);
   font-size: 12px;
 }
 </style>

@@ -4,6 +4,12 @@ import java.time.OffsetDateTime;
 
 /**
  * 统一 API 错误响应体，用于前端稳定读取状态码、错误码和提示信息。
+ *
+ * @param status HTTP 状态码
+ * @param code 业务错误码
+ * @param message 提示信息
+ * @param path 请求路径
+ * @param timestamp 错误发生时间
  */
 public record ApiErrorResponse(
         int status,

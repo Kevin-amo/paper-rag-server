@@ -24,7 +24,7 @@ import java.util.Map;
  */
 @Component
 @RequiredArgsConstructor
-public class DefaultPaperStructuredModelCompleter implements PaperStructuredModelCompleter {
+public class PaperStructuredModelCompleterImpl implements PaperStructuredModelCompleter {
 
     private static final int FULL_TEXT_LIMIT = 12000;
 

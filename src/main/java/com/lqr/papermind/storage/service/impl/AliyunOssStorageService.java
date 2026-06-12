@@ -21,6 +21,14 @@ public class AliyunOssStorageService implements ObjectStorageService {
 
     private final OssProperties properties;
 
+    /**
+     * 上传对象到阿里云 OSS。
+     *
+     * @param objectKey    对象键
+     * @param inputStream  文件输入流
+     * @param contentLength 文件内容长度（字节）
+     * @param contentType  文件内容类型
+     */
     @Override
     public void putObject(String objectKey, InputStream inputStream, long contentLength, String contentType) {
         ensureConfigured();

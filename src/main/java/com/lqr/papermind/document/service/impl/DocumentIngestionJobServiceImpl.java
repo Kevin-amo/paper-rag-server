@@ -189,6 +189,13 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
                 .eq(DocumentIngestionJob::getId, jobId)));
     }
 
+    /**
+     * 校验请求的来源类型与已有文档的来源类型是否兼容，不兼容时抛出冲突异常。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param requestedSourceType 请求的来源类型
+     */
     private void assertSourceTypeCompatible(UUID ownerUserId, String sourceId, String requestedSourceType) {
         documentPersistenceService.findAnyDocument(ownerUserId, sourceId)
                 .ifPresent(document -> {
@@ -201,6 +208,12 @@ public class DocumentIngestionJobServiceImpl implements DocumentIngestionJobServ
                 });
     }
 
+    /**
+     * 从元数据中提取来源类型，默认为用户上传类型。
+     *
+     * @param metadata 元数据映射
+     * @return 来源类型字符串
+     */
     private String sourceType(Map<String, Object> metadata) {
         Object sourceType = metadata == null ? null : metadata.get(MetadataKeys.SOURCE_TYPE);
         if (MetadataKeys.SOURCE_TYPE_REVIEW.equalsIgnoreCase(sourceType == null ? null : String.valueOf(sourceType))) {

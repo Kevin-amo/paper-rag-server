@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { Document, List, UserFilled, TrendCharts } from '@element-plus/icons-vue';
 import AdminShell from '../../components/admin/AdminShell.vue';
 import AdminReviewTaskTable from '../../components/admin/review/AdminReviewTaskTable.vue';
 import ReviewAssignmentDrawer from '../../components/admin/review/ReviewAssignmentDrawer.vue';
@@ -94,50 +95,58 @@ onMounted(async () => {
 <template>
   <AdminShell :active="activeTab" :title="activeSectionTitle">
     <section class="summary-grid">
-      <div class="summary-card accent-blue">
-        <span class="metric-icon">T</span>
-        <div>
-          <span>任务总数</span>
-          <strong>{{ adminReviews.total.value }}</strong>
+      <div class="summary-card">
+        <div class="summary-icon blue">
+          <el-icon :size="20"><Document /></el-icon>
+        </div>
+        <div class="summary-body">
+          <span class="summary-label">任务总数</span>
+          <strong class="summary-value">{{ adminReviews.total.value }}</strong>
         </div>
       </div>
-      <div class="summary-card accent-indigo">
-        <span class="metric-icon">P</span>
-        <div>
-          <span>当前页任务</span>
-          <strong>{{ adminReviews.tasks.value.length }}</strong>
+      <div class="summary-card">
+        <div class="summary-icon indigo">
+          <el-icon :size="20"><List /></el-icon>
+        </div>
+        <div class="summary-body">
+          <span class="summary-label">当前页任务</span>
+          <strong class="summary-value">{{ adminReviews.tasks.value.length }}</strong>
         </div>
       </div>
-      <div class="summary-card accent-green">
-        <span class="metric-icon">S</span>
-        <div>
-          <span>提交进度</span>
-          <strong>{{ submittedTotal }}/{{ assignmentTotal }}</strong>
+      <div class="summary-card">
+        <div class="summary-icon green">
+          <el-icon :size="20"><TrendCharts /></el-icon>
+        </div>
+        <div class="summary-body">
+          <span class="summary-label">提交进度</span>
+          <strong class="summary-value">{{ submittedTotal }}<span class="summary-denom">/{{ assignmentTotal }}</span></strong>
         </div>
       </div>
-      <div class="summary-card accent-amber">
-        <span class="metric-icon">R</span>
-        <div>
-          <span>评审员</span>
-          <strong>{{ adminReviews.reviewerLoads.value.length }}</strong>
+      <div class="summary-card">
+        <div class="summary-icon amber">
+          <el-icon :size="20"><UserFilled /></el-icon>
+        </div>
+        <div class="summary-body">
+          <span class="summary-label">评审员</span>
+          <strong class="summary-value">{{ adminReviews.reviewerLoads.value.length }}</strong>
         </div>
       </div>
     </section>
 
-    <section class="dashboard-card app-card">
+    <section class="dashboard-card">
       <el-tabs v-model="activeTab">
         <el-tab-pane label="批次与小组" name="config">
-          <div class="section-note">
-            <strong>批次与小组</strong>
-            <span>配置评审批次、评审小组、组长和组内成员；普通评审任务分配后续交由组长处理。</span>
+          <div class="section-header">
+            <h3>批次与小组</h3>
+            <p>配置评审批次、评审小组、组长和组内成员；普通评审任务分配后续交由组长处理。</p>
           </div>
           <ReviewBatchGroupPanel />
         </el-tab-pane>
 
         <el-tab-pane label="全局进度" name="tasks">
-          <div class="section-note">
-            <strong>全局进度</strong>
-            <span>查看所有评审任务进度；普通分配主流程由组长处理，admin 仅保留异常兜底改派入口。</span>
+          <div class="section-header">
+            <h3>全局进度</h3>
+            <p>查看所有评审任务进度；普通分配主流程由组长处理，admin 仅保留异常兜底改派入口。</p>
           </div>
           <div class="toolbar">
             <el-input
@@ -180,9 +189,9 @@ onMounted(async () => {
         </el-tab-pane>
 
         <el-tab-pane label="评审指标" name="criteria">
-          <div class="section-note">
-            <strong>评审指标</strong>
-            <span>查看当前评审标准、评分维度和权重说明。</span>
+          <div class="section-header">
+            <h3>评审指标</h3>
+            <p>查看当前评审标准、评分维度和权重说明。</p>
           </div>
           <ReviewCriteriaPanel />
         </el-tab-pane>
@@ -215,109 +224,131 @@ onMounted(async () => {
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 .summary-card {
   display: flex;
   align-items: center;
   gap: 14px;
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-  padding: 16px;
-  background: #fff;
-  box-shadow: 0 10px 26px rgba(16, 24, 40, 0.04);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 18px 20px;
+  background: var(--app-surface);
+  transition: box-shadow 0.2s ease;
 }
 
-.metric-icon {
-  width: 42px;
-  height: 42px;
-  display: inline-flex;
+.summary-card:hover {
+  box-shadow: var(--app-shadow-sm);
+}
+
+.summary-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 850;
+  border-radius: var(--app-radius-sm);
+  flex-shrink: 0;
 }
 
-.summary-card span {
-  display: block;
-  color: #667085;
-  font-size: 13px;
+.summary-icon.blue {
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
 }
 
-.summary-card strong {
+.summary-icon.indigo {
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+
+.summary-icon.green {
+  background: var(--app-success-soft);
+  color: var(--app-success);
+}
+
+.summary-icon.amber {
+  background: var(--app-warning-soft);
+  color: var(--app-warning);
+}
+
+.summary-label {
   display: block;
-  margin-top: 7px;
-  color: #101828;
-  font-size: 26px;
+  color: var(--app-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.summary-value {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-text);
+  font-size: 28px;
+  font-weight: 700;
   line-height: 1;
+  letter-spacing: -0.02em;
 }
 
-.accent-blue .metric-icon {
-  background: #eaf2ff;
-  color: #155eef;
-}
-
-.accent-indigo .metric-icon {
-  background: #eef2ff;
-  color: #4f46e5;
-}
-
-.accent-green .metric-icon {
-  background: #e8f8ef;
-  color: #099250;
-}
-
-.accent-amber .metric-icon {
-  background: #fff4df;
-  color: #dc6803;
+.summary-denom {
+  color: var(--app-text-subtle);
+  font-size: 18px;
+  font-weight: 500;
 }
 
 .dashboard-card {
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-  padding: 18px;
-  background: #fff;
-  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.05);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 20px;
+  background: var(--app-surface);
 }
 
-.section-note {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid #edf1f7;
-  padding-bottom: 12px;
+.section-header {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--app-border);
 }
 
-.section-note strong {
-  color: #101828;
+.section-header h3 {
+  margin: 0;
+  color: var(--app-text);
   font-size: 16px;
+  font-weight: 700;
 }
 
-.section-note span {
-  color: #667085;
+.section-header p {
+  margin: 4px 0 0;
+  color: var(--app-text-muted);
   font-size: 13px;
+  line-height: 1.6;
 }
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) 180px auto auto;
+  grid-template-columns: minmax(200px, 1fr) 160px auto auto;
   gap: 10px;
   margin-bottom: 16px;
 }
 
 .status-select {
-  width: 180px;
+  width: 160px;
 }
 
 .toolbar :deep([class~="el-input__wrapper"]),
 .toolbar :deep([class~="el-select__wrapper"]) {
-  min-height: 38px;
-  border-radius: 9px;
-  box-shadow: 0 0 0 1px #d0d7e2 inset;
+  min-height: 36px;
+  border-radius: var(--app-radius-sm) !important;
+  box-shadow: none !important;
+  border: 1px solid var(--app-border);
+}
+
+.toolbar :deep([class~="el-input__wrapper"]:hover),
+.toolbar :deep([class~="el-select__wrapper"]:hover) {
+  border-color: var(--app-border-strong);
+}
+
+.toolbar :deep([class~="el-input__wrapper"][class~="is-focus"]),
+.toolbar :deep([class~="el-select__wrapper"]:focus-within) {
+  border-color: var(--app-primary);
 }
 
 .pagination-wrap {
@@ -337,10 +368,8 @@ onMounted(async () => {
     width: 100%;
   }
 
-  .section-note {
+  .section-header {
     align-items: flex-start;
-    flex-direction: column;
-    gap: 6px;
   }
 }
 </style>

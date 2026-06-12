@@ -11,28 +11,6 @@ import java.util.Objects;
  */
 public final class PaperStructuredContentSupport {
 
-    public static final List<String> TEXT_FIELDS = List.of(
-            "title",
-            "abstract",
-            "introduction",
-            "literatureReview",
-            "methodology",
-            "experimentResults",
-            "discussion",
-            "conclusion",
-            "references",
-            "researchObject",
-            "researchQuestion",
-            "methodPath",
-            "experimentDataSummary"
-    );
-
-    public static final List<String> LIST_FIELDS = List.of(
-            "keywords",
-            "innovationPoints",
-            "mainConclusions"
-    );
-
     public static final List<String> ALL_FIELDS = List.of(
             "title",
             "abstract",

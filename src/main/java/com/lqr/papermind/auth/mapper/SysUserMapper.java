@@ -30,6 +30,12 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             """)
     long countActiveByRole(@Param("roleCode") String roleCode);
 
+    /**
+     * 查询指定角色下的所有活跃用户列表，按昵称或用户名排序。
+     *
+     * @param roleCode 角色编码
+     * @return 活跃用户列表
+     */
     @Select("""
             select u.*
             from public.sys_user u

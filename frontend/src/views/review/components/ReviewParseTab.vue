@@ -20,13 +20,13 @@ defineEmits<{
 
 <template>
   <section class="detail-section" v-loading="structuredParseLoading">
-    <div class="section-title">
-      <div>
+    <div class="section-header">
+      <div class="section-header-left">
         <h3>结构化理解与内容解析</h3>
-        <span>独立于 AI 评审报告的论文结构化解析结果</span>
+        <p>独立于 AI 评审报告的论文结构化解析结果</p>
       </div>
       <div class="section-actions">
-        <el-tag :type="structuredParse?.status === 'FAILED' ? 'danger' : structuredParse ? 'success' : 'info'" effect="plain">
+        <el-tag :type="structuredParse?.status === 'FAILED' ? 'danger' : structuredParse ? 'success' : 'info'" size="small" effect="plain">
           {{ structuredParse?.status || '未生成' }}
         </el-tag>
         <el-button size="small" :disabled="assignmentSubmitted" :loading="regeneratingStructuredParse" @click="$emit('rerunStructuredParse')">
@@ -38,13 +38,13 @@ defineEmits<{
       {{ structuredParse.errorMessage }}
     </div>
     <div class="parse-tags">
-      <el-tag v-if="structuredParse?.updatedAt" type="info" effect="plain">
+      <el-tag v-if="structuredParse?.updatedAt" type="info" size="small" effect="plain">
         更新时间：{{ formatDate(structuredParse.updatedAt) }}
       </el-tag>
-      <el-tag v-for="field in missingFields" :key="`missing-${field}`" type="warning" effect="plain">
+      <el-tag v-for="field in missingFields" :key="`missing-${field}`" type="warning" size="small" effect="plain">
         缺失：{{ field }}
       </el-tag>
-      <el-tag v-for="field in lowConfidenceFields" :key="`low-${field}`" type="danger" effect="plain">
+      <el-tag v-for="field in lowConfidenceFields" :key="`low-${field}`" type="danger" size="small" effect="plain">
         低置信：{{ field }}
       </el-tag>
     </div>
@@ -113,74 +113,85 @@ defineEmits<{
 
 <style scoped>
 .detail-section {
-  margin-top: 22px;
+  margin-top: 20px;
 }
 
-.section-title {
+.section-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--app-border);
 }
 
-.section-title h3 {
+.section-header h3 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.section-header p {
   margin: 4px 0 0;
-  color: #101828;
+  color: var(--app-text-muted);
+  font-size: 13px;
 }
 
-.section-title span {
-  color: #667085;
-  font-size: 12px;
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.section-actions,
 .parse-tags {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-}
-
-.parse-tags {
+  gap: 6px;
   margin-top: 12px;
 }
 
 .parse-alert {
   margin-top: 12px;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 14px;
+  border: 1px solid var(--app-danger-soft);
+  border-radius: var(--app-radius-sm);
   padding: 10px 12px;
-  background: rgba(239, 68, 68, 0.08);
-  color: #b91c1c;
+  background: var(--app-danger-soft);
+  color: var(--app-danger);
+  font-size: 13px;
   line-height: 1.6;
 }
 
 .section-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 14px;
 }
 
 .section-grid article {
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-  padding: 16px;
-  background: #fff;
-  box-shadow: none;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  padding: 12px;
+  background: var(--app-surface);
 }
 
 .section-grid span {
   display: block;
-  color: #667085;
+  color: var(--app-text-muted);
   font-size: 12px;
+  font-weight: 500;
 }
 
 .section-grid strong {
   display: block;
-  margin-top: 8px;
-  color: #101828;
-  line-height: 1.6;
+  margin-top: 4px;
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .paper-sections {
@@ -188,7 +199,7 @@ defineEmits<{
 }
 
 .paper-sections p {
-  color: #475467;
+  color: var(--app-text-muted);
   line-height: 1.7;
 }
 
@@ -203,9 +214,9 @@ defineEmits<{
     grid-template-columns: 1fr;
   }
 
-  .section-title {
-    align-items: flex-start;
+  .section-header {
     flex-direction: column;
+    gap: 8px;
   }
 }
 </style>

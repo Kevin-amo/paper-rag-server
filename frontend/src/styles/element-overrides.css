@@ -1,120 +1,137 @@
 .el-card,
 .el-dialog,
 .el-drawer {
-  --el-border-radius-base: 16px;
+  --el-border-radius-base: var(--app-radius-md);
 }
 
 .el-button {
-  --el-button-hover-bg-color: rgba(255, 255, 255, 0.88);
-  --el-button-hover-border-color: rgba(0, 122, 255, 0.26);
-  border-radius: 999px;
-  font-weight: 750;
+  --el-button-hover-bg-color: rgba(37, 99, 235, 0.06);
+  --el-button-hover-border-color: var(--app-primary);
+  border-radius: var(--app-radius-sm);
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.el-button:active {
+  transform: scale(0.98);
 }
 
 .el-button--primary {
   --el-button-bg-color: var(--app-primary);
   --el-button-border-color: var(--app-primary);
-  --el-button-hover-bg-color: var(--app-primary-dark);
-  --el-button-hover-border-color: var(--app-primary-dark);
-  box-shadow: 0 12px 26px rgba(0, 122, 255, 0.2);
+  --el-button-hover-bg-color: var(--app-primary-hover);
+  --el-button-hover-border-color: var(--app-primary-hover);
 }
 
 .el-button--success {
   --el-button-bg-color: var(--app-success);
   --el-button-border-color: var(--app-success);
-  --el-button-hover-bg-color: #28b84d;
-  --el-button-hover-border-color: #28b84d;
-  --el-button-active-bg-color: #229f42;
-  --el-button-active-border-color: #229f42;
+  --el-button-hover-bg-color: #059669;
+  --el-button-hover-border-color: #059669;
+  --el-button-active-bg-color: #047857;
+  --el-button-active-border-color: #047857;
   --el-button-text-color: #fff;
   --el-button-hover-text-color: #fff;
   --el-button-active-text-color: #fff;
 }
 
 .el-drawer {
-  background: rgba(248, 249, 252, 0.92);
-  backdrop-filter: blur(24px) saturate(170%);
-  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  background: var(--app-surface);
 }
 
 .el-drawer__header {
   margin-bottom: 0;
-  padding: 24px 26px 16px;
-  border-bottom: 1px solid rgba(209, 209, 214, 0.58);
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .el-drawer__body {
-  padding: 22px 26px 26px;
+  padding: 20px 24px 24px;
   background: transparent;
 }
 
 .el-dialog {
   overflow: hidden;
-  border: 1px solid rgba(209, 209, 214, 0.72);
-  border-radius: 26px;
-  background: #ffffff;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-lg);
 }
 
 .el-dialog__title {
   color: var(--app-text);
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .el-message {
-  --apple-message-accent: #007aff;
-  --el-message-bg-color: rgba(255, 255, 255, 0.76);
-  --el-message-border-color: rgba(255, 255, 255, 0.62);
-  --el-message-text-color: #1d1d1f;
-  min-width: min(420px, calc(100vw - 32px));
-  padding: 13px 18px 13px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.66);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(246, 247, 251, 0.74)) !important;
-  box-shadow:
-    0 18px 45px rgba(15, 23, 42, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.86);
-  color: #1d1d1f;
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-}
-
-.el-message::before {
-  width: 9px;
-  height: 9px;
-  margin-right: 12px;
-  border-radius: 999px;
-  background: var(--apple-message-accent);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--apple-message-accent) 16%, transparent);
-  content: '';
-  flex: 0 0 auto;
+  --el-message-bg-color: var(--app-surface);
+  --el-message-border-color: var(--app-border);
+  --el-message-text-color: var(--app-text);
+  min-width: min(380px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface) !important;
+  box-shadow: var(--app-shadow-md);
+  color: var(--app-text);
 }
 
 .el-message .el-message__icon {
-  margin-right: 10px;
-  color: var(--apple-message-accent);
-  font-size: 18px;
+  margin-right: 8px;
+  font-size: 16px;
 }
 
 .el-message .el-message__content {
-  color: #1d1d1f;
+  color: var(--app-text);
   font-size: 14px;
-  font-weight: 700;
-  line-height: 1.55;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
-.el-message--success {
-  --apple-message-accent: #34c759;
+.el-message--success .el-message__icon {
+  color: var(--app-success);
 }
 
-.el-message--warning {
-  --apple-message-accent: #ff9f0a;
+.el-message--warning .el-message__icon {
+  color: var(--app-warning);
 }
 
-.el-message--error {
-  --apple-message-accent: #ff3b30;
+.el-message--error .el-message__icon {
+  color: var(--app-danger);
 }
 
-.el-message--info {
-  --apple-message-accent: #007aff;
+.el-message--info .el-message__icon {
+  color: var(--app-primary);
+}
+
+.el-tag {
+  border-radius: var(--app-radius-xs);
+  font-weight: 600;
+}
+
+.el-tabs__item {
+  font-weight: 600;
+}
+
+.el-input__wrapper,
+.el-select__wrapper {
+  border-radius: var(--app-radius-sm) !important;
+}
+
+.el-table {
+  --el-table-border-color: var(--app-border);
+  --el-table-header-bg-color: var(--app-surface-soft);
+  --el-table-row-hover-bg-color: var(--app-primary-soft);
+}
+
+.el-table th.el-table__cell {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.el-progress__text {
+  font-weight: 600;
 }

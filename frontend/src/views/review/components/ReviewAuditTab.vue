@@ -9,9 +9,9 @@ defineProps<{
 
 <template>
   <section class="detail-section">
-    <div class="section-title">
+    <div class="section-header">
       <h3>评审留档信息</h3>
-      <span>模型、提示词、指标版本与人工调整记录</span>
+      <p>模型、提示词、指标版本与人工调整记录</p>
     </div>
     <div v-if="selectedReport" class="audit-grid">
       <article>
@@ -38,61 +38,64 @@ defineProps<{
 
 <style scoped>
 .detail-section {
-  margin-top: 22px;
+  margin-top: 20px;
 }
 
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+.section-header {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--app-border);
 }
 
-.section-title h3 {
+.section-header h3 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.section-header p {
   margin: 4px 0 0;
-  color: #101828;
-}
-
-.section-title span {
-  color: #667085;
-  font-size: 12px;
+  color: var(--app-text-muted);
+  font-size: 13px;
 }
 
 .audit-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 14px;
 }
 
 .audit-grid article {
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-  padding: 16px;
-  background: #fff;
-  box-shadow: none;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  padding: 14px;
+  background: var(--app-surface);
 }
 
 .audit-grid span {
   display: block;
-  color: #667085;
+  color: var(--app-text-muted);
   font-size: 12px;
+  font-weight: 500;
 }
 
 .audit-grid strong {
   display: block;
-  margin-top: 8px;
-  color: #101828;
-  line-height: 1.6;
+  margin-top: 6px;
+  color: var(--app-text);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .manual-delta {
   margin: 14px 0 0;
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-  padding: 16px;
-  background: #f8fafc;
-  color: #101828;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  padding: 14px;
+  background: var(--app-surface-soft);
+  color: var(--app-text-muted);
+  font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -107,11 +110,6 @@ defineProps<{
 @media (max-width: 720px) {
   .audit-grid {
     grid-template-columns: 1fr;
-  }
-
-  .section-title {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }
 </style>

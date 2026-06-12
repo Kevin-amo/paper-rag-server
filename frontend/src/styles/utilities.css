@@ -1,10 +1,14 @@
 .app-card {
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: var(--app-radius-lg);
-  background: var(--app-glass-strong);
-  box-shadow: var(--app-shadow-subtle);
-  backdrop-filter: blur(22px) saturate(165%);
-  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-xs);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.app-card:hover {
+  box-shadow: var(--app-shadow-sm);
+  border-color: var(--app-border-strong);
 }
 
 .app-muted {
@@ -12,9 +16,7 @@
 }
 
 .apple-surface {
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  background: var(--app-glass);
-  box-shadow: var(--app-shadow-subtle);
-  backdrop-filter: blur(24px) saturate(170%);
-  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-xs);
 }

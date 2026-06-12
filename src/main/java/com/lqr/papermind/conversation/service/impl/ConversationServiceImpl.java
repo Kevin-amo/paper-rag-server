@@ -27,15 +27,22 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ConversationServiceImpl implements ConversationService {
 
+    /** 会话标题最大长度 */
     private static final int MAX_TITLE_LENGTH = 60;
+    /** 历史消息查询最大窗口大小 */
     private static final int MAX_HISTORY_LIMIT = 40;
+    /** 引用列表反序列化类型 */
     private static final TypeReference<List<AnswerCitation>> CITATION_LIST_TYPE = new TypeReference<>() {
     };
+    /** 元数据反序列化类型 */
     private static final TypeReference<Map<String, Object>> METADATA_MAP_TYPE = new TypeReference<>() {
     };
 
+    /** 会话数据访问接口 */
     private final ConversationMapper conversationMapper;
+    /** 会话消息数据访问接口 */
     private final ConversationMessageMapper messageMapper;
+    /** JSON 序列化工具 */
     private final ObjectMapper objectMapper;
 
     /**

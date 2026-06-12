@@ -17,16 +17,34 @@ import java.util.List;
 
 /**
  * 基于 Resend API 的邮件发送实现。
+ *
+ * <p>通过 Resend 平台的 REST API 发送事务性邮件，支持注册验证码和换绑邮箱验证码两种场景。
+ * 所有邮件均包含 HTML 和纯文本两种格式，确保不同邮件客户端的兼容性。</p>
  */
 @Slf4j
 @Service
 public class ResendMailService implements MailService {
 
+    /**
+     * 邮件服务提供商标识。
+     */
     private static final String PROVIDER = "resend";
+    /**
+     * 注册验证码邮件主题。
+     */
     private static final String REGISTER_EMAIL_CODE_SUBJECT = "PaperMind 注册验证码";
+    /**
+     * 换绑邮箱验证码邮件主题。
+     */
     private static final String CHANGE_EMAIL_CODE_SUBJECT = "PaperMind 换绑邮箱验证码";
 
+    /**
+     * Spring REST 客户端构建器。
+     */
     private final RestClient.Builder restClientBuilder;
+    /**
+     * Resend 邮件服务配置。
+     */
     private final ResendProperties properties;
 
     /**
@@ -227,6 +245,15 @@ public class ResendMailService implements MailService {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
+    /**
+     * Resend API 邮件请求体。
+     *
+     * @param from    发件人邮箱地址
+     * @param to      收件人邮箱地址列表
+     * @param subject 邮件主题
+     * @param html    HTML 格式邮件内容
+     * @param text    纯文本格式邮件内容
+     */
     record ResendEmailRequest(
             String from,
             List<String> to,

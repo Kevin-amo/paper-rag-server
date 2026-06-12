@@ -5,7 +5,6 @@ import {
   Bell,
   DataAnalysis,
   Files,
-  Search,
   Setting,
   SwitchButton,
   User,
@@ -95,10 +94,15 @@ onMounted(() => {
   <div class="admin-layout" v-loading="props.loading">
     <aside class="admin-sidebar" aria-label="管理后台导航">
       <div class="sidebar-brand">
-        <span class="brand-mark">PR</span>
-        <div>
-          <strong>Paper Review</strong>
-          <small>Research Operations</small>
+        <div class="brand-logo">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect width="28" height="28" rx="7" fill="#2563EB"/>
+            <path d="M8 9h12M8 14h8M8 19h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <strong>PaperMind</strong>
+          <span>管理控制台</span>
         </div>
       </div>
 
@@ -113,28 +117,37 @@ onMounted(() => {
           @click="navigate(item)"
         >
           <el-icon><component :is="item.icon" /></el-icon>
-          <span>{{ item.title }}</span>
-          <small>{{ item.description }}</small>
+          <div class="menu-item-text">
+            <span>{{ item.title }}</span>
+            <small>{{ item.description }}</small>
+          </div>
         </button>
       </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="user-avatar">{{ currentUserName.charAt(0) }}</div>
+          <div class="user-info">
+            <span class="user-name">{{ currentUserName }}</span>
+            <span class="user-role">管理员</span>
+          </div>
+        </div>
+      </div>
     </aside>
 
     <div class="admin-main">
       <header class="admin-topbar">
-        <div class="topbar-title">
-          <p>Research Operations Console</p>
+        <div class="topbar-left">
           <h1>{{ pageTitle }}</h1>
         </div>
-        <div class="topbar-search">
-          <el-input :prefix-icon="Search" placeholder="搜索论文、评审任务、用户..." />
-        </div>
-        <div class="topbar-actions">
+        <div class="topbar-right">
           <el-button circle :icon="Bell" aria-label="通知" />
-          <el-tag type="info" effect="plain">{{ currentUserName }} · 管理员</el-tag>
-          <el-button v-if="canAccessLeaderWorkspace" @click="router.push('/review-leader')">组长工作台</el-button>
-          <el-button @click="router.push('/review')">评审工作台</el-button>
-          <el-button v-if="auth.hasRole('USER')" @click="router.push('/user')">用户端</el-button>
-          <el-button :icon="SwitchButton" @click="handleLogout">退出登录</el-button>
+          <el-divider direction="vertical" />
+          <el-button v-if="canAccessLeaderWorkspace" size="small" @click="router.push('/review-leader')">组长工作台</el-button>
+          <el-button size="small" @click="router.push('/review')">评审工作台</el-button>
+          <el-button v-if="auth.hasRole('USER')" size="small" @click="router.push('/user')">用户端</el-button>
+          <el-divider direction="vertical" />
+          <el-button :icon="SwitchButton" text @click="handleLogout">退出</el-button>
         </div>
       </header>
 
@@ -149,11 +162,9 @@ onMounted(() => {
 .admin-layout {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  max-width: 100%;
-  background: #f6f8fb;
-  color: #101828;
-  overflow-x: hidden;
+  grid-template-columns: 240px minmax(0, 1fr);
+  background: var(--app-bg);
+  color: var(--app-text);
 }
 
 .admin-sidebar {
@@ -162,184 +173,197 @@ onMounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  border-right: 1px solid #dde3ee;
-  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
-  padding: 18px 14px;
+  background: var(--app-surface);
+  border-right: 1px solid var(--app-border);
+  overflow-y: auto;
 }
 
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 10px 18px;
-  border-bottom: 1px solid #edf1f7;
+  gap: 10px;
+  padding: 20px 16px;
+  border-bottom: 1px solid var(--app-border);
 }
 
-.brand-mark {
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 850;
-  letter-spacing: 0.02em;
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+.sidebar-brand:hover .brand-logo svg {
+  transform: scale(1.05);
 }
 
-.sidebar-brand strong,
-.sidebar-brand small {
+.brand-logo svg {
+  transition: transform 0.2s ease;
+}
+
+.brand-logo {
+  flex-shrink: 0;
+}
+
+.brand-text strong {
   display: block;
-}
-
-.sidebar-brand strong {
-  color: #0f172a;
-  font-size: 17px;
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 700;
   line-height: 1.2;
 }
 
-.sidebar-brand small {
-  margin-top: 3px;
-  color: #6b7280;
-  font-size: 12px;
+.brand-text span {
+  display: block;
+  color: var(--app-text-subtle);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .sidebar-menu {
-  display: grid;
-  gap: 4px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 8px;
 }
 
 .sidebar-menu-item {
   width: 100%;
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: 3px 10px;
+  display: flex;
   align-items: center;
+  gap: 10px;
   border: 0;
-  border-radius: 10px;
-  padding: 11px 12px;
+  border-radius: var(--app-radius-sm);
+  padding: 10px 12px;
   background: transparent;
-  color: #344054;
+  color: var(--app-text-muted);
   cursor: pointer;
   text-align: left;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: all 0.15s ease;
 }
 
 .sidebar-menu-item:hover {
-  background: #f1f6ff;
+  background: var(--app-surface-soft);
+  color: var(--app-text);
 }
 
 .sidebar-menu-item.active {
-  background: #eaf2ff;
-  color: #155eef;
-  font-weight: 700;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
 }
 
 .sidebar-menu-item .el-icon {
-  grid-row: span 2;
-  color: inherit;
+  flex-shrink: 0;
   font-size: 18px;
 }
 
-.sidebar-menu-item span {
+.menu-item-text span {
+  display: block;
   font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
-.sidebar-menu-item small {
-  color: #667085;
-  font-size: 12px;
+.menu-item-text small {
+  display: block;
+  color: var(--app-text-subtle);
+  font-size: 11px;
   font-weight: 400;
+  margin-top: 2px;
+}
+
+.sidebar-menu-item.active .menu-item-text small {
+  color: var(--app-primary);
+  opacity: 0.7;
+}
+
+.sidebar-footer {
+  padding: 12px 8px;
+  border-top: 1px solid var(--app-border);
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--app-radius-sm);
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--app-radius-sm);
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.user-info {
+  min-width: 0;
+}
+
+.user-name {
+  display: block;
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-role {
+  display: block;
+  color: var(--app-text-subtle);
+  font-size: 11px;
 }
 
 .admin-main {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
 }
 
 .admin-topbar {
   position: sticky;
   top: 0;
   z-index: 10;
-  display: grid;
-  grid-template-columns: minmax(180px, 280px) minmax(240px, 560px) auto;
+  display: flex;
   align-items: center;
   gap: 16px;
-  min-height: 70px;
-  border-bottom: 1px solid #dde3ee;
-  background: rgba(255, 255, 255, 0.94);
-  padding: 12px 24px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  min-height: 56px;
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-surface);
+  padding: 0 24px;
 }
 
-.topbar-title {
-  min-width: 0;
-}
-
-.admin-topbar p {
-  margin: 0 0 3px;
-  color: #667085;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.admin-topbar h1 {
+.topbar-left h1 {
   margin: 0;
-  color: #101828;
-  font-size: 20px;
-  line-height: 1.2;
-}
-
-.topbar-search :deep([class~="el-input__wrapper"]) {
-  min-height: 40px;
-  border-radius: 10px;
-  box-shadow: 0 0 0 1px #d0d7e2 inset;
-}
-
-.admin-layout :deep([class~="el-button"]) {
-  border-radius: 8px;
+  color: var(--app-text);
+  font-size: 18px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
-.admin-layout :deep([class~="el-button--primary"]) {
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
-}
-
-.admin-layout :deep([class~="el-tag"]) {
-  border-radius: 7px;
-  font-weight: 700;
-}
-
-.admin-layout :deep([class~="el-table__header-wrapper"] th) {
-  background: #f8fafc;
-  color: #475467;
-  font-size: 12px;
-  font-weight: 750;
-}
-
-.admin-layout :deep([class~="el-table__row"]:hover > td) {
-  background: #f5f8ff;
-}
-
-.topbar-actions {
+.topbar-right {
+  margin-left: auto;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.topbar-right :deep(.el-divider--vertical) {
+  height: 20px;
+  margin: 0 4px;
 }
 
 .admin-content {
   display: grid;
-  gap: 16px;
+  gap: 20px;
   min-width: 0;
-  padding: 20px 24px 32px;
+  padding: 24px;
   overflow-x: auto;
 }
 
@@ -349,13 +373,10 @@ onMounted(() => {
 
 @media (max-width: 1120px) {
   .admin-topbar {
-    grid-template-columns: 1fr;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    padding: 12px 24px;
   }
 
-  .topbar-actions {
-    justify-content: flex-start;
-  }
 }
 
 @media (max-width: 860px) {
@@ -367,11 +388,17 @@ onMounted(() => {
     position: static;
     height: auto;
     border-right: 0;
-    border-bottom: 1px solid #d9dee8;
+    border-bottom: 1px solid var(--app-border);
   }
 
   .sidebar-menu {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px;
+  }
+
+  .sidebar-footer {
+    display: none;
   }
 
   .admin-topbar {
@@ -381,11 +408,15 @@ onMounted(() => {
 
 @media (max-width: 560px) {
   .sidebar-menu {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 
   .admin-content {
-    padding: 14px;
+    padding: 16px;
+  }
+
+  .topbar-right {
+    flex-wrap: wrap;
   }
 }
 </style>

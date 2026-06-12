@@ -10,11 +10,11 @@ defineProps<{
 
 <template>
   <section class="detail-section">
+    <div class="section-header">
+      <h3>个性化评语</h3>
+      <p>优点、不足与修改建议</p>
+    </div>
     <div class="comments-card">
-      <div class="section-title compact">
-        <h3>个性化评语</h3>
-        <span>优点、不足与修改建议</span>
-      </div>
       <p class="comment-summary">{{ textValue(comments.summary || comments.finalAdvice, selectedReport?.finalRecommendation || '暂无评语') }}</p>
       <div class="comment-columns">
         <div>
@@ -38,70 +38,66 @@ defineProps<{
 
 <style scoped>
 .detail-section {
-  margin-top: 22px;
+  margin-top: 20px;
 }
 
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+.section-header {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--app-border);
 }
 
-.section-title.compact {
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 2px;
+.section-header h3 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 700;
 }
 
-.section-title h3 {
+.section-header p {
   margin: 4px 0 0;
-  color: #101828;
-}
-
-.section-title span {
-  color: #667085;
-  font-size: 12px;
+  color: var(--app-text-muted);
+  font-size: 13px;
 }
 
 .comments-card {
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
   padding: 16px;
-  background: #fff;
-  box-shadow: none;
+  background: var(--app-surface);
 }
 
 .comment-summary {
-  color: #475467;
+  color: var(--app-text-muted);
   line-height: 1.7;
 }
 
 .comment-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--app-border);
 }
 
 .comment-columns strong {
-  color: #101828;
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .comment-columns ul {
   margin: 8px 0 0;
-  padding-left: 18px;
-  color: #667085;
+  padding-left: 16px;
+  color: var(--app-text-muted);
+  font-size: 13px;
   line-height: 1.8;
 }
 
 @media (max-width: 720px) {
   .comment-columns {
     grid-template-columns: 1fr;
-  }
-
-  .section-title {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }
 </style>

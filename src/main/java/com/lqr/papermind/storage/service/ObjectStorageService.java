@@ -3,7 +3,7 @@ package com.lqr.papermind.storage.service;
 import java.io.InputStream;
 
 /**
- * 对象存储服务边界，屏蔽具体云厂商 SDK。
+ * 对象存储服务边界
  */
 public interface ObjectStorageService {
 

@@ -97,6 +97,11 @@ public class VectorWriteServiceImpl implements VectorWriteService {
         log.info("vector.delete.done ownerUserId={} sourceId={} costMs={}", ownerUserId, sourceId, elapsedMs(startNanos));
     }
 
+    /**
+     * 根据用户ID和文档来源删除该用户的向量记录。
+     *
+     * @param sourceId 文档来源标识
+     */
     @Override
     @Transactional
     public void deleteUserVectorsBySourceId(UUID ownerUserId, String sourceId) {

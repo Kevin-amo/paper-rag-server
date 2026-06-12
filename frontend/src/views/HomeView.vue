@@ -47,16 +47,22 @@ onMounted(async () => {
 .redirect-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 24px 28px;
+  gap: 6px;
+  padding: 24px 32px;
   border: 1px solid var(--app-border);
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: var(--app-shadow);
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface);
   text-align: center;
+}
+
+.redirect-card strong {
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .redirect-card span {
   color: var(--app-text-muted);
+  font-size: 13px;
 }
 </style>

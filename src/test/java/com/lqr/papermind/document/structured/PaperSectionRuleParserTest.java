@@ -2,7 +2,7 @@ package com.lqr.papermind.document.structured;
 
 import com.lqr.papermind.document.service.DocumentPersistenceService;
 import com.lqr.papermind.document.structured.model.StructuredParseResult;
-import com.lqr.papermind.document.structured.service.impl.DefaultPaperSectionRuleParser;
+import com.lqr.papermind.document.structured.service.impl.PaperSectionRuleParserImpl;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PaperSectionRuleParserTest {
 
-    private final DefaultPaperSectionRuleParser parser = new DefaultPaperSectionRuleParser();
+    private final PaperSectionRuleParserImpl parser = new PaperSectionRuleParserImpl();
 
     @Test
     void parseShouldRecognizeChineseNumberedSections() {

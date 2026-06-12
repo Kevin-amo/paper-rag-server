@@ -27,56 +27,56 @@ function isRiskActionDisabled(
 
 <template>
   <section class="detail-section">
-    <div class="section-title">
-      <div>
-        <h3>风险提示</h3>
-        <span>政治表述、参考文献、结构与语言风险的规范化记录</span>
-      </div>
+    <div class="section-header">
+      <h3>风险提示</h3>
+      <p>政治表述、参考文献、结构与语言风险的规范化记录</p>
     </div>
     <div v-loading="riskLoading">
-      <div v-if="riskRecords.length" class="risk-list normalized-risk-list">
-        <article v-for="risk in riskRecords" :key="risk.id">
-          <el-tag :type="riskTypeMap[risk.riskLevel] || 'info'" effect="plain">{{ risk.riskLevel }}</el-tag>
-          <div>
-            <div class="risk-heading">
+      <div v-if="riskRecords.length" class="risk-list">
+        <article v-for="risk in riskRecords" :key="risk.id" class="risk-card">
+          <div class="risk-card-header">
+            <div class="risk-type">
+              <span class="risk-level-dot" :class="risk.riskLevel"></span>
               <strong>{{ risk.riskType }}</strong>
-              <el-tag size="small" effect="plain">{{ riskStatusLabel(risk.status) }}</el-tag>
             </div>
-            <p>{{ risk.evidence || '未给出证据' }}</p>
-            <span>{{ risk.suggestion || '建议人工复核' }}</span>
-            <span v-if="risk.confidence != null">置信度：{{ risk.confidence }}</span>
-            <span v-if="risk.detector">检测器：{{ risk.detector }}</span>
-            <div class="risk-actions">
-              <el-button
-                size="small"
-                type="primary"
-                plain
-                :loading="isRiskUpdating(risk.id, riskStatusUpdatingIds)"
-                :disabled="isRiskActionDisabled(risk, 'CONFIRMED', riskStatusUpdatingIds)"
-                @click="$emit('set-risk-status', risk.id, 'CONFIRMED')"
-              >
-                确认
-              </el-button>
-              <el-button
-                size="small"
-                plain
-                :loading="isRiskUpdating(risk.id, riskStatusUpdatingIds)"
-                :disabled="isRiskActionDisabled(risk, 'IGNORED', riskStatusUpdatingIds)"
-                @click="$emit('set-risk-status', risk.id, 'IGNORED')"
-              >
-                忽略
-              </el-button>
-              <el-button
-                size="small"
-                type="success"
-                plain
-                :loading="isRiskUpdating(risk.id, riskStatusUpdatingIds)"
-                :disabled="isRiskActionDisabled(risk, 'RESOLVED', riskStatusUpdatingIds)"
-                @click="$emit('set-risk-status', risk.id, 'RESOLVED')"
-              >
-                标记解决
-              </el-button>
-            </div>
+            <el-tag size="small" effect="plain">{{ riskStatusLabel(risk.status) }}</el-tag>
+          </div>
+          <p class="risk-evidence">{{ risk.evidence || '未给出证据' }}</p>
+          <p class="risk-suggestion">{{ risk.suggestion || '建议人工复核' }}</p>
+          <div class="risk-meta">
+            <span v-if="risk.confidence != null">置信度 {{ risk.confidence }}</span>
+            <span v-if="risk.detector">检测器 {{ risk.detector }}</span>
+          </div>
+          <div class="risk-actions">
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :loading="isRiskUpdating(risk.id, riskStatusUpdatingIds)"
+              :disabled="isRiskActionDisabled(risk, 'CONFIRMED', riskStatusUpdatingIds)"
+              @click="$emit('set-risk-status', risk.id, 'CONFIRMED')"
+            >
+              确认
+            </el-button>
+            <el-button
+              size="small"
+              plain
+              :loading="isRiskUpdating(risk.id, riskStatusUpdatingIds)"
+              :disabled="isRiskActionDisabled(risk, 'IGNORED', riskStatusUpdatingIds)"
+              @click="$emit('set-risk-status', risk.id, 'IGNORED')"
+            >
+              忽略
+            </el-button>
+            <el-button
+              size="small"
+              type="success"
+              plain
+              :loading="isRiskUpdating(risk.id, riskStatusUpdatingIds)"
+              :disabled="isRiskActionDisabled(risk, 'RESOLVED', riskStatusUpdatingIds)"
+              @click="$emit('set-risk-status', risk.id, 'RESOLVED')"
+            >
+              标记解决
+            </el-button>
           </div>
         </article>
       </div>
@@ -87,85 +87,117 @@ function isRiskActionDisabled(
 
 <style scoped>
 .detail-section {
-  margin-top: 22px;
+  margin-top: 20px;
 }
 
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+.section-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--app-border);
 }
 
-.section-title h3 {
+.section-header h3 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.section-header p {
   margin: 4px 0 0;
-  color: #101828;
-}
-
-.section-title span {
-  color: #667085;
-  font-size: 12px;
+  color: var(--app-text-muted);
+  font-size: 13px;
 }
 
 .risk-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 10px;
 }
 
-.risk-list article {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px 10px;
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-  padding: 14px;
-  background: #fff;
+.risk-card {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  padding: 16px;
+  background: var(--app-surface);
+  transition: border-color 0.15s ease;
 }
 
-.risk-list strong,
-.risk-list p,
-.risk-list span {
-  grid-column: 2;
+.risk-card:hover {
+  border-color: var(--app-border-strong);
 }
 
-.risk-list strong {
-  color: #101828;
-}
-
-.risk-list p {
-  color: #475467;
-  line-height: 1.7;
-}
-
-.risk-list span {
-  color: #667085;
-  font-size: 12px;
-}
-
-.risk-list p,
-.risk-list span,
-.risk-heading {
-  overflow-wrap: anywhere;
-}
-
-.risk-heading,
-.risk-actions {
+.risk-card-header {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.risk-type {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.risk-actions {
-  margin-top: 10px;
+.risk-level-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-@media (max-width: 720px) {
-  .section-title {
-    align-items: flex-start;
-    flex-direction: column;
-  }
+.risk-level-dot.HIGH,
+.risk-level-dot.CRITICAL {
+  background: var(--app-danger);
+}
+
+.risk-level-dot.MEDIUM {
+  background: var(--app-warning);
+}
+
+.risk-level-dot.LOW {
+  background: var(--app-success);
+}
+
+.risk-type strong {
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.risk-evidence {
+  margin: 10px 0 0;
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.risk-suggestion {
+  margin: 6px 0 0;
+  color: var(--app-text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.risk-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.risk-meta span {
+  color: var(--app-text-subtle);
+  font-size: 12px;
+}
+
+.risk-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
 }
 </style>

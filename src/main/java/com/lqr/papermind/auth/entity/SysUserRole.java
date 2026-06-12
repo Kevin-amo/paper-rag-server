@@ -13,7 +13,12 @@ import java.util.UUID;
 @TableName("public.sys_user_role")
 public class SysUserRole {
 
+    /** 用户ID。 */
     private UUID userId;
+
+    /** 角色ID。 */
     private UUID roleId;
+
+    /** 记录创建时间。 */
     private OffsetDateTime createdAt;
 }

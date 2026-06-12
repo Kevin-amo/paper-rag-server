@@ -5,6 +5,10 @@ import java.util.UUID;
 
 /**
  * 统一文献搜索响应。
+ *
+ * @param conversationId 关联的会话标识，可为空
+ * @param summary 搜索结果摘要文本，可为空
+ * @param items 搜索结果列表
  */
 public record LiteratureSearchResponse(
         UUID conversationId,

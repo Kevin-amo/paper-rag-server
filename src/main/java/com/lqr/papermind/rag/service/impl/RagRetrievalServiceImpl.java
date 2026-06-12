@@ -36,8 +36,9 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
     private final RerankService rerankService;
 
     /**
-     * 根据问题从向量库召回最相关的文档分块。1
+     * 根据问题从向量库召回最相关的文档分块。
      *
+     * @param ownerUserId 拥有者用户ID
      * @param question 用户问题
      * @param topK 召回数量
      * @return 按相关度排序的分块列表
@@ -151,6 +152,12 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
         }
     }
 
+    /**
+     * 根据配置的候选倍数计算重排序所需的候选召回数量。
+     *
+     * @param resolvedTopK 最终需要返回的分块数量
+     * @return 重排序前的候选召回数量
+     */
     private int rerankCandidateTopK(int resolvedTopK) {
         int multiplier = ragProperties.rerank().candidateMultiplier();
         return Math.max(resolvedTopK * multiplier, resolvedTopK);
@@ -179,6 +186,13 @@ public class RagRetrievalServiceImpl implements RagRetrievalService {
         }
     }
 
+    /**
+     * 从元数据映射中安全提取指定键的字符串值。
+     *
+     * @param metadata 元数据映射
+     * @param key 目标字段名
+     * @return 提取的字符串值，不存在时返回 null
+     */
     private String stringMetadata(Map<String, Object> metadata, String key) {
         if (metadata == null || !metadata.containsKey(key)) {
             return null;

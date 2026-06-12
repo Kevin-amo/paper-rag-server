@@ -158,10 +158,10 @@ onUnmounted(() => {
     <section class="login-shell">
       <aside class="brand-panel">
         <div>
-          <p class="eyebrow">Paper RAG</p>
-          <h1>论文知识库与 RAG 问答系统</h1>
+          <p class="eyebrow">Paper Mind</p>
+          <h1>论文知识库与智能评审系统</h1>
           <p class="brand-desc">
-            面向论文资料管理、文档解析、分块检索与引用可追溯问答的一体化工作台。
+            面向论文资料管理、文档解析、RAG 问答与学术评审的一体化工作台。
           </p>
         </div>
 
@@ -175,8 +175,8 @@ onUnmounted(() => {
             <span>会话持久化、上下文追踪、引用来源展示</span>
           </div>
           <div class="feature-card">
-            <strong>权限控制</strong>
-            <span>普通用户工作台与管理员用户管理分离</span>
+            <strong>论文评审</strong>
+            <span>智能评审、质量评估与反馈生成</span>
           </div>
         </div>
       </aside>

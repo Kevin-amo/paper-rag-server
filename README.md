@@ -1,50 +1,94 @@
-# Paper Review Assistant
+# Paper Mind
 
-Paper Review Assistant 是一个面向论文辅助评审场景的平台，支持用户端论文上传与问答、评审端结构化解析与多维评分、AI 辅助评语与风险提示、后台用户和角色管理。系统保留现有 DashScope / Qwen 模型链路，不额外接入文心大模型。
+Paper Mind 是一个面向论文辅助评审场景的智能平台，支持用户端论文上传与问答、评审端结构化解析与多维评分、AI 辅助评语与风险提示、评审组长分配与共识确认、后台用户和角色管理。系统基于 DashScope / Qwen 模型链路，集成 OpenAlex 外部文献检索。
 
 项目包含两部分：
 
-- 后端：Spring Boot 3 + Java 21
+- 后端：Spring Boot 3.5 + Java 21
 - 前端：Vue 3 + Vite + Element Plus
 
 ## 功能特性
 
+### 用户与认证
+
 - 用户登录、注册、登出和当前用户信息查询
-- JWT 鉴权、登录失败锁定、Token 注销
-- 管理员用户管理：创建用户、修改角色、禁用用户、重置密码
-- 用户端论文上传、批量上传、异步解析入库和文档问答
-- 评审端论文任务池、结构化内容解析、多维辅助评分和人工调整
-- AI 辅助评语生成、风险提示、最终意见保存和评审留档
-- 文档解析、切分、元数据提取和持久化
+- JWT 无状态鉴权、登录失败锁定、Token 注销
+- 邮箱验证码注册（Resend 邮件服务）
+- 用户个人设置：修改密码、修改昵称、换绑邮箱
+- 用户头像上传（阿里云 OSS / 本地存储自动切换）
+
+### 管理员
+
+- 用户管理：创建用户、修改角色、禁用用户、重置密码、删除用户
+- 评审配置：评审批次管理、评审小组与成员管理、评审指标配置
+- 评审任务管理：任务查看、评审员分配、共识重新计算与确认
+- 评审员工作负载查看
+
+### 文档管理
+
+- 用户端论文上传、批量上传、异步解析入库
+- 文档列表、详情、分片、内嵌图片资源查看
+- 文档元数据编辑、软删除与恢复
+- 文档重建索引
+- 论文结构化解析（规则 + 模型双通道，支持重新生成）
+
+### RAG 智能问答
+
+- Agent 编排式 SSE 流式问答
 - pgvector 向量存储和相似度检索
 - DashScope / Qwen 大模型问答、Embedding 和 Rerank
-- RAG 普通问答和 SSE 流式问答
-- 文档列表、详情、分片、内嵌图片资源查看
+- 外部文献检索（OpenAlex），带 Redis 缓存和防缓存击穿
+- 引用归一化与文献上下文策略
+
+### 论文辅助评审
+
+- 评审任务池与评审员分配
+- 论文结构化内容解析（规则解析 + 模型补全 + 合并策略）
+- 多维辅助评分（6 项预置指标：政策导向、专业匹配、创新性、逻辑性、语言质量、参考文献规范）
+- AI 辅助评语生成、风险提示（参考文献格式检查）
+- 风险项全生命周期管理（确认 / 忽略 / 解决）
+- 评审报告调整与提交
+- 评审共识自动计算与人工确认
+- 评审组长工作台：任务分配、报告查看、共识管理
+- 评审操作留档（before/after 快照与 diff）
+
+### 基础设施
+
 - Redis、RabbitMQ、PostgreSQL/pgvector 本地 Docker 编排
+- Docker Compose 全栈部署（前端 Nginx + 后端 + 基础设施）
 
 ## 技术栈
 
 ### 后端
 
-- Java 21
-- Spring Boot 3.5.x
-- Spring Security
-- Spring AI / DashScope
-- MyBatis-Plus
-- PostgreSQL + pgvector
-- Redis
-- RabbitMQ
-- Apache Tika / PDFBox
-- Maven
+| 技术 | 版本 |
+| --- | --- |
+| Java | 21 |
+| Spring Boot | 3.5.14 |
+| Spring Security | (随 Boot 版本) |
+| Spring AI | 1.1.5 |
+| spring-ai-alibaba-starter-dashscope | 1.1.2.0 |
+| MyBatis-Plus | 3.5.16 |
+| PostgreSQL + pgvector | 16 |
+| Redis | 7.4 |
+| RabbitMQ | 3.13 |
+| Apache Tika | 2.9.2 |
+| Apache PDFBox | 2.0.31 |
+| Aliyun OSS SDK | 3.18.5 |
+| Maven | 3.9+ |
 
 ### 前端
 
-- Vue 3
-- TypeScript
-- Vite
-- Element Plus
-- Axios
-- MarkdownIt + DOMPurify
+| 技术 | 版本 |
+| --- | --- |
+| Vue | 3.5 |
+| TypeScript | 6.0 |
+| Vite | 8.0 |
+| Element Plus | 2.13 |
+| Vue Router | 5.0 |
+| Axios | 1.16 |
+| MarkdownIt | 14.1 |
+| DOMPurify | 3.4 |
 
 ## 目录结构
 
@@ -59,12 +103,12 @@ paper-mind/
 │   │   │   ├── common/          # 通用响应、异常、日志和类型处理
 │   │   │   ├── config/          # Spring Security、MyBatis 和应用配置
 │   │   │   ├── conversation/    # 会话和消息
-│   │   │   ├── document/        # 文档上传、解析、切分、入库和资源管理
-│   │   │   ├── literature/      # 外部文献检索、意图解析和缓存
-│   │   │   ├── mail/            # 邮件发送配置和服务
+│   │   │   ├── document/        # 文档上传、解析、切分、入库、资源管理和结构化解析
+│   │   │   ├── literature/      # OpenAlex 外部文献检索、意图解析和缓存
+│   │   │   ├── mail/            # Resend 邮件发送配置和服务
 │   │   │   ├── rag/             # RAG 检索和回答
-│   │   │   ├── review/          # 论文辅助评审任务、评分报告和评审标准
-│   │   │   ├── storage/         # 对象存储
+│   │   │   ├── review/          # 论文辅助评审任务、评分报告、评审标准、共识和留档
+│   │   │   ├── storage/         # 阿里云 OSS 对象存储
 │   │   │   └── vector/          # 向量写入
 │   │   └── resources/
 │   │       ├── application.yaml
@@ -84,7 +128,7 @@ paper-mind/
 │   ├── package.json
 │   └── vite.config.ts
 ├── storage/                     # 本地上传/解析临时文件，默认被 git 忽略
-├── docker-compose.yml           # PostgreSQL、Redis、RabbitMQ
+├── docker-compose.yml           # 全栈部署（前端 + 后端 + PostgreSQL + Redis + RabbitMQ）
 └── pom.xml
 ```
 
@@ -109,9 +153,9 @@ docker compose up -d
 
 该命令会启动：
 
-- PostgreSQL + pgvector：`localhost:5432`
-- Redis：`localhost:6379`
-- RabbitMQ：`localhost:5672`
+- PostgreSQL 16 + pgvector：`localhost:5432`
+- Redis 7.4：`localhost:6379`
+- RabbitMQ 3.13：`localhost:5672`
 - RabbitMQ Management：`http://localhost:15672`
 
 默认本地账号见 `docker-compose.yml`。
@@ -163,6 +207,29 @@ app:
       display-name: 系统管理员
 ```
 
+如需启用邮箱验证码注册，配置 Resend：
+
+```yaml
+app:
+  mail:
+    resend:
+      api-key: your-resend-api-key
+      from: noreply@your-domain.com
+```
+
+如需启用阿里云 OSS 头像存储，配置：
+
+```yaml
+app:
+  storage:
+    oss:
+      endpoint: https://oss-cn-hangzhou.aliyuncs.com
+      bucket: your-bucket
+      access-key-id: your-access-key-id
+      access-key-secret: your-access-key-secret
+      public-base-url: https://your-bucket.oss-cn-hangzhou.aliyuncs.com
+```
+
 > 注意：`application-local*.yaml` 默认被 `.gitignore` 忽略，不要把真实密钥提交到仓库。
 
 ### 3. 启动后端
@@ -205,6 +272,26 @@ Vite 默认会把 `/api/*` 请求代理到 `http://localhost:8080`，并去掉 `
 $env:VITE_BACKEND_URL="http://localhost:8080"
 npm run dev
 ```
+
+### 5. Docker Compose 全栈部署
+
+`docker-compose.yml` 支持一键部署完整应用（前端 + 后端 + 基础设施）：
+
+```bash
+docker compose --profile full up -d --build
+```
+
+必须设置的环境变量：
+
+| 变量 | 说明 |
+| --- | --- |
+| `POSTGRES_PASSWORD` | PostgreSQL 密码 |
+| `REDIS_PASSWORD` | Redis 密码 |
+| `RABBITMQ_PASSWORD` | RabbitMQ 密码 |
+| `DASHSCOPE_API_KEY` | DashScope API Key |
+| `JWT_SECRET` | JWT 签名密钥（生产环境务必使用强密钥） |
+
+可通过 `.env` 文件或环境变量传入。前端通过 Nginx 反向代理 `/api/` 到后端，默认对外暴露 `${HTTP_PORT:-80}` 端口。
 
 ## 常用命令
 
@@ -253,7 +340,7 @@ src/main/resources/application.yaml
 src/main/resources/application-local.yaml
 ```
 
-常用环境变量：
+### 基础环境变量
 
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
@@ -263,20 +350,109 @@ src/main/resources/application-local.yaml
 | `DB_PASSWORD` | 数据库密码 | 空 |
 | `REDIS_HOST` | Redis 地址 | `localhost` |
 | `REDIS_PORT` | Redis 端口 | `6379` |
+| `REDIS_PASSWORD` | Redis 密码 | 空 |
+| `REDIS_DATABASE` | Redis 数据库编号 | `0` |
 | `RABBITMQ_HOST` | RabbitMQ 地址 | `192.168.200.129` |
 | `RABBITMQ_PORT` | RabbitMQ 端口 | `5672` |
 | `RABBITMQ_USERNAME` | RabbitMQ 用户名 | `admin` |
 | `RABBITMQ_PASSWORD` | RabbitMQ 密码 | `admin` |
 | `DASHSCOPE_API_KEY` | DashScope API Key | 空 |
 | `JWT_SECRET` | JWT 签名密钥 | 本地开发默认值 |
-| `REGISTER_EMAIL_CODE_TTL` | 注册邮箱验证码有效期 | `5m` |
-| `REGISTER_EMAIL_CODE_EMAIL_COOLDOWN` | 同一邮箱发送冷却时间 | `60s` |
-| `REGISTER_EMAIL_CODE_EMAIL_DAILY_LIMIT` | 同一邮箱每日发送上限 | `10` |
-| `REGISTER_EMAIL_CODE_IP_MINUTE_LIMIT` | 同一 IP 每分钟发送上限 | `20` |
-| `REGISTER_EMAIL_CODE_IP_DAILY_LIMIT` | 同一 IP 每日发送上限 | `200` |
-| `DOCUMENT_INGESTION_STORAGE_DIR` | 文档上传临时目录 | `storage/document-ingestion` |
-| `RAG_DEFAULT_TOP_K` | 默认召回数量 | `3` |
-| `RAG_RERANK_ENABLED` | 是否启用重排序 | `true` |
+
+### AI 模型配置
+
+| 配置项 | 说明 | 默认值 |
+| --- | --- | --- |
+| `spring.ai.dashscope.chat.options.model` | 对话模型 | `qwen3.6-27b` |
+| `spring.ai.dashscope.chat.options.temperature` | 温度 | `0.2` |
+| `spring.ai.dashscope.chat.options.max-tokens` | 最大输出 token | `6144` |
+| `spring.ai.dashscope.chat.options.enable-thinking` | 启用思考模式 | `false` |
+| `spring.ai.dashscope.embedding.options.model` | Embedding 模型 | `text-embedding-v4` |
+| `spring.ai.dashscope.embedding.options.dimensions` | Embedding 维度 | `1536` |
+
+### PgVector 配置
+
+| 配置项 | 说明 | 默认值 |
+| --- | --- | --- |
+| `spring.ai.vectorstore.pgvector.dimensions` | 向量维度 | `1536` |
+| `spring.ai.vectorstore.pgvector.index-type` | 索引类型 | `hnsw` |
+| `spring.ai.vectorstore.pgvector.distance-type` | 距离类型 | `cosine_distance` |
+| `spring.ai.vectorstore.pgvector.table-name` | 表名 | `vector_store` |
+
+### RAG 配置 (`app.rag`)
+
+| 配置项 | 说明 | 默认值 |
+| --- | --- | --- |
+| `app.rag.chunk-size` | 单个文本片段最大字符数 | `800` |
+| `app.rag.chunk-overlap` | 相邻片段重叠字符数 | `120` |
+| `app.rag.default-top-k` | 问答检索默认召回片段数 | `3` |
+| `app.rag.similarity-threshold` | 向量检索相似度阈值 | `0` |
+| `app.rag.rerank.enabled` | 是否启用精排序 | `true` |
+| `app.rag.rerank.model` | 精排序模型 | `qwen3-rerank` |
+| `app.rag.rerank.top-n` | 精排序返回数量 | `5` |
+| `app.rag.rerank.candidate-multiplier` | 候选倍数 | `3` |
+| `app.rag.rerank.timeout` | 精排序超时 | `10s` |
+
+### 文献检索配置 (`app.literature.search`)
+
+| 配置项 | 说明 | 默认值 |
+| --- | --- | --- |
+| `app.literature.search.openalex.enabled` | 启用 OpenAlex 搜索 | `true` |
+| `app.literature.search.openalex.endpoint` | OpenAlex API 地址 | `https://api.openalex.org/works` |
+| `app.literature.search.openalex.timeout` | 请求超时 | `10s` |
+| `app.literature.search.openalex.mailto` | 联系邮箱（Polite Pool） | 空 |
+| `app.literature.search.cache.enabled` | 启用缓存 | `true` |
+| `app.literature.search.cache.ttl` | 缓存过期时间 | `20m` |
+
+### 文档入库配置 (`app.document-ingestion`)
+
+| 配置项 | 说明 | 默认值 |
+| --- | --- | --- |
+| `app.document-ingestion.storage-dir` | 上传文件存储目录 | `storage/document-ingestion` |
+| `app.document-ingestion.keep-upload-file` | 入库后保留原始文件 | `false` |
+| `app.document-ingestion.max-retry-count` | 最大重试次数 | `3` |
+| `app.document-ingestion.listener.concurrency` | MQ 监听器初始并发 | `2` |
+| `app.document-ingestion.listener.max-concurrency` | MQ 监听器最大并发 | `4` |
+| `app.document-ingestion.cleanup.enabled` | 启用过期文件清理 | `true` |
+| `app.document-ingestion.cleanup.retention` | 文件保留时长 | `24h` |
+
+### 安全配置 (`app.security`)
+
+| 配置项 | 说明 | 默认值 |
+| --- | --- | --- |
+| `app.security.jwt.access-token-ttl` | 访问令牌有效期 | `12h` |
+| `app.security.login-attempt.enabled` | 启用登录失败锁定 | `true` |
+| `app.security.login-attempt.max-failures` | 最大失败次数 | `5` |
+| `app.security.login-attempt.window` | 失败计数窗口 | `10m` |
+| `app.security.login-attempt.lock-duration` | 锁定时长 | `10m` |
+| `app.security.register-email-code.code-ttl` | 验证码有效期 | `5m` |
+| `app.security.register-email-code.email-cooldown` | 同一邮箱发送冷却 | `60s` |
+| `app.security.register-email-code.email-daily-limit` | 每邮箱每日上限 | `10` |
+| `app.security.register-email-code.ip-minute-limit` | 每 IP 每分钟上限 | `20` |
+| `app.security.register-email-code.ip-daily-limit` | 每 IP 每日上限 | `200` |
+
+### 对象存储配置 (`app.storage.oss`)
+
+| 配置项 | 说明 | 默认值 |
+| --- | --- | --- |
+| `app.storage.oss.endpoint` | 阿里云 OSS Endpoint | 空 |
+| `app.storage.oss.bucket` | OSS Bucket | 空 |
+| `app.storage.oss.access-key-id` | AccessKey ID | 空 |
+| `app.storage.oss.access-key-secret` | AccessKey Secret | 空 |
+| `app.storage.oss.public-base-url` | 公共访问 URL | 空 |
+| `app.storage.oss.avatar-prefix` | 头像存储前缀 | `avatars` |
+| `app.storage.oss.avatar-max-size` | 头像最大大小 | `5MB` |
+
+> OSS 未配置时，头像存储自动回退到本地文件系统。
+
+### 邮件配置 (`app.mail.resend`)
+
+| 配置项 | 说明 | 默认值 |
+| --- | --- | --- |
+| `app.mail.resend.enabled` | 启用 Resend 邮件 | `true` |
+| `app.mail.resend.api-key` | Resend API 密钥 | 空 |
+| `app.mail.resend.from` | 发件人地址 | 空 |
+| `app.mail.resend.timeout` | 请求超时 | `10s` |
 
 > 生产部署时务必显式配置 `JWT_SECRET`、数据库密码、RabbitMQ 密码和 DashScope API Key，不要使用开发默认值。
 
@@ -288,7 +464,7 @@ src/main/resources/application-local.yaml
 Authorization: Bearer <access-token>
 ```
 
-### 认证
+### 认证 (`/auth`)
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -297,11 +473,15 @@ Authorization: Bearer <access-token>
 | `POST` | `/auth/register` | 使用邮箱验证码注册 |
 | `GET` | `/auth/me` | 当前用户信息 |
 | `POST` | `/auth/me/avatar` | 上传头像 |
+| `POST` | `/auth/me/password` | 修改密码 |
+| `POST` | `/auth/me/display-name` | 修改昵称 |
+| `POST` | `/auth/me/email-code` | 发送换绑邮箱验证码 |
+| `POST` | `/auth/me/email` | 换绑邮箱 |
 | `POST` | `/auth/logout` | 登出 |
 
 注册邮箱验证码发送会进行 Redis 频控：同一邮箱默认 `60s` 冷却、24 小时窗口内最多 `10` 次；同一 IP 默认每分钟最多 `20` 次、24 小时窗口内最多 `200` 次。触发上限时接口返回 `429 TOO_MANY_REQUESTS`。
 
-### 文档
+### 文档 (`/documents`)
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -310,21 +490,25 @@ Authorization: Bearer <access-token>
 | `GET` | `/documents` | 分页查询文档列表 |
 | `GET` | `/documents/jobs/{jobId}` | 查询入库任务 |
 | `GET` | `/documents/{sourceId}` | 查询文档详情 |
+| `GET` | `/documents/{sourceId}/structured-parse` | 查询论文结构化解析结果 |
+| `GET` | `/documents/{sourceId}/structured-parse/status` | 查询结构化解析状态 |
+| `POST` | `/documents/{sourceId}/structured-parse/regenerate` | 重新生成结构化解析 |
 | `GET` | `/documents/{sourceId}/chunks` | 查询文档分片 |
 | `GET` | `/documents/{sourceId}/assets` | 查询文档资源 |
 | `GET` | `/documents/{sourceId}/assets/{assetId}/content` | 下载资源内容 |
 | `PATCH` | `/documents/{sourceId}/metadata` | 更新文档元数据 |
-| `DELETE` | `/documents/{sourceId}` | 删除文档 |
+| `DELETE` | `/documents` | 删除当前用户全部文档 |
+| `DELETE` | `/documents/{sourceId}` | 删除指定文档 |
 | `POST` | `/documents/{sourceId}/restore` | 恢复文档 |
 | `POST` | `/documents/{sourceId}/reindex` | 重建索引 |
 
-### Agent 问答
+### Agent 问答 (`/agent`)
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | `POST` | `/agent/ask/stream` | Agent SSE 流式问答 |
 
-### 会话
+### 会话 (`/conversations`)
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -334,7 +518,72 @@ Authorization: Bearer <access-token>
 | `GET` | `/conversations/{conversationId}/messages` | 查询会话消息 |
 | `DELETE` | `/conversations/{conversationId}` | 删除会话 |
 
-### 管理员
+### 评审 (`/reviews`)
+
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| `POST` | `/reviews/upload` | REVIEWER | 上传评审论文 |
+| `GET` | `/reviews/tasks` | REVIEWER | 分页查询评审任务列表 |
+| `POST` | `/reviews/tasks` | - | 创建评审任务 |
+| `GET` | `/reviews/tasks/{taskId}` | REVIEWER | 获取评审任务详情 |
+| `GET` | `/reviews/tasks/{taskId}/consensus` | REVIEWER | 获取评审任务共识 |
+| `PATCH` | `/reviews/tasks/{taskId}/consensus` | REVIEWER | 更新评审任务共识 |
+| `POST` | `/reviews/tasks/{taskId}/consensus/confirm` | REVIEWER | 确认评审任务共识 |
+| `POST` | `/reviews/tasks/{taskId}/ai-review` | REVIEWER | 生成 AI 评审报告 |
+| `GET` | `/reviews/tasks/{taskId}/structured-parse` | REVIEWER | 获取论文结构化解析 |
+| `POST` | `/reviews/tasks/{taskId}/structured-parse/regenerate` | REVIEWER | 重新生成结构化解析 |
+| `PATCH` | `/reviews/reports/{reportId}` | REVIEWER | 更新评审报告 |
+| `POST` | `/reviews/assignments/{assignmentId}/submit` | REVIEWER | 提交评审分配 |
+| `GET` | `/reviews/reports/{reportId}/risks` | REVIEWER | 获取评审报告风险列表 |
+| `PUT` | `/reviews/risks/{riskId}` | REVIEWER | 更新风险项 |
+| `POST` | `/reviews/risks/{riskId}/confirm` | REVIEWER | 确认风险项 |
+| `POST` | `/reviews/risks/{riskId}/ignore` | REVIEWER | 忽略风险项 |
+| `POST` | `/reviews/risks/{riskId}/resolve` | REVIEWER | 解决风险项 |
+| `GET` | `/reviews/criteria` | REVIEWER | 获取评审标准列表 |
+| `POST` | `/reviews/criteria` | ADMIN | 创建评审标准 |
+| `PATCH` | `/reviews/criteria/{id}` | ADMIN | 更新评审标准 |
+
+### 管理员 - 评审任务 (`/admin/reviews`)
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/admin/reviews/tasks` | 分页查询评审任务列表 |
+| `GET` | `/admin/reviews/tasks/{taskId}` | 获取评审任务详情 |
+| `POST` | `/admin/reviews/tasks/{taskId}/assignments` | 分配评审员 |
+| `POST` | `/admin/reviews/tasks/{taskId}/consensus/recalculate` | 重新计算评审共识 |
+| `PATCH` | `/admin/reviews/tasks/{taskId}/consensus` | 更新评审共识 |
+| `POST` | `/admin/reviews/tasks/{taskId}/consensus/confirm` | 确认评审共识 |
+| `GET` | `/admin/reviews/reviewer-loads` | 获取评审员工作负载 |
+
+### 管理员 - 评审配置 (`/admin/reviews`)
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/admin/reviews/batches` | 分页查询评审批次列表 |
+| `POST` | `/admin/reviews/batches` | 创建评审批次 |
+| `PATCH` | `/admin/reviews/batches/{batchId}` | 更新评审批次 |
+| `GET` | `/admin/reviews/groups` | 获取评审组列表 |
+| `POST` | `/admin/reviews/groups` | 创建评审组 |
+| `PATCH` | `/admin/reviews/groups/{groupId}` | 更新评审组 |
+| `GET` | `/admin/reviews/groups/{groupId}/members` | 获取评审组成员列表 |
+| `PUT` | `/admin/reviews/groups/{groupId}/members` | 替换评审组成员 |
+
+### 评审组长 (`/review-leader`)
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/review-leader/groups` | 获取当前用户负责的评审组列表 |
+| `GET` | `/review-leader/groups/{groupId}/members` | 获取评审组成员列表 |
+| `GET` | `/review-leader/groups/{groupId}/tasks` | 获取评审组任务列表 |
+| `GET` | `/review-leader/groups/{groupId}/tasks/unassigned` | 获取未分配的任务列表 |
+| `POST` | `/review-leader/groups/{groupId}/tasks/{taskId}/assignments` | 分配评审任务给评审员 |
+| `GET` | `/review-leader/groups/{groupId}/tasks/{taskId}/reports` | 获取评审任务报告列表 |
+| `GET` | `/review-leader/groups/{groupId}/tasks/{taskId}/consensus` | 获取评审任务共识 |
+| `POST` | `/review-leader/groups/{groupId}/tasks/{taskId}/consensus/recalculate` | 重新计算评审共识 |
+| `PATCH` | `/review-leader/groups/{groupId}/tasks/{taskId}/consensus` | 更新评审共识 |
+| `POST` | `/review-leader/groups/{groupId}/tasks/{taskId}/consensus/confirm` | 确认评审共识 |
+
+### 管理员 - 用户管理 (`/admin/users`)
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -345,6 +594,51 @@ Authorization: Bearer <access-token>
 | `PATCH` | `/admin/users/{id}/status` | 更新用户状态 |
 | `POST` | `/admin/users/{id}/reset-password` | 重置密码 |
 | `DELETE` | `/admin/users/{id}` | 删除用户 |
+
+## 角色体系
+
+| 角色 | 代码 | 说明 |
+| --- | --- | --- |
+| 管理员 | `ADMIN` | 用户管理、评审配置、评审任务管理 |
+| 普通用户 | `USER` | 文档管理与 RAG 问答 |
+| 评审员 | `REVIEWER` | 论文辅助评审、评审报告调整、评审组长工作台 |
+
+## 评审工作流
+
+### 任务状态
+
+```text
+PENDING_ASSIGNMENT → ASSIGNED → IN_REVIEW → SUBMITTED → CONSENSUS_CONFIRMED / NEEDS_REVIEW
+```
+
+### 评审报告状态
+
+```text
+AI_GENERATED → ADJUSTED → CONFIRMED → COMPLETED
+```
+
+### 共识状态
+
+```text
+DRAFT → IN_DISCUSSION → CONFIRMED → ARCHIVED
+```
+
+### 风险项状态
+
+```text
+OPEN → CONFIRMED / IGNORED / RESOLVED
+```
+
+### 预置评审指标
+
+| 指标 | 代码 | 权重 | 分类 |
+| --- | --- | --- | --- |
+| 政策导向 | `POLICY` | 20 | CONTENT |
+| 专业匹配 | `MATCH` | 20 | CONTENT |
+| 创新性 | `INNOVATION` | 20 | QUALITY |
+| 逻辑性 | `LOGIC` | 20 | QUALITY |
+| 语言质量 | `LANGUAGE` | 20 | QUALITY |
+| 参考文献规范 | `REFERENCE` | 10 | FORMAT |
 
 ## 数据库初始化
 

@@ -56,6 +56,9 @@ public final class MetadataKeys {
     public static final String SECTION_TYPE = "sectionType";
     public static final String SECTION_LEVEL = "sectionLevel";
 
+    /**
+     * 私有构造方法，防止工具类被实例化。
+     */
     private MetadataKeys() {
     }
 }

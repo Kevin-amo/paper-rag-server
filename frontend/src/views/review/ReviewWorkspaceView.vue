@@ -92,12 +92,12 @@ onMounted(async () => {
 <template>
   <MainLayout class="review-page">
     <PageHeader
-      eyebrow="AI Review Workspace"
+      eyebrow="Review Workspace"
       title="论文辅助评审工作台"
       description="面向教师/评委的论文初筛、结构化解析、多维评分、风险提示与评审留档入口。"
     >
       <template #actions>
-        <el-tag type="primary" size="large">{{ currentUserName }} · 评审端</el-tag>
+        <el-tag type="primary" size="large">{{ currentUserName }}</el-tag>
         <el-button type="primary" :loading="reviews.uploading.value" @click="handleSelectReviewPaper">上传待评审论文</el-button>
         <el-button v-if="canAccessLeaderWorkspace" @click="router.push('/review-leader')">组长工作台</el-button>
         <el-button v-if="auth.hasRole('USER')" @click="router.push('/user')">用户端</el-button>
@@ -106,23 +106,30 @@ onMounted(async () => {
       </template>
     </PageHeader>
 
-    <section class="summary-grid">
-      <article class="summary-card app-card">
-        <span>待评审</span>
+    <section class="stats-bar">
+      <div class="stat-item">
+        <span class="stat-dot pending"></span>
+        <span class="stat-label">待评审</span>
         <strong>{{ reviews.pendingCount.value }}</strong>
-      </article>
-      <article class="summary-card app-card">
-        <span>评审中</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-dot reviewing"></span>
+        <span class="stat-label">评审中</span>
         <strong>{{ reviews.reviewingCount.value }}</strong>
-      </article>
-      <article class="summary-card app-card">
-        <span>已完成</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-dot completed"></span>
+        <span class="stat-label">已完成</span>
         <strong>{{ reviews.completedCount.value }}</strong>
-      </article>
-      <article class="summary-card app-card muted">
-        <span>评审指标</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-dot criteria"></span>
+        <span class="stat-label">评审指标</span>
         <strong>{{ reviews.criteria.value.length }}</strong>
-      </article>
+      </div>
     </section>
 
     <section class="review-layout">
@@ -138,16 +145,19 @@ onMounted(async () => {
         @page-change="handlePageChange"
       />
 
-      <main class="review-detail app-card" v-loading="reviews.detailLoading.value">
+      <main class="review-detail" v-loading="reviews.detailLoading.value">
         <template v-if="selectedTask">
-          <div class="detail-hero">
-            <div>
-              <p>Paper Review</p>
+          <div class="detail-header">
+            <div class="detail-title">
               <h2>{{ selectedTask.title }}</h2>
-              <span>{{ selectedTask.sourceId }} · {{ formatDate(selectedTask.createdAt) }}</span>
+              <div class="detail-meta">
+                <span>{{ selectedTask.sourceId }}</span>
+                <span class="meta-dot"></span>
+                <span>{{ formatDate(selectedTask.createdAt) }}</span>
+              </div>
             </div>
-            <div class="hero-actions">
-              <el-tag v-if="selectedTask.currentAssignment" size="large" effect="plain">
+            <div class="detail-actions">
+              <el-tag v-if="selectedTask.currentAssignment" size="default" effect="plain">
                 {{ statusLabel(selectedTask.currentAssignment.status) }}
               </el-tag>
               <el-button type="primary" :disabled="assignmentSubmitted" :loading="reviews.generating.value" @click="reviews.runAiReview">
@@ -222,211 +232,185 @@ onMounted(async () => {
 
 <style scoped>
 .review-page {
-  gap: 16px;
-  padding: 20px 24px 32px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0) 240px),
-    #f6f8fb;
+  gap: 20px;
+  padding: 24px;
+  background: var(--app-bg);
 }
 
 .review-page :deep([class~="page-header"]) {
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-  padding: 20px 22px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.05);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 24px 28px;
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-xs);
 }
 
 .review-page :deep([class~="page-eyebrow"]) {
   margin-bottom: 6px;
-  color: #155eef;
+  color: var(--app-primary);
   font-size: 12px;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .review-page :deep([class~="page-header"] h1) {
-  color: #101828;
-  font-size: clamp(22px, 2.2vw, 30px);
-  letter-spacing: 0;
+  color: var(--app-text);
+  font-size: clamp(22px, 2.2vw, 28px);
+  letter-spacing: -0.02em;
 }
 
 .review-page :deep([class~="page-description"]) {
   margin-top: 8px;
-  color: #475467;
+  color: var(--app-text-muted);
   line-height: 1.6;
 }
 
 .review-page :deep([class~="el-button"]) {
-  border-radius: 8px;
-  font-weight: 700;
-}
-
-.review-page :deep([class~="el-button--primary"]) {
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
-}
-
-.review-page :deep([class~="el-input__wrapper"]),
-.review-page :deep([class~="el-select__wrapper"]),
-.review-page :deep([class~="el-textarea__inner"]),
-.review-page :deep([class~="el-input-number"] [class~="el-input__wrapper"]) {
-  border-radius: 9px;
-  box-shadow: 0 0 0 1px #d0d7e2 inset;
+  border-radius: var(--app-radius-sm);
 }
 
 .review-page :deep([class~="el-tabs__item"]) {
-  color: #475467;
-  font-weight: 700;
+  color: var(--app-text-muted);
+  font-weight: 600;
 }
 
 .review-page :deep([class~="el-tabs__item"][class~="is-active"]) {
-  color: #155eef;
+  color: var(--app-primary);
 }
 
 .review-page :deep([class~="el-tabs__active-bar"]) {
-  background: #155eef;
-}
-
-.review-page :deep([class~="el-collapse"]) {
-  border-color: #edf1f7;
-}
-
-.review-page :deep([class~="el-collapse-item__header"]) {
-  color: #101828;
-  font-weight: 750;
+  background: var(--app-primary);
 }
 
 .review-page .app-card,
 .review-detail {
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.05);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface);
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+.stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 14px 24px;
+  background: var(--app-surface);
 }
 
-.summary-card {
-  position: relative;
-  min-height: 96px;
-  display: grid;
-  align-content: center;
-  padding: 16px 18px 16px 72px;
-  border-color: #dde3ee;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 10px 26px rgba(16, 24, 40, 0.04);
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
 }
 
-.summary-card::before {
-  position: absolute;
-  left: 18px;
-  top: 50%;
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  transform: translateY(-50%);
+.stat-item:first-child {
+  padding-left: 0;
+}
+
+.stat-item:last-child {
+  padding-right: 0;
+}
+
+.stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stat-dot.pending {
+  background: var(--app-primary);
+}
+
+.stat-dot.reviewing {
+  background: var(--app-warning);
+}
+
+.stat-dot.completed {
+  background: var(--app-success);
+}
+
+.stat-dot.criteria {
+  background: var(--app-accent);
+}
+
+.stat-label {
+  color: var(--app-text-muted);
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 500;
 }
 
-.summary-card:nth-child(1)::before {
-  background: #eaf2ff;
-  color: #155eef;
-  content: 'Q';
+.stat-item strong {
+  color: var(--app-text);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-.summary-card:nth-child(2)::before {
-  background: #fff4df;
-  color: #dc6803;
-  content: 'R';
-}
-
-.summary-card:nth-child(3)::before {
-  background: #e8f8ef;
-  color: #099250;
-  content: 'C';
-}
-
-.summary-card:nth-child(4)::before {
-  background: #eef2ff;
-  color: #4f46e5;
-  content: 'M';
-}
-
-.summary-card span {
-  color: #155eef;
-  font-size: 12px;
-  font-weight: 850;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.summary-card strong {
-  display: block;
-  margin-top: 8px;
-  color: #101828;
-  font-size: 28px;
+.stat-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--app-border);
+  flex-shrink: 0;
 }
 
 .review-layout {
   display: grid;
-  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
-  gap: 16px;
-  min-height: 680px;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 20px;
+  min-height: 640px;
 }
 
 .review-detail {
-  padding: 18px;
+  padding: 24px;
 }
 
-.detail-hero {
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.detail-title h2 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.detail-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #edf1f7;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--app-text-subtle);
+  font-size: 13px;
 }
 
-.detail-hero p {
-  margin: 0;
-  color: #155eef;
-  font-size: 12px;
-  font-weight: 850;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.meta-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--app-text-subtle);
 }
 
-.detail-hero h2 {
-  margin: 4px 0 0;
-  color: #101828;
-}
-
-.detail-hero span {
-  color: #667085;
-  font-size: 12px;
-}
-
-.hero-actions {
+.detail-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .review-tabs {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 @media (max-width: 1180px) {
@@ -438,18 +422,22 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .stats-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .stat-divider {
+    display: none;
+  }
+
+  .stat-item {
+    padding: 4px 12px 4px 0;
   }
 }
 
 @media (max-width: 720px) {
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .detail-hero {
-    align-items: flex-start;
+  .detail-header {
     flex-direction: column;
   }
 }

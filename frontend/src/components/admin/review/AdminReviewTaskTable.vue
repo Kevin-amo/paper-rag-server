@@ -48,37 +48,37 @@ function handleTaskAction(command: TaskActionCommand, task: AdminReviewTaskSumma
 
 <template>
   <el-table :data="tasks" v-loading="loading" class="review-task-table">
-    <el-table-column prop="title" label="标题" min-width="260" show-overflow-tooltip />
-    <el-table-column label="状态" width="130">
+    <el-table-column prop="title" label="标题" min-width="240" show-overflow-tooltip />
+    <el-table-column label="状态" width="120">
       <template #default="{ row }">
-        <el-tag :type="statusType(row.status)">{{ row.status }}</el-tag>
+        <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
       </template>
     </el-table-column>
-    <el-table-column label="进度" min-width="180">
+    <el-table-column label="进度" min-width="160">
       <template #default="{ row }">
         <div class="progress-cell">
-          <el-progress :percentage="progress(row)" :stroke-width="10" />
+          <el-progress :percentage="progress(row)" :stroke-width="8" />
           <span>{{ row.submittedCount }}/{{ row.assignmentCount }}</span>
         </div>
       </template>
     </el-table-column>
-    <el-table-column label="负责人" min-width="180" show-overflow-tooltip>
+    <el-table-column label="负责人" min-width="140" show-overflow-tooltip>
       <template #default="{ row }">{{ reviewerName(row) }}</template>
     </el-table-column>
-    <el-table-column label="截止时间" min-width="180">
+    <el-table-column label="截止时间" min-width="160">
       <template #default="{ row }">{{ formatDate(row.dueAt) }}</template>
     </el-table-column>
-    <el-table-column label="共识状态" width="150">
+    <el-table-column label="共识" width="130">
       <template #default="{ row }">
-        <el-tag :type="row.consensusStatus === 'CONFIRMED' ? 'success' : 'info'">
+        <el-tag :type="row.consensusStatus === 'CONFIRMED' ? 'success' : 'info'" size="small">
           {{ row.consensusStatus || '-' }}
         </el-tag>
       </template>
     </el-table-column>
-    <el-table-column label="操作" width="130" fixed="right" align="center">
+    <el-table-column label="操作" width="120" fixed="right" align="center">
       <template #default="{ row }">
         <div class="task-actions">
-          <el-button text type="primary" @click="emit('open', row)">详情</el-button>
+          <el-button text type="primary" size="small" @click="emit('open', row)">详情</el-button>
           <el-dropdown
             trigger="click"
             placement="bottom-end"
@@ -103,32 +103,22 @@ function handleTaskAction(command: TaskActionCommand, task: AdminReviewTaskSumma
 
 <style scoped>
 .review-task-table {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
   overflow: hidden;
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-}
-
-.review-task-table :deep([class~="el-table__header-wrapper"] th) {
-  background: #f8fafc;
-  color: #475467;
-  font-size: 12px;
-  font-weight: 750;
-}
-
-.review-task-table :deep([class~="el-table__row"]:hover > td) {
-  background: #f5f8ff;
 }
 
 .progress-cell {
   display: grid;
-  grid-template-columns: minmax(90px, 1fr) auto;
+  grid-template-columns: minmax(80px, 1fr) auto;
   align-items: center;
   gap: 10px;
 }
 
 .progress-cell span {
-  color: #667085;
+  color: var(--app-text-muted);
   font-size: 12px;
+  font-weight: 500;
 }
 
 .task-actions {
@@ -143,28 +133,24 @@ function handleTaskAction(command: TaskActionCommand, task: AdminReviewTaskSumma
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 0;
   padding: 0;
   background: transparent;
-  color: var(--app-primary);
+  color: var(--app-text-subtle);
   cursor: pointer;
-  font: inherit;
-  line-height: 1;
-  transition: color 0.16s ease;
+  border-radius: var(--app-radius-xs);
+  transition: all 0.15s ease;
 }
 
-.action-menu-trigger:hover,
-.action-menu-trigger:focus {
-  background: transparent;
-  color: var(--app-primary-dark);
-  outline: none;
-  box-shadow: none;
+.action-menu-trigger:hover {
+  background: var(--app-surface-soft);
+  color: var(--app-primary);
 }
 
 .action-menu-trigger:focus-visible {
-  outline: 2px solid rgba(0, 122, 255, 0.3);
+  outline: 2px solid var(--app-primary);
   outline-offset: 2px;
 }
 

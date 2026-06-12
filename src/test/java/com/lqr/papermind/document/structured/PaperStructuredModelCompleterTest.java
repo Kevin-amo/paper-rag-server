@@ -9,7 +9,7 @@ import com.lqr.papermind.document.structured.model.PaperStructuredContent;
 import com.lqr.papermind.document.structured.model.PaperStructuredContentSupport;
 import com.lqr.papermind.document.structured.model.StructuredFieldEvidence;
 import com.lqr.papermind.document.structured.model.StructuredParseResult;
-import com.lqr.papermind.document.structured.service.impl.DefaultPaperStructuredModelCompleter;
+import com.lqr.papermind.document.structured.service.impl.PaperStructuredModelCompleterImpl;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
@@ -29,7 +29,7 @@ class PaperStructuredModelCompleterTest {
     @Test
     void completeShouldRetryWithJsonRepairPromptWhenFirstOutputHasNoJsonObject() {
         LlmService llmService = mock(LlmService.class);
-        DefaultPaperStructuredModelCompleter completer = new DefaultPaperStructuredModelCompleter(llmService, new ObjectMapper());
+        PaperStructuredModelCompleterImpl completer = new PaperStructuredModelCompleterImpl(llmService, new ObjectMapper());
         StructuredParseResult ruleResult = new StructuredParseResult(
                 PaperStructuredContentSupport.emptyContent(),
                 PaperStructuredContentSupport.emptyEvidence("RULE"),
@@ -51,7 +51,7 @@ class PaperStructuredModelCompleterTest {
     @Test
     void completeShouldUseFirstBalancedJsonObjectWhenOutputHasTrailingExplanation() {
         LlmService llmService = mock(LlmService.class);
-        DefaultPaperStructuredModelCompleter completer = new DefaultPaperStructuredModelCompleter(llmService, new ObjectMapper());
+        PaperStructuredModelCompleterImpl completer = new PaperStructuredModelCompleterImpl(llmService, new ObjectMapper());
         StructuredParseResult ruleResult = new StructuredParseResult(
                 PaperStructuredContentSupport.emptyContent(),
                 PaperStructuredContentSupport.emptyEvidence("RULE"),
@@ -75,7 +75,7 @@ class PaperStructuredModelCompleterTest {
     @Test
     void completeShouldDeriveFieldsFromRuleResultWhenModelOutputsNoJsonTwice() {
         LlmService llmService = mock(LlmService.class);
-        DefaultPaperStructuredModelCompleter completer = new DefaultPaperStructuredModelCompleter(llmService, new ObjectMapper());
+        PaperStructuredModelCompleterImpl completer = new PaperStructuredModelCompleterImpl(llmService, new ObjectMapper());
         PaperStructuredContent ruleContent = new PaperStructuredContent(
                 "软件分析与建模技术课程设计",
                 null,
@@ -123,7 +123,7 @@ class PaperStructuredModelCompleterTest {
     @Test
     void completeShouldKeepFirstAndRepairOutputsWhenBothHaveNoJsonObject() {
         LlmService llmService = mock(LlmService.class);
-        DefaultPaperStructuredModelCompleter completer = new DefaultPaperStructuredModelCompleter(llmService, new ObjectMapper());
+        PaperStructuredModelCompleterImpl completer = new PaperStructuredModelCompleterImpl(llmService, new ObjectMapper());
         StructuredParseResult ruleResult = new StructuredParseResult(
                 PaperStructuredContentSupport.emptyContent(),
                 PaperStructuredContentSupport.emptyEvidence("RULE"),

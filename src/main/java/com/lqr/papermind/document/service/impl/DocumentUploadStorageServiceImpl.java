@@ -19,7 +19,7 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
-public class LocalDocumentUploadStorageService implements DocumentUploadStorageService {
+public class DocumentUploadStorageServiceImpl implements DocumentUploadStorageService {
 
     private final DocumentIngestionProperties properties;
 

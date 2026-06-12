@@ -8,5 +8,11 @@ import com.lqr.papermind.document.structured.model.StructuredParseResult;
  */
 public interface PaperSectionRuleParser {
 
+    /**
+     * 根据章节标题规则解析论文结构。
+     *
+     * @param document 文档详情
+     * @return 规则解析结果
+     */
     StructuredParseResult parse(DocumentPersistenceService.DocumentDetail document);
 }

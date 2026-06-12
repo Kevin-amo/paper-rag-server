@@ -98,6 +98,14 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
         return findDocument(ownerUserId, sourceId, MetadataKeys.SOURCE_TYPE_REVIEW);
     }
 
+    /**
+     * 按来源 ID 和来源类型查询文档详情。
+     *
+     * @param ownerUserId 文档所属用户 ID
+     * @param sourceId 文档来源标识
+     * @param sourceType 来源类型过滤条件，为 null 时不过滤
+     * @return 文档详情，不存在时返回空
+     */
     private Optional<DocumentDetail> findDocument(UUID ownerUserId, String sourceId, String sourceType) {
         LambdaQueryWrapper<DocumentEntity> wrapper = new LambdaQueryWrapper<DocumentEntity>()
                 .eq(DocumentEntity::getOwnerUserId, ownerUserId)
@@ -627,6 +635,12 @@ public class DocumentPersistenceServiceImpl implements DocumentPersistenceServic
         return metadata == null ? Map.of() : metadata;
     }
 
+    /**
+     * 为查询条件应用来源类型过滤，用户类型兼容无来源类型的记录。
+     *
+     * @param wrapper 查询条件包装器
+     * @param sourceType 来源类型，为 null 时不过滤
+     */
     private void applySourceTypeFilter(LambdaQueryWrapper<DocumentEntity> wrapper, String sourceType) {
         if (sourceType == null || sourceType.isBlank()) {
             return;

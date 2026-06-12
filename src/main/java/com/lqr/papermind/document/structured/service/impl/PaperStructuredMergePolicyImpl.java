@@ -15,7 +15,7 @@ import java.util.Map;
  * 规则优先、模型补齐的结构化结果合并策略。
  */
 @Component
-public class DefaultPaperStructuredMergePolicy implements PaperStructuredMergePolicy {
+public class PaperStructuredMergePolicyImpl implements PaperStructuredMergePolicy {
 
     private static final double RULE_KEEP_CONFIDENCE = 0.7;
 
@@ -28,13 +28,16 @@ public class DefaultPaperStructuredMergePolicy implements PaperStructuredMergePo
             StructuredFieldEvidence modelEvidence = modelResult.evidence().get(field);
             Object ruleValue = PaperStructuredContentSupport.value(ruleResult.content(), field);
             Object modelValue = PaperStructuredContentSupport.value(modelResult.content(), field);
+            // 规则结果非空且置信度 >= 0.7 时，保留规则结果
             boolean keepRule = !PaperStructuredContentSupport.isEmpty(ruleValue)
                     && ruleEvidence != null
                     && ruleEvidence.confidence() >= RULE_KEEP_CONFIDENCE;
             if (keepRule || PaperStructuredContentSupport.isEmpty(modelValue)) {
+                // 保留规则结果
                 evidence.put(field, mergedEvidence(field, ruleEvidence, PaperStructuredContentSupport.isEmpty(ruleValue)));
                 continue;
             }
+            // 模型结果非空时，使用模型结果
             content = PaperStructuredContentSupport.withValue(content, field, modelValue);
             evidence.put(field, mergedEvidence(field, modelEvidence, false));
         }

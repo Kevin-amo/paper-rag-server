@@ -1110,22 +1110,51 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return metadata;
     }
 
+    /**
+     * 复制文档块并更新其索引编号。
+     *
+     * @param chunk 原始文档块
+     * @param chunkIndex 新的索引编号
+     * @return 更新索引后的文档块
+     */
     private DocumentChunk withChunkIndex(DocumentChunk chunk, int chunkIndex) {
         Map<String, Object> metadata = new LinkedHashMap<>(chunk.metadata());
         metadata.put(MetadataKeys.CHUNK_INDEX, chunkIndex);
         return new DocumentChunk(chunk.chunkId(), chunk.sourceId(), chunkIndex, chunk.content(), metadata);
     }
 
+    /**
+     * 返回文档块的类型排序权重，图片上下文类型权重较高。
+     *
+     * @param chunk 文档块
+     * @return 排序权重值
+     */
     private int chunkTypeOrder(DocumentChunk chunk) {
         Object chunkType = chunk.metadata() == null ? null : chunk.metadata().get(MetadataKeys.CHUNK_TYPE);
         return CHUNK_TYPE_FIGURE_CONTEXT.equals(chunkType) ? 1 : 0;
     }
 
+    /**
+     * 从元数据中安全读取整数值，转换失败时返回默认值。
+     *
+     * @param metadata 元数据映射
+     * @param key 键名
+     * @param fallback 默认值
+     * @return 整数值或默认值
+     */
     private int metadataInt(Map<String, Object> metadata, String key, int fallback) {
         Integer value = metadata == null ? null : integerValue(metadata.get(key));
         return value == null ? fallback : value;
     }
 
+    /**
+     * 校验并构建有效的文本范围，超出文本长度时自动修正。
+     *
+     * @param start 起始偏移
+     * @param end 结束偏移
+     * @param textLength 文本总长度
+     * @return 有效的文本范围，无效时返回空
+     */
     private Optional<TextRange> validTextRange(Integer start, Integer end, int textLength) {
         if (start == null || end == null || textLength <= 0) {
             return Optional.empty();
@@ -1135,6 +1164,13 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return safeStart < safeEnd ? Optional.of(new TextRange(safeStart, safeEnd)) : Optional.empty();
     }
 
+    /**
+     * 在全文中查找 caption 文本的所有出现位置。
+     *
+     * @param fullText 文档全文
+     * @param caption 图片说明文本
+     * @return 匹配的文本范围列表
+     */
     private List<TextRange> findCaptionMatches(String fullText, String caption) {
         String needle = caption == null ? "" : caption.strip();
         if (fullText == null || needle.isBlank()) {
@@ -1154,6 +1190,12 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return matches;
     }
 
+    /**
+     * 返回第一个非空的偏移量值。
+     *
+     * @param offsets 候选偏移量列表
+     * @return 第一个非空偏移量，全部为空时返回 null
+     */
     private Integer firstAvailableOffset(Integer... offsets) {
         for (Integer offset : offsets) {
             if (offset != null) {
@@ -1163,6 +1205,13 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return null;
     }
 
+    /**
+     * 计算偏移量到文本范围的最近距离，偏移量在范围内时返回 0。
+     *
+     * @param offset 待比较偏移量
+     * @param range 文本范围
+     * @return 最近距离
+     */
     private int distanceToRange(int offset, TextRange range) {
         if (offset >= range.start() && offset <= range.end()) {
             return 0;
@@ -1170,6 +1219,13 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return Math.min(Math.abs(offset - range.start()), Math.abs(offset - range.end()));
     }
 
+    /**
+     * 查找完全包含或部分重叠指定文本范围的段落。
+     *
+     * @param paragraphs 段落列表
+     * @param range 目标文本范围
+     * @return 匹配的段落，不存在时返回空
+     */
     private Optional<ParagraphBlock> paragraphContainingRange(List<ParagraphBlock> paragraphs, TextRange range) {
         return paragraphs.stream()
                 .filter(paragraph -> paragraph.start() <= range.start() && paragraph.end() >= range.end())
@@ -1179,6 +1235,16 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
                         .findFirst());
     }
 
+    /**
+     * 沿指定方向查找最近的符合条件的上下文段落。
+     *
+     * @param paragraphs 段落列表
+     * @param sections 章节列表
+     * @param captionParagraph 图片说明所在段落
+     * @param captionRange 图片说明文本范围
+     * @param direction 搜索方向，-1 向前，1 向后
+     * @return 符合条件的上下文段落，不存在时返回 null
+     */
     private ParagraphBlock nearestContextParagraph(List<ParagraphBlock> paragraphs,
                                                    List<SectionBlock> sections,
                                                    ParagraphBlock captionParagraph,
@@ -1197,6 +1263,16 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return null;
     }
 
+    /**
+     * 沿指定方向查找相邻的上下文段落，遇到章节边界时停止搜索。
+     *
+     * @param paragraphs 段落列表
+     * @param sections 章节列表
+     * @param captionParagraph 图片说明所在段落
+     * @param captionRange 图片说明文本范围
+     * @param direction 搜索方向，-1 向前，1 向后
+     * @return 相邻的上下文段落，不存在时返回 null
+     */
     private ParagraphBlock adjacentContextParagraph(List<ParagraphBlock> paragraphs,
                                                     List<SectionBlock> sections,
                                                     ParagraphBlock captionParagraph,
@@ -1218,6 +1294,14 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return null;
     }
 
+    /**
+     * 判断段落是否适合作为相邻上下文，排除短段落、标题行、目录和参考文献等。
+     *
+     * @param paragraph 待判断段落
+     * @param sections 章节列表
+     * @param captionRange 图片说明文本范围
+     * @return 适合作为上下文时返回 true
+     */
     private boolean isAdjacentContextParagraph(ParagraphBlock paragraph, List<SectionBlock> sections, TextRange captionRange) {
         if (paragraph == null || rangesOverlap(paragraph.start(), paragraph.end(), captionRange.start(), captionRange.end())) {
             return false;
@@ -1242,6 +1326,14 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return !looksLikeVisualNoiseParagraph(paragraph);
     }
 
+    /**
+     * 判断段落是否满足上下文段落的最低质量要求。
+     *
+     * @param paragraph 待判断段落
+     * @param sections 章节列表
+     * @param captionRange 图片说明文本范围
+     * @return 满足条件时返回 true
+     */
     private boolean isEligibleContextParagraph(ParagraphBlock paragraph, List<SectionBlock> sections, TextRange captionRange) {
         if (paragraph == null || rangesOverlap(paragraph.start(), paragraph.end(), captionRange.start(), captionRange.end())) {
             return false;
@@ -1266,6 +1358,13 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return !looksLikeVisualNoiseParagraph(paragraph);
     }
 
+    /**
+     * 查找包含指定偏移量的章节。
+     *
+     * @param sections 章节列表
+     * @param offset 目标偏移量
+     * @return 匹配的章节，不存在时返回空
+     */
     private Optional<SectionBlock> sectionContainingOffset(List<SectionBlock> sections, int offset) {
         return sections.stream()
                 .filter(section -> !section.paragraphs().isEmpty())
@@ -1274,6 +1373,13 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
                 .findFirst();
     }
 
+    /**
+     * 查找包含指定段落的章节。
+     *
+     * @param sections 章节列表
+     * @param paragraph 目标段落
+     * @return 匹配的章节，不存在时返回空
+     */
     private Optional<SectionBlock> sectionContainingParagraph(List<SectionBlock> sections, ParagraphBlock paragraph) {
         return sections.stream()
                 .filter(section -> section.paragraphs().contains(paragraph)
@@ -1281,10 +1387,25 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
                 .findFirst();
     }
 
+    /**
+     * 判断两个范围是否重叠。
+     *
+     * @param leftStart 左范围起始
+     * @param leftEnd 左范围结束
+     * @param rightStart 右范围起始
+     * @param rightEnd 右范围结束
+     * @return 重叠时返回 true
+     */
     private boolean rangesOverlap(int leftStart, int leftEnd, int rightStart, int rightEnd) {
         return leftStart < rightEnd && leftEnd > rightStart;
     }
 
+    /**
+     * 判断段落是否像图片说明段落。
+     *
+     * @param normalized 归一化后的段落文本
+     * @return 符合图片说明特征时返回 true
+     */
     private boolean looksLikeCaptionParagraph(String normalized) {
         String lower = normalized.toLowerCase(Locale.ROOT);
         return lower.startsWith("figure ")
@@ -1294,12 +1415,24 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
                 || normalized.matches("^[图表]\\s*[0-9一二三四五六七八九十]+[.．、:：\\s].*");
     }
 
+    /**
+     * 判断段落是否像参考文献条目。
+     *
+     * @param normalized 归一化后的段落文本
+     * @return 符合参考文献特征时返回 true
+     */
     private boolean looksLikeReferenceEntry(String normalized) {
         return normalized.matches("^\\[\\d+].*")
                 || normalized.matches("^\\d+\\.\\s+.+")
                 || normalized.matches("^[A-Z][A-Za-z-]+,\\s+.+\\(\\d{4}\\).*");
     }
 
+    /**
+     * 判断段落是否全部由视觉识别噪声组成。
+     *
+     * @param paragraph 待判断段落
+     * @return 全为噪声行时返回 true
+     */
     private boolean looksLikeVisualNoiseParagraph(ParagraphBlock paragraph) {
         List<LineBlock> lines = extractLines(paragraph.content()).stream()
                 .filter(line -> !line.content().isBlank())
@@ -1307,6 +1440,15 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return !lines.isEmpty() && lines.stream().allMatch(line -> isVisualArtifactLine(line.content()));
     }
 
+    /**
+     * 渲染图片上下文内容，包含章节标题、图片说明和前后文段落。
+     *
+     * @param sectionTitle 章节标题
+     * @param caption 图片说明
+     * @param before 前文上下文
+     * @param after 后文上下文
+     * @return 渲染后的上下文文本
+     */
     private String renderFigureContextContent(String sectionTitle, String caption, String before, String after) {
         StringBuilder builder = new StringBuilder("[Figure Context]");
         if (sectionTitle != null && !sectionTitle.isBlank()) {
@@ -1322,6 +1464,12 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return builder.toString();
     }
 
+    /**
+     * 获取用于内容渲染的章节标题，前置内容章节返回空字符串。
+     *
+     * @param section 章节块
+     * @return 章节标题或空字符串
+     */
     private String sectionTitleForContent(SectionBlock section) {
         if (section == null || section.title() == null || section.title().isBlank()) {
             return "";
@@ -1332,6 +1480,12 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return section.title();
     }
 
+    /**
+     * 安全获取段落的上下文文本，空段落返回 null。
+     *
+     * @param paragraph 段落块
+     * @return 段落文本或 null
+     */
     private String contextText(ParagraphBlock paragraph) {
         if (paragraph == null || paragraph.content() == null || paragraph.content().isBlank()) {
             return null;
@@ -1339,6 +1493,14 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return paragraph.content().strip();
     }
 
+    /**
+     * 缩短上下文文本至目标长度，保留头部或尾部并添加省略号。
+     *
+     * @param text 原始文本
+     * @param excess 超出的字符数
+     * @param keepEnd true 保留尾部，false 保留头部
+     * @return 缩短后的文本
+     */
     private String shortenContext(String text, int excess, boolean keepEnd) {
         if (text == null || text.isBlank()) {
             return "";
@@ -1358,10 +1520,25 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return text.substring(0, targetLength - 1).stripTrailing() + "…";
     }
 
+    /**
+     * 归一化资产类型字符串为小写格式。
+     *
+     * @param assetType 原始资产类型
+     * @return 归一化后的资产类型
+     */
     private String normalizeAssetType(String assetType) {
         return assetType == null ? "" : assetType.strip().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 根据资产信息生成稳定的唯一资产 ID。
+     *
+     * @param sourceId 文档来源标识
+     * @param caption 图片说明
+     * @param page 页码
+     * @param bbox 边界框
+     * @return 基于内容哈希的 UUID 字符串
+     */
     private String stableAssetId(String sourceId, String caption, Integer page, String bbox) {
         String material = sourceId
                 + "::figure-asset::"
@@ -1373,6 +1550,12 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return UUID.nameUUIDFromBytes(material.getBytes(StandardCharsets.UTF_8)).toString();
     }
 
+    /**
+     * 从多个候选值中返回第一个非空白字符串。
+     *
+     * @param values 候选值列表
+     * @return 第一个非空白字符串，全部为空时返回 null
+     */
     private String firstNonBlankString(Object... values) {
         for (Object value : values) {
             if (value == null) {
@@ -1386,6 +1569,12 @@ public class DocumentSplittingServiceImpl implements DocumentSplittingService {
         return null;
     }
 
+    /**
+     * 从多个候选值中返回第一个非空且非空白的值。
+     *
+     * @param values 候选值列表
+     * @return 第一个有效值，全部为空时返回 null
+     */
     private Object firstPresent(Object... values) {
         for (Object value : values) {
             if (value == null) {

@@ -12,6 +12,7 @@ import java.util.UUID;
  */
 public interface ConversationService {
 
+    /** 默认历史消息查询上限 */
     int DEFAULT_HISTORY_MESSAGE_LIMIT = 20;
 
     /**

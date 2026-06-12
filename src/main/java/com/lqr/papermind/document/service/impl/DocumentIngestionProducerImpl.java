@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @RequiredArgsConstructor
-public class RabbitDocumentIngestionProducer implements DocumentIngestionProducer {
+public class DocumentIngestionProducerImpl implements DocumentIngestionProducer {
 
     private final RabbitTemplate rabbitTemplate;
     private final DocumentIngestionJobService documentIngestionJobService;

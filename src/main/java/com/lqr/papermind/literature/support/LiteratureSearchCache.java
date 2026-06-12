@@ -184,12 +184,28 @@ public class LiteratureSearchCache {
         }
     }
 
+    /**
+     * 缓存重建锁的持有句柄，用于释放锁时校验身份。
+     *
+     * @param lockKey Redis 锁键名
+     * @param lockValue 锁持有者的唯一标识
+     */
     public record LockHandle(
             String lockKey,
             String lockValue
     ) {
     }
 
+    /**
+     * 文献搜索缓存的业务键，用于生成稳定的 Redis 缓存键。
+     *
+     * @param query 搜索关键词
+     * @param limit 返回数量
+     * @param sortBy 排序方式
+     * @param categories 分类筛选条件列表
+     * @param dateFrom 起始日期
+     * @param dateTo 截止日期
+     */
     public record Key(
             String query,
             int limit,

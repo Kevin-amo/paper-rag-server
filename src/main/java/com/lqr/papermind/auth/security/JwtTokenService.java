@@ -27,6 +27,12 @@ public class JwtTokenService {
     private final JwtDecoder jwtDecoder;
     private final SecurityProperties securityProperties;
 
+    /**
+     * 为当前用户签发访问令牌，包含用户ID、角色和过期时间等声明。
+     *
+     * @param principal 当前用户主体
+     * @return 签发的 JWT 令牌字符串
+     */
     public String createAccessToken(SecurityUserPrincipal principal) {
         Instant now = Instant.now();
         Instant expiresAt = now.plus(securityProperties.jwt().accessTokenTtl());
@@ -57,6 +63,13 @@ public class JwtTokenService {
         }
     }
 
+    /**
+     * 解码并校验 JWT 令牌，返回包含所有声明的 Jwt 对象。
+     *
+     * @param token JWT 令牌字符串
+     * @return 解码后的 Jwt 对象
+     * @throws JwtException 令牌无效或已过期时抛出
+     */
     public Jwt decode(String token) {
         return jwtDecoder.decode(token);
     }

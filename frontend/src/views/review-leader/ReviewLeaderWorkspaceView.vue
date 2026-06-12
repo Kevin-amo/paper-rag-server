@@ -289,49 +289,50 @@ onMounted(async () => {
 <template>
   <MainLayout class="leader-page">
     <PageHeader
-      eyebrow="Review Leader Workspace"
+      eyebrow="Review Leader"
       title="评审组长工作台"
       description="按评审小组处理任务分配、组内评分详情、最终评分与共识确认。"
     >
       <template #actions>
-        <el-tag type="primary" size="large">{{ currentUserName }} · 组长端</el-tag>
+        <el-tag type="primary" size="large">{{ currentUserName }}</el-tag>
         <el-button @click="router.push('/review')">评审工作台</el-button>
         <el-button v-if="auth.isAdmin.value" @click="router.push('/admin/reviews')">管理后台</el-button>
         <el-button @click="handleLogout">退出登录</el-button>
       </template>
     </PageHeader>
 
-    <section class="summary-grid">
-      <article class="summary-card app-card">
-        <span>负责小组</span>
+    <section class="stats-bar">
+      <div class="stat-item">
+        <span class="stat-label">负责小组</span>
         <strong>{{ groups.length }}</strong>
-      </article>
-      <article class="summary-card app-card">
-        <span>本组任务</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-label">本组任务</span>
         <strong>{{ tasks.length }}</strong>
-      </article>
-      <article class="summary-card app-card">
-        <span>待分配</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-label">待分配</span>
         <strong>{{ unassignedCount }}</strong>
-      </article>
-      <article class="summary-card app-card muted">
-        <span>待最终评分</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-label">待最终评分</span>
         <strong>{{ submittedCount }}</strong>
-      </article>
-      <article class="summary-card app-card muted">
-        <span>最终已确认</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-label">最终已确认</span>
         <strong>{{ confirmedCount }}</strong>
-      </article>
+      </div>
     </section>
 
     <section class="leader-shell">
-      <aside class="group-panel app-card" v-loading="loading || scopeLoading">
+      <aside class="group-panel" v-loading="loading || scopeLoading">
         <div class="panel-header">
-          <div>
-            <p>Groups</p>
-            <h2>我的小组</h2>
-          </div>
-          <el-button @click="loadGroups">刷新</el-button>
+          <h2>我的小组</h2>
+          <el-button size="small" @click="loadGroups">刷新</el-button>
         </div>
 
         <el-select v-model="selectedGroupId" class="full-width" placeholder="选择评审小组">
@@ -359,17 +360,14 @@ onMounted(async () => {
         </div>
       </aside>
 
-      <main class="task-panel app-card" v-loading="scopeLoading">
+      <main class="task-panel" v-loading="scopeLoading">
         <div class="panel-header">
-          <div>
-            <p>Tasks</p>
-            <h2>本组评审任务</h2>
-          </div>
-          <el-button type="primary" @click="loadGroupScope()">刷新任务</el-button>
+          <h2>本组评审任务</h2>
+          <el-button type="primary" size="small" @click="loadGroupScope()">刷新任务</el-button>
         </div>
 
         <el-table :data="tasks" class="task-table" highlight-current-row @row-click="(row: AdminReviewTaskSummary) => loadTaskDetail(row.id)">
-          <el-table-column label="论文" min-width="240" show-overflow-tooltip>
+          <el-table-column label="论文" min-width="220" show-overflow-tooltip>
             <template #default="{ row }">
               <div class="task-title-cell">
                 <strong>{{ row.title }}</strong>
@@ -377,23 +375,23 @@ onMounted(async () => {
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="状态" width="130">
+          <el-table-column label="状态" width="120">
             <template #default="{ row }">
-              <el-tag effect="plain">{{ statusLabel(row.status) }}</el-tag>
+              <el-tag size="small" effect="plain">{{ statusLabel(row.status) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="分配/提交" width="120">
+          <el-table-column label="分配/提交" width="100">
             <template #default="{ row }">
               {{ row.submittedCount }}/{{ row.assignmentCount }}
             </template>
           </el-table-column>
-          <el-table-column label="组长" min-width="150" show-overflow-tooltip>
+          <el-table-column label="组长" min-width="130" show-overflow-tooltip>
             <template #default="{ row }">{{ taskLeadName(row) }}</template>
           </el-table-column>
-          <el-table-column label="截止时间" width="180">
+          <el-table-column label="截止时间" width="160">
             <template #default="{ row }">{{ formatDate(row.dueAt) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="230" fixed="right">
+          <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
               <el-button size="small" @click.stop="loadTaskDetail(row.id)">详情</el-button>
               <el-button size="small" type="primary" :disabled="!isUnassignedTask(row)" @click.stop="openAssignDialog(row)">
@@ -407,13 +405,10 @@ onMounted(async () => {
     </section>
 
     <section class="detail-grid" v-if="selectedTask">
-      <article class="app-card detail-card" v-loading="detailLoading">
+      <article class="detail-card" v-loading="detailLoading">
         <div class="panel-header">
-          <div>
-            <p>Reports</p>
-            <h2>组内评分详情</h2>
-          </div>
-          <el-tag>{{ reports.length }} 份报告</el-tag>
+          <h2>组内评分详情</h2>
+          <el-tag size="small">{{ reports.length }} 份报告</el-tag>
         </div>
 
         <el-empty v-if="!reports.length" description="暂无已生成的个人评分报告" />
@@ -430,23 +425,20 @@ onMounted(async () => {
               <span>更新时间：{{ formatDate(report.updatedAt) }}</span>
             </div>
             <el-table v-if="scoreItems(report).length" :data="scoreItems(report)" size="small" class="score-table">
-              <el-table-column prop="name" label="指标" min-width="160" show-overflow-tooltip />
-              <el-table-column prop="score" label="得分" width="90" />
-              <el-table-column prop="maxScore" label="满分" width="90" />
-              <el-table-column prop="reason" label="理由" min-width="220" show-overflow-tooltip />
+              <el-table-column prop="name" label="指标" min-width="140" show-overflow-tooltip />
+              <el-table-column prop="score" label="得分" width="80" />
+              <el-table-column prop="maxScore" label="满分" width="80" />
+              <el-table-column prop="reason" label="理由" min-width="200" show-overflow-tooltip />
             </el-table>
             <pre class="json-block">{{ JSON.stringify(report.comments || {}, null, 2) }}</pre>
           </el-collapse-item>
         </el-collapse>
       </article>
 
-      <article class="app-card detail-card consensus-card" v-loading="detailLoading">
+      <article class="detail-card consensus-card" v-loading="detailLoading">
         <div class="panel-header">
-          <div>
-            <p>Consensus</p>
-            <h2>最终评分 / 共识</h2>
-          </div>
-          <el-tag :type="consensus?.status === 'CONFIRMED' ? 'success' : 'warning'" effect="plain">
+          <h2>最终评分 / 共识</h2>
+          <el-tag :type="consensus?.status === 'CONFIRMED' ? 'success' : 'warning'" size="small" effect="plain">
             {{ statusLabel(consensus?.status) }}
           </el-tag>
         </div>
@@ -458,7 +450,7 @@ onMounted(async () => {
         </div>
 
         <div class="consensus-actions">
-          <el-button type="primary" :loading="consensusRecalculating" :disabled="consensus?.status === 'CONFIRMED'" @click="recalculateConsensus">
+          <el-button type="primary" size="small" :loading="consensusRecalculating" :disabled="consensus?.status === 'CONFIRMED'" @click="recalculateConsensus">
             重新计算共识
           </el-button>
         </div>
@@ -468,7 +460,7 @@ onMounted(async () => {
             <el-input-number v-model="consensusForm.finalScore" :min="0" :max="100" :precision="0" class="full-width" />
           </el-form-item>
           <el-form-item label="最终建议">
-            <el-input v-model="consensusForm.finalRecommendation" type="textarea" :rows="5" placeholder="填写最终评审建议" />
+            <el-input v-model="consensusForm.finalRecommendation" type="textarea" :rows="4" placeholder="填写最终评审建议" />
           </el-form-item>
         </el-form>
 
@@ -483,7 +475,7 @@ onMounted(async () => {
       </article>
     </section>
 
-    <el-dialog v-model="assignDialogVisible" title="分配本组评审任务" width="560px">
+    <el-dialog v-model="assignDialogVisible" title="分配本组评审任务" width="520px">
       <div v-if="assignmentTask" class="assign-task-card">
         <strong>{{ assignmentTask.title }}</strong>
         <span>{{ assignmentTask.sourceId }}</span>
@@ -519,51 +511,86 @@ onMounted(async () => {
 
 <style scoped>
 .leader-page {
-  color: #101828;
+  gap: 20px;
+  padding: 24px;
+  background: var(--app-bg);
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
+.leader-page :deep([class~="page-header"]) {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 24px 28px;
+  background: var(--app-surface);
 }
 
-.summary-card {
+.leader-page :deep([class~="page-eyebrow"]) {
+  color: var(--app-primary);
+}
+
+.leader-page :deep([class~="page-header"] h1) {
+  color: var(--app-text);
+}
+
+.leader-page :deep([class~="el-button"]) {
+  border-radius: var(--app-radius-sm);
+}
+
+.stats-bar {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 14px 24px;
+  background: var(--app-surface);
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  padding: 18px;
+  padding: 0 16px;
 }
 
-.summary-card span {
-  color: #667085;
+.stat-item:first-child {
+  padding-left: 0;
+}
+
+.stat-item:last-child {
+  padding-right: 0;
+}
+
+.stat-label {
+  color: var(--app-text-muted);
   font-size: 13px;
+  font-weight: 500;
 }
 
-.summary-card strong {
-  font-size: 30px;
+.stat-item strong {
+  color: var(--app-text);
+  font-size: 20px;
+  font-weight: 700;
 }
 
-.summary-card.muted {
-  background: rgba(255, 255, 255, 0.78);
+.stat-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--app-border);
+  flex-shrink: 0;
 }
 
 .leader-shell {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 18px;
-}
-
-.app-card {
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 20px;
 }
 
 .group-panel,
 .task-panel,
 .detail-card {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface);
   padding: 20px;
 }
 
@@ -573,20 +600,15 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
-}
-
-.panel-header p {
-  margin: 0 0 4px;
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .panel-header h2 {
   margin: 0;
-  font-size: 20px;
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .full-width {
@@ -598,11 +620,19 @@ onMounted(async () => {
 .selected-task-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 16px;
-  background: #f8fafc;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-soft);
+}
+
+.group-card strong,
+.assign-task-card strong,
+.selected-task-card strong {
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .group-card span,
@@ -612,7 +642,7 @@ onMounted(async () => {
 .task-title-cell span,
 .report-title span,
 .report-meta span {
-  color: #667085;
+  color: var(--app-text-muted);
   font-size: 13px;
 }
 
@@ -621,23 +651,40 @@ onMounted(async () => {
 }
 
 .member-list h3 {
-  margin: 0 0 12px;
-  font-size: 15px;
+  margin: 0 0 10px;
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .member-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 0;
-  border-bottom: 1px solid #eef2f7;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--app-border);
 }
 
-.task-title-cell,
-.report-title {
+.member-item:last-child {
+  border-bottom: none;
+}
+
+.member-item strong {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.task-title-cell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+}
+
+.task-title-cell strong {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .task-table {
@@ -646,29 +693,41 @@ onMounted(async () => {
 
 .detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(360px, 0.75fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+  gap: 20px;
+}
+
+.report-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.report-title strong {
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .report-meta {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .score-table {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .json-block {
-  max-height: 220px;
+  max-height: 200px;
   overflow: auto;
   margin: 0;
   padding: 12px;
-  border-radius: 12px;
-  background: #0f172a;
-  color: #dbeafe;
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-soft);
+  color: var(--app-text-muted);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -681,28 +740,31 @@ onMounted(async () => {
 .consensus-actions,
 .consensus-form,
 .consensus-footer {
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .consensus-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
 }
 
 @media (max-width: 1180px) {
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .stats-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .stat-divider {
+    display: none;
+  }
+
+  .stat-item {
+    padding: 4px 12px 4px 0;
   }
 
   .leader-shell,
   .detail-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 720px) {
-  .summary-grid {
     grid-template-columns: 1fr;
   }
 }

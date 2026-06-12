@@ -203,6 +203,18 @@ public class LiteratureSearchIntentParser {
         return candidate.substring(0, boundaryIndex).replaceFirst("[，。,.;；、\\s]+$", "").trim();
     }
 
+    /**
+     * 文献搜索意图解析结果。
+     *
+     * @param query 搜索关键词
+     * @param limit 期望返回数量
+     * @param sortBy 排序方式，例如 relevance 或 date
+     * @param dateFrom 起始日期，格式为 YYYY-MM-DD
+     * @param dateTo 截止日期，格式为 YYYY-MM-DD
+     * @param categories 分类筛选条件列表
+     * @param followUp 是否为追问，需要继承上一轮搜索上下文
+     * @param withinPreviousItems 是否限定在上一轮搜索结果中筛选
+     */
     public record Intent(
             String query,
             Integer limit,

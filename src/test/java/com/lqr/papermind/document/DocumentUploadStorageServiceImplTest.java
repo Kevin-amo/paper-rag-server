@@ -1,7 +1,7 @@
 package com.lqr.papermind.document;
 
 import com.lqr.papermind.document.config.DocumentIngestionProperties;
-import com.lqr.papermind.document.service.impl.LocalDocumentUploadStorageService;
+import com.lqr.papermind.document.service.impl.DocumentUploadStorageServiceImpl;
 import com.lqr.papermind.document.service.DocumentUploadStorageService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 本地文档上传存储服务的文件名净化和落盘路径测试。
  */
-class LocalDocumentUploadStorageServiceTest {
+class DocumentUploadStorageServiceImplTest {
 
     @TempDir
     Path tempDir;
@@ -26,7 +26,7 @@ class LocalDocumentUploadStorageServiceTest {
         DocumentIngestionProperties properties = new DocumentIngestionProperties(
                 tempDir.toString(), true, 3, new DocumentIngestionProperties.Listener(2, 4), null
         );
-        LocalDocumentUploadStorageService service = new LocalDocumentUploadStorageService(properties);
+        DocumentUploadStorageServiceImpl service = new DocumentUploadStorageServiceImpl(properties);
         UUID ownerUserId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
         MockMultipartFile file = new MockMultipartFile("file", "..\\evil.pdf", "application/pdf", "content".getBytes());

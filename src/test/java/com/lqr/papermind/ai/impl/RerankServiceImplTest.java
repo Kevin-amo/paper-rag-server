@@ -1,6 +1,6 @@
 package com.lqr.papermind.ai.impl;
 
-import com.lqr.papermind.ai.service.impl.DashScopeRerankServiceImpl;
+import com.lqr.papermind.ai.service.impl.RerankServiceImpl;
 import com.lqr.papermind.common.model.DocumentChunk;
 import com.lqr.papermind.common.model.RetrievedChunk;
 import com.lqr.papermind.rag.config.RagProperties;
@@ -21,13 +21,13 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.http.HttpMethod.POST;
 
-class DashScopeRerankServiceImplTest {
+class RerankServiceImplTest {
 
     @Test
     void rerankShouldMapRequestAndResponse() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        DashScopeRerankServiceImpl service = new DashScopeRerankServiceImpl(
+        RerankServiceImpl service = new RerankServiceImpl(
                 builder,
                 new RagProperties(800, 120, 5, 0),
                 "test-key",
@@ -64,7 +64,7 @@ class DashScopeRerankServiceImplTest {
 
     @Test
     void rerankShouldFallbackWhenApiKeyMissing() {
-        DashScopeRerankServiceImpl service = new DashScopeRerankServiceImpl(
+        RerankServiceImpl service = new RerankServiceImpl(
                 RestClient.builder(),
                 new RagProperties(800, 120, 5, 0),
                 ""
@@ -80,7 +80,7 @@ class DashScopeRerankServiceImplTest {
     void rerankShouldFallbackWhenResponseIsEmpty() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        DashScopeRerankServiceImpl service = new DashScopeRerankServiceImpl(
+        RerankServiceImpl service = new RerankServiceImpl(
                 builder,
                 new RagProperties(800, 120, 5, 0),
                 "test-key",

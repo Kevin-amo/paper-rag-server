@@ -4,6 +4,20 @@ import java.util.List;
 
 /**
  * 统一论文搜索结果。
+ *
+ * @param title 论文标题
+ * @param authors 作者列表
+ * @param abstractText 摘要文本
+ * @param year 发表年份
+ * @param publishedDate 发表日期
+ * @param updatedDate 更新日期
+ * @param categories 分类列表
+ * @param primaryCategory 主分类
+ * @param doi 数字对象标识符
+ * @param url 论文网页地址
+ * @param pdfUrl PDF 下载地址
+ * @param source 数据来源标识，例如 openalex
+ * @param externalId 外部系统中的唯一标识
  */
 public record LiteratureSearchResult(
         String title,

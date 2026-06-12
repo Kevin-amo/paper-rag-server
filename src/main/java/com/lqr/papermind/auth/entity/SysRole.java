@@ -15,11 +15,19 @@ import java.util.UUID;
 @TableName("public.sys_role")
 public class SysRole {
 
+    /** 角色主键ID。 */
     @TableId(value = "id", type = IdType.INPUT)
     private UUID id;
 
+    /** 角色编码，如 ADMIN、USER、REVIEWER。 */
     private String code;
+
+    /** 角色名称。 */
     private String name;
+
+    /** 角色描述。 */
     private String description;
+
+    /** 记录创建时间。 */
     private OffsetDateTime createdAt;
 }

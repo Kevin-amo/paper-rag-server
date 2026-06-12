@@ -51,10 +51,21 @@ public record OssProperties(
         return publicBaseUrl == null ? "" : publicBaseUrl.replaceAll("/+$", "");
     }
 
+    /**
+     * 判断 OSS 配置是否完整。
+     *
+     * @return 若 endpoint、bucket、accessKeyId 和 accessKeySecret 均已配置则返回 {@code true}
+     */
     public boolean isConfigured() {
         return hasText(endpoint) && hasText(bucket) && hasText(accessKeyId) && hasText(accessKeySecret);
     }
 
+    /**
+     * 判断字符串是否非空且包含有效文本。
+     *
+     * @param value 待检查的字符串
+     * @return 若字符串不为 {@code null} 且去除首尾空白后长度大于零则返回 {@code true}
+     */
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
     }

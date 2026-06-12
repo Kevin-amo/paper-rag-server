@@ -5,8 +5,13 @@ package com.lqr.papermind.auth.security;
  */
 public final class RoleCodes {
 
+    /** 管理员角色编码。 */
     public static final String ADMIN = "ADMIN";
+
+    /** 审阅者角色编码。 */
     public static final String REVIEWER = "REVIEWER";
+
+    /** 普通用户角色编码。 */
     public static final String USER = "USER";
 
     private RoleCodes() {

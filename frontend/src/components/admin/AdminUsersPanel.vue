@@ -7,7 +7,7 @@ export default {
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { EditPen, MoreFilled } from '@element-plus/icons-vue';
+import { EditPen, MoreFilled, User, UserFilled, Avatar, CircleClose } from '@element-plus/icons-vue';
 import StatusTag from '../common/StatusTag.vue';
 import RoleTag from '../common/RoleTag.vue';
 import { useAdminUsers } from '../../composables/useAdminUsers';
@@ -132,30 +132,38 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
     </div>
 
     <section class="admin-summary">
-      <div class="summary-card accent-blue">
-        <span class="metric-icon">U</span>
-        <div>
+      <div class="summary-card">
+        <div class="summary-icon blue">
+          <el-icon :size="18"><User /></el-icon>
+        </div>
+        <div class="summary-body">
           <span>当前页用户</span>
           <strong>{{ admin.users.value.length }}</strong>
         </div>
       </div>
-      <div class="summary-card accent-green">
-        <span class="metric-icon">A</span>
-        <div>
+      <div class="summary-card">
+        <div class="summary-icon green">
+          <el-icon :size="18"><UserFilled /></el-icon>
+        </div>
+        <div class="summary-body">
           <span>启用账号</span>
           <strong>{{ admin.activeCount.value }}</strong>
         </div>
       </div>
-      <div class="summary-card accent-indigo">
-        <span class="metric-icon">M</span>
-        <div>
+      <div class="summary-card">
+        <div class="summary-icon indigo">
+          <el-icon :size="18"><Avatar /></el-icon>
+        </div>
+        <div class="summary-body">
           <span>管理员</span>
           <strong>{{ admin.adminCount.value }}</strong>
         </div>
       </div>
-      <div class="summary-card accent-red">
-        <span class="metric-icon">D</span>
-        <div>
+      <div class="summary-card">
+        <div class="summary-icon red">
+          <el-icon :size="18"><CircleClose /></el-icon>
+        </div>
+        <div class="summary-body">
           <span>禁用账号</span>
           <strong>{{ admin.disabledCount.value }}</strong>
         </div>
@@ -178,7 +186,7 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
     </div>
 
     <el-table :data="admin.users.value" :loading="admin.loading.value" class="users-table">
-      <el-table-column label="用户" min-width="220">
+      <el-table-column label="用户" min-width="200">
         <template #default="{ row }">
           <div class="user-cell">
             <strong>{{ row.displayName || row.username }}</strong>
@@ -186,10 +194,10 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="email" label="邮箱" min-width="190" show-overflow-tooltip>
+      <el-table-column prop="email" label="邮箱" min-width="180" show-overflow-tooltip>
         <template #default="{ row }">{{ row.email || '-' }}</template>
       </el-table-column>
-      <el-table-column label="角色" min-width="240">
+      <el-table-column label="角色" min-width="220">
         <template #default="{ row }">
           <div class="inline-edit-cell">
             <div class="tag-list">
@@ -236,7 +244,7 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="150">
+      <el-table-column label="状态" width="140">
         <template #default="{ row }">
           <div class="inline-edit-cell compact">
             <StatusTag :status="row.status" />
@@ -281,13 +289,13 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="最近登录" min-width="170">
+      <el-table-column label="最近登录" min-width="160">
         <template #default="{ row }">{{ formatDate(row.lastLoginAt) }}</template>
       </el-table-column>
-      <el-table-column label="创建时间" min-width="170">
+      <el-table-column label="创建时间" min-width="160">
         <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="110" fixed="right" align="center">
+      <el-table-column label="操作" width="100" fixed="right" align="center">
         <template #default="{ row }">
           <el-dropdown
             trigger="click"
@@ -328,7 +336,7 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
       />
     </div>
 
-    <el-dialog v-model="admin.formDialogVisible.value" :title="admin.dialogTitle.value" width="480px" class="user-form-dialog">
+    <el-dialog v-model="admin.formDialogVisible.value" :title="admin.dialogTitle.value" width="480px">
       <el-form label-position="top">
         <el-form-item label="用户名" required>
           <el-input v-model="admin.userForm.username" :disabled="admin.formMode.value === 'edit'" placeholder="例如 alice" />
@@ -374,11 +382,10 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
 .users-panel {
   display: grid;
   gap: 16px;
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-  padding: 18px;
-  background: #fff;
-  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.05);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 20px;
+  background: var(--app-surface);
 }
 
 .panel-heading {
@@ -386,19 +393,20 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid #edf1f7;
+  border-bottom: 1px solid var(--app-border);
   padding-bottom: 14px;
 }
 
 .panel-heading h2 {
   margin: 0;
-  color: #101828;
-  font-size: 18px;
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .panel-heading p {
-  margin: 6px 0 0;
-  color: #667085;
+  margin: 4px 0 0;
+  color: var(--app-text-muted);
   font-size: 13px;
 }
 
@@ -411,95 +419,113 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
 .summary-card {
   display: flex;
   align-items: center;
-  gap: 14px;
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
-  padding: 14px;
-  background: #fff;
-  box-shadow: 0 10px 26px rgba(16, 24, 40, 0.04);
+  gap: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  padding: 14px 16px;
+  background: var(--app-surface);
+  transition: box-shadow 0.2s ease;
 }
 
-.metric-icon {
+.summary-card:hover {
+  box-shadow: var(--app-shadow-sm);
+}
+
+.summary-icon {
   width: 40px;
   height: 40px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 850;
+  border-radius: var(--app-radius-sm);
+  flex-shrink: 0;
 }
 
-.summary-card span {
-  display: block;
-  color: #667085;
-  font-size: 13px;
+.summary-icon.blue {
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
 }
 
-.summary-card strong {
+.summary-icon.green {
+  background: var(--app-success-soft);
+  color: var(--app-success);
+}
+
+.summary-icon.indigo {
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+
+.summary-icon.red {
+  background: var(--app-danger-soft);
+  color: var(--app-danger);
+}
+
+.summary-body span {
   display: block;
-  margin-top: 8px;
-  color: #101828;
+  color: var(--app-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.summary-body strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--app-text);
   font-size: 24px;
+  font-weight: 700;
   line-height: 1;
-}
-
-.accent-blue .metric-icon {
-  background: #eaf2ff;
-  color: #155eef;
-}
-
-.accent-green .metric-icon {
-  background: #e8f8ef;
-  color: #099250;
-}
-
-.accent-indigo .metric-icon {
-  background: #eef2ff;
-  color: #4f46e5;
-}
-
-.accent-red .metric-icon {
-  background: #feecec;
-  color: #d92d20;
+  letter-spacing: -0.02em;
 }
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 150px auto auto;
+  grid-template-columns: minmax(200px, 1fr) 140px auto auto;
   gap: 10px;
 }
 
 .status-filter {
-  width: 150px;
+  width: 140px;
 }
 
 .toolbar :deep([class~="el-input__wrapper"]),
 .toolbar :deep([class~="el-select__wrapper"]) {
-  min-height: 38px;
-  border-radius: 9px;
-  box-shadow: 0 0 0 1px #d0d7e2 inset;
+  min-height: 36px;
+  border-radius: var(--app-radius-sm) !important;
+  box-shadow: none !important;
+  border: 1px solid var(--app-border);
+}
+
+.toolbar :deep([class~="el-input__wrapper"]:hover),
+.toolbar :deep([class~="el-select__wrapper"]:hover) {
+  border-color: var(--app-border-strong);
+}
+
+.toolbar :deep([class~="el-input__wrapper"][class~="is-focus"]),
+.toolbar :deep([class~="el-select__wrapper"]:focus-within) {
+  border-color: var(--app-primary);
 }
 
 .users-table {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
   overflow: hidden;
-  border: 1px solid #dde3ee;
-  border-radius: 10px;
 }
 
 .user-cell {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .user-cell strong {
-  color: #101828;
-  font-weight: 700;
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .user-cell span {
-  color: #667085;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 
@@ -519,19 +545,16 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .cell-edit-button {
   width: 28px;
   height: 28px;
   min-width: 28px;
-  color: #667085;
+  color: var(--app-text-subtle);
   opacity: 0;
-  transition:
-    opacity 0.18s ease,
-    background-color 0.18s ease,
-    color 0.18s ease;
+  transition: opacity 0.15s ease, color 0.15s ease;
 }
 
 .inline-edit-cell:hover .cell-edit-button,
@@ -542,39 +565,38 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
 .cell-edit-button:hover,
 .cell-edit-button:focus {
   color: var(--app-primary);
-  background: var(--app-primary-soft);
 }
 
 .inline-editor {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .inline-editor-title {
-  color: #101828;
+  color: var(--app-text);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .role-choice-list,
 .status-choice-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .role-choice-list :deep([class~="el-checkbox-button__inner"]),
 .status-choice-list :deep([class~="el-radio-button__inner"]) {
-  border: 1px solid #d0d7e2;
-  border-radius: 999px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-xs);
   box-shadow: none;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .role-choice-list :deep([class~="el-checkbox-button"]:first-child [class~="el-checkbox-button__inner"]),
 .status-choice-list :deep([class~="el-radio-button"]:first-child [class~="el-radio-button__inner"]) {
-  border-left: 1px solid #d0d7e2;
-  border-radius: 999px;
+  border-left: 1px solid var(--app-border);
+  border-radius: var(--app-radius-xs);
 }
 
 .role-choice-list :deep([class~="el-checkbox-button"][class~="is-checked"] [class~="el-checkbox-button__inner"]),
@@ -587,38 +609,31 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
 .inline-editor-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .action-menu-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 32px;
-  min-width: 72px;
-  border: 0;
-  padding: 0 8px;
-  background: transparent;
-  color: var(--app-primary);
-  cursor: pointer;
   justify-content: center;
-  box-shadow: none;
-  font-weight: 800;
-  font: inherit;
-  line-height: 1;
-  transition: color 0.16s ease;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--app-text-subtle);
+  cursor: pointer;
+  border-radius: var(--app-radius-xs);
+  transition: all 0.15s ease;
 }
 
-.action-menu-trigger:hover,
-.action-menu-trigger:focus {
-  background: transparent;
-  color: var(--app-primary-dark);
-  outline: none;
-  box-shadow: none;
+.action-menu-trigger:hover {
+  background: var(--app-surface-soft);
+  color: var(--app-primary);
 }
 
 .action-menu-trigger:focus-visible {
-  outline: 2px solid rgba(0, 122, 255, 0.3);
+  outline: 2px solid var(--app-primary);
   outline-offset: 2px;
 }
 
@@ -632,30 +647,30 @@ async function handleUserAction(command: UserActionCommand, user: AdminUser) {
 }
 
 :global([class~="admin-inline-popover"]) {
-  border: 1px solid rgba(209, 209, 214, 0.78);
-  border-radius: 14px;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  box-shadow: var(--app-shadow-md);
 }
 
 :global([class~="user-actions-menu"]) {
-  min-width: 132px;
+  min-width: 120px;
 }
 
 :global([class~="user-actions-menu"] [class~="danger-menu-item"]) {
   color: var(--app-danger);
-  font-weight: 800;
+  font-weight: 600;
 }
 
 :global([class~="user-actions-menu"] [class~="danger-menu-item"]:not([class~="is-disabled"]):hover) {
-  background: rgba(255, 59, 48, 0.1);
-  color: #d70015;
+  background: var(--app-danger-soft);
+  color: var(--app-danger);
 }
 
 :global([class~="danger-confirm-button"]) {
   --el-button-bg-color: var(--app-danger);
   --el-button-border-color: var(--app-danger);
-  --el-button-hover-bg-color: #ff6259;
-  --el-button-hover-border-color: #ff6259;
+  --el-button-hover-bg-color: #dc2626;
+  --el-button-hover-border-color: #dc2626;
 }
 
 @media (max-width: 980px) {

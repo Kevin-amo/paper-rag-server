@@ -19,6 +19,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.UUID;
 
+/**
+ * JWT 认证过滤器，从请求头或查询参数中提取令牌，校验有效性后设置安全上下文。
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -77,6 +80,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    /**
+     * 判断令牌是否因密码变更而失效，即令牌签发时间早于密码变更时间。
+     *
+     * @param jwt 解码后的 JWT 对象
+     * @return 令牌因密码变更而失效返回 true，否则返回 false
+     */
     private boolean isTokenRevokedByPasswordChange(Jwt jwt) {
         try {
             String userId = jwt.getClaimAsString("userId");
@@ -90,6 +99,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * 判断令牌是否绑定到当前用户，即令牌中的用户ID与加载的用户主体一致。
+     *
+     * @param jwt 解码后的 JWT 对象
+     * @param userDetails 加载的用户详情
+     * @return 绑定一致返回 true，否则返回 false
+     */
     private boolean isTokenBoundToUser(Jwt jwt, UserDetails userDetails) {
         if (!(userDetails instanceof SecurityUserPrincipal principal)) {
             return false;

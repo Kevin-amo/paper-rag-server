@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  * 面向中文、英文论文常见章节标题的规则解析器。
  */
 @Component
-public class DefaultPaperSectionRuleParser implements PaperSectionRuleParser {
+public class PaperSectionRuleParserImpl implements PaperSectionRuleParser {
 
     private static final int MAX_SECTION_LENGTH = 8000;
     private static final int MAX_HEADING_LENGTH = 120;

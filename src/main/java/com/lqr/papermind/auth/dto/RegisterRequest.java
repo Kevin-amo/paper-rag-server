@@ -4,6 +4,14 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
+/**
+ * 用户注册请求体。
+ *
+ * @param username 用户名
+ * @param password 密码
+ * @param email 邮箱地址
+ * @param emailCode 邮箱验证码（6位数字）
+ */
 public record RegisterRequest(
         @NotBlank(message = "用户名不能为空") String username,
         @NotBlank(message = "密码不能为空") String password,

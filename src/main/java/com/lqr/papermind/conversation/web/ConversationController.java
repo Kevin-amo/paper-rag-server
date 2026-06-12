@@ -29,6 +29,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ConversationController {
 
+    /** 会话领域服务 */
     private final ConversationService conversationService;
 
     /**

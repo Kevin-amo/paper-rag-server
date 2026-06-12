@@ -48,7 +48,7 @@ public record RagProperties(
             similarityThreshold = 0;
         }
         if (rerank == null) {
-            rerank = new RerankProperties(true, "gte-rerank-v2", 5, 3, Duration.ofSeconds(10), "https://dashscope.aliyuncs.com");
+            rerank = new RerankProperties(true, "qwen3-rerank", 5, 3, Duration.ofSeconds(10), "https://dashscope.aliyuncs.com");
         }
     }
 

@@ -27,7 +27,7 @@ import java.util.Set;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DashScopeRerankServiceImpl implements RerankService {
+public class RerankServiceImpl implements RerankService {
 
     private static final String RERANK_PATH = "/api/v1/services/rerank/text-rerank/text-rerank";
 
@@ -44,9 +44,9 @@ public class DashScopeRerankServiceImpl implements RerankService {
      * @param apiKey DashScope API 密钥
      */
     @Autowired
-    public DashScopeRerankServiceImpl(RestClient.Builder restClientBuilder,
-                                      RagProperties ragProperties,
-                                      @Value("${spring.ai.dashscope.api-key:}") String apiKey) {
+    public RerankServiceImpl(RestClient.Builder restClientBuilder,
+                             RagProperties ragProperties,
+                             @Value("${spring.ai.dashscope.api-key:}") String apiKey) {
         this(restClientBuilder, ragProperties, apiKey, true);
     }
 
@@ -61,7 +61,9 @@ public class DashScopeRerankServiceImpl implements RerankService {
     public List<RetrievedChunk> rerank(String question, List<RetrievedChunk> candidates, int topN) {
         RagProperties.RerankProperties rerank = ragProperties.rerank();
         long startNanos = System.nanoTime();
+        // 检查服务是否可用
         String unavailableReason = unavailableReason(question, candidates, topN);
+        // 服务不可用时，返回原候选顺序
         if (unavailableReason != null) {
             log.warn("rerank.fallback enabled={} model={} candidateCount={} topN={} fallbackReason={} costMs={}",
                     rerank.enabled(), rerank.model(), candidates == null ? 0 : candidates.size(), topN, unavailableReason, elapsedMs(startNanos));
@@ -70,6 +72,7 @@ public class DashScopeRerankServiceImpl implements RerankService {
         log.info("rerank.start enabled={} model={} candidateCount={} topN={}",
                 rerank.enabled(), rerank.model(), candidates.size(), topN);
         try {
+            // 调用 DashScope rerank API
             DashScopeRerankResponse response = client(rerank)
                     .post()
                     .uri(RERANK_PATH)
@@ -112,18 +115,23 @@ public class DashScopeRerankServiceImpl implements RerankService {
      * @return 不可用原因字符串，可用时返回 null
      */
     private String unavailableReason(String question, List<RetrievedChunk> candidates, int topN) {
+        // 检查服务是否已启用
         if (!ragProperties.rerank().enabled()) {
             return "DISABLED";
         }
+        // 检查参数是否有效
         if (question == null || question.isBlank()) {
             return "EMPTY_QUESTION";
         }
+        // 检查候选片段列表是否为空
         if (candidates == null || candidates.isEmpty()) {
             return "EMPTY_CANDIDATES";
         }
+        // 检查期望返回数量是否有效
         if (topN <= 0) {
             return "INVALID_TOP_N";
         }
+        // 检查 API 密钥是否有效
         if (apiKey == null || apiKey.isBlank()) {
             return "MISSING_API_KEY";
         }
@@ -149,7 +157,7 @@ public class DashScopeRerankServiceImpl implements RerankService {
     }
 
     /**
-     * 构建 DashScope rerank API 的请求体。
+     * 构建 DashScope rerank API 的请求体（把Java对象转成JSON格式）
      *
      * @param question 用户问题
      * @param candidates 候选片段列表
@@ -186,8 +194,10 @@ public class DashScopeRerankServiceImpl implements RerankService {
             log.warn("rerank.fallback candidateCount={} topN={} fallbackReason=EMPTY_RESPONSE", candidates.size(), topN);
             return candidates;
         }
+        // 过滤出有效结果（索引在候选列表范围内）
         List<DashScopeRerankResult> validResults = response.output().results().stream()
                 .filter(result -> result.index() >= 0 && result.index() < candidates.size())
+                // 按相关度排序（高到低）
                 .sorted(Comparator.comparingDouble(DashScopeRerankResult::relevanceScore).reversed())
                 .limit(Math.min(topN, candidates.size()))
                 .toList();

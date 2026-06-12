@@ -27,6 +27,14 @@ public record LiteratureSearchProperties(
         }
     }
 
+    /**
+     * OpenAlex 文献搜索源配置。
+     *
+     * @param enabled 是否启用 OpenAlex 搜索
+     * @param endpoint OpenAlex API 接口地址
+     * @param timeout 请求超时时间
+     * @param mailto 联系邮箱，用于 OpenAlex polite pool
+     */
     public record OpenAlex(
             Boolean enabled,
             String endpoint,
@@ -64,6 +72,16 @@ public record LiteratureSearchProperties(
         }
     }
 
+    /**
+     * 文献搜索缓存配置。
+     *
+     * @param enabled 是否启用缓存
+     * @param ttl 缓存过期时间
+     * @param lockTtl 缓存重建锁过期时间
+     * @param waitRetryInterval 等待缓存重建的重试间隔
+     * @param waitMaxAttempts 等待缓存重建的最大重试次数
+     * @param ttlJitter 缓存过期时间随机抖动范围
+     */
     public record Cache(
             Boolean enabled,
             Duration ttl,

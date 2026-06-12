@@ -8,7 +8,12 @@ defineProps<{
 
 <template>
   <div class="empty-state" :class="{ compact }">
-    <div class="empty-icon">⌁</div>
+    <div class="empty-icon">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <rect x="6" y="4" width="20" height="24" rx="3" stroke="currentColor" stroke-width="2"/>
+        <path d="M11 11h10M11 15h7M11 19h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
     <strong>{{ title }}</strong>
     <p v-if="description">{{ description }}</p>
     <slot />
@@ -20,45 +25,39 @@ defineProps<{
   display: grid;
   place-items: center;
   gap: 8px;
-  min-height: 220px;
+  min-height: 200px;
   padding: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.76);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.62);
-  box-shadow:
-    0 18px 44px rgba(15, 23, 42, 0.07),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  border: 1px dashed var(--app-border);
+  border-radius: var(--app-radius-md);
   text-align: center;
-  backdrop-filter: blur(18px) saturate(165%);
-  -webkit-backdrop-filter: blur(18px) saturate(165%);
 }
 
 .empty-state.compact {
-  min-height: 120px;
-  padding: 18px;
+  min-height: 100px;
+  padding: 16px;
 }
 
 .empty-icon {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
-  color: var(--app-primary);
-  background: rgba(0, 122, 255, 0.1);
-  font-size: 26px;
-  font-weight: 700;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--app-radius-sm);
+  color: var(--app-text-subtle);
+  background: var(--app-surface-soft);
 }
 
 strong {
   color: var(--app-text);
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 p {
-  max-width: 460px;
+  max-width: 360px;
   margin: 0;
   color: var(--app-text-muted);
-  line-height: 1.7;
+  font-size: 13px;
+  line-height: 1.6;
 }
 </style>
